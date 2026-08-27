@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>index.html</title>
+<title>Biblia de Cocina</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
@@ -272,6 +272,23 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .admin-filters .field{margin-bottom:0; flex:1; min-width:140px;}
 .admin-header{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:6px;}
 .admin-header h2{font-family:'Bebas Neue',sans-serif; font-size:24px; margin:0; letter-spacing:0.5px;}
+.admin-subtabs{display:flex; gap:6px; margin-bottom:18px;}
+.admin-subtabs button{
+  padding:9px 16px; border-radius:7px; border:1px solid var(--border); background:var(--surface);
+  color:var(--text-muted); font-weight:700; font-size:13px; cursor:pointer;
+}
+.admin-subtabs button.active{background:var(--accent); border-color:var(--accent); color:#1C1000;}
+.adminpanel{display:none;}
+.adminpanel.active{display:block;}
+.user-row{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  padding:14px 16px; margin-bottom:8px; border-radius:10px; border:1px solid var(--border); background:var(--surface);
+}
+.user-row .u-main{min-width:0;}
+.user-row .u-name{font-weight:700; font-size:15px; color:var(--text);}
+.user-row .u-email{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); margin-top:2px;}
+.user-row .u-actions{display:flex; align-items:center; gap:8px;}
+.user-row select{width:auto; min-width:130px; padding:8px 30px 8px 10px; font-size:13px;}
 
 /* ===== MODAL ===== */
 .modal-overlay{
@@ -411,19 +428,34 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     </div>
 
     <div id="view-admin" class="view">
-      <div class="admin-header">
-        <h2>Historial completo</h2>
-        <button class="btn btn-ghost btn-small" id="exportCsvBtn">Exportar CSV</button>
+      <div class="admin-subtabs">
+        <button id="adminsub-produccion" class="active">Producción</button>
+        <button id="adminsub-usuarios">Usuarios</button>
       </div>
-      <div class="admin-filters">
-        <div class="field"><label class="field-label">Desde</label><input type="date" id="fDesde"></div>
-        <div class="field"><label class="field-label">Hasta</label><input type="date" id="fHasta"></div>
-        <div class="field"><label class="field-label">Receta</label><input type="text" id="fReceta" placeholder="Nombre o código"></div>
-        <div class="field"><label class="field-label">Responsable</label><input type="text" id="fResponsable" placeholder="Nombre"></div>
-        <button class="btn btn-accent btn-small" id="fApply">Filtrar</button>
+
+      <div id="adminpanel-produccion" class="adminpanel active">
+        <div class="admin-header">
+          <h2>Historial completo</h2>
+          <button class="btn btn-ghost btn-small" id="exportCsvBtn">Exportar CSV</button>
+        </div>
+        <div class="admin-filters">
+          <div class="field"><label class="field-label">Desde</label><input type="date" id="fDesde"></div>
+          <div class="field"><label class="field-label">Hasta</label><input type="date" id="fHasta"></div>
+          <div class="field"><label class="field-label">Receta</label><input type="text" id="fReceta" placeholder="Nombre o código"></div>
+          <div class="field"><label class="field-label">Responsable</label><input type="text" id="fResponsable" placeholder="Nombre"></div>
+          <button class="btn btn-accent btn-small" id="fApply">Filtrar</button>
+        </div>
+        <span class="sub" id="adminCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="adminList" style="margin-top:10px;"></div>
       </div>
-      <span class="sub" id="adminCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
-      <div id="adminList" style="margin-top:10px;"></div>
+
+      <div id="adminpanel-usuarios" class="adminpanel">
+        <div class="admin-header">
+          <h2>Usuarios y permisos</h2>
+        </div>
+        <div class="empty-note" style="margin-bottom:14px;">Cambia el rol de cada persona entre <b>Cocina</b> (solo ver recetas, dejar observaciones, registrar producción) y <b>Admin</b> (además, ve todo el historial, puede anular registros y exportar).</div>
+        <div id="usersList"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -855,6 +887,56 @@ document.getElementById('voidConfirm').addEventListener('click', async ()=>{
   loadAdminHistory();
 });
 
+/* ---------- SUB-PESTAÑAS ADMIN ---------- */
+document.getElementById('adminsub-produccion').addEventListener('click', ()=>switchAdminSub('produccion'));
+document.getElementById('adminsub-usuarios').addEventListener('click', ()=>switchAdminSub('usuarios'));
+function switchAdminSub(name){
+  ['produccion','usuarios'].forEach(n=>{
+    document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
+    document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
+  });
+  if(name==='usuarios') loadUsers();
+}
+
+/* ---------- GESTIÓN DE USUARIOS ---------- */
+async function loadUsers(){
+  const wrap = document.getElementById('usersList');
+  wrap.innerHTML = '<div class="empty-note">Cargando usuarios...</div>';
+  const { data, error } = await supa.from('profiles').select('*').order('created_at', {ascending:true});
+  if(error){ wrap.innerHTML = '<div class="empty-note">No se pudo cargar la lista de usuarios.</div>'; return; }
+  if(!data || data.length===0){ wrap.innerHTML = '<div class="empty-note">Aún no hay usuarios registrados.</div>'; return; }
+  wrap.innerHTML = data.map(u=>`
+    <div class="user-row" data-id="${u.id}">
+      <div class="u-main">
+        <div class="u-name">${escapeHtml(u.name || '(sin nombre)')}</div>
+        <div class="u-email">${escapeHtml(u.email || '')}</div>
+      </div>
+      <div class="u-actions">
+        <select data-role-for="${u.id}">
+          <option value="cocina" ${u.role==='cocina'?'selected':''}>Cocina</option>
+          <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+        </select>
+        <button class="btn btn-accent btn-small" data-save-role="${u.id}">Guardar</button>
+      </div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-save-role]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.saveRole;
+      const select = wrap.querySelector(`[data-role-for="${id}"]`);
+      const newRole = select.value;
+      if(id === session.user.id && newRole !== 'admin'){
+        showToast('No puedes quitarte tu propio rol de admin desde aquí');
+        select.value = 'admin';
+        return;
+      }
+      const { error } = await supa.from('profiles').update({ role: newRole }).eq('id', id);
+      if(error){ showToast('Error al actualizar: ' + error.message); return; }
+      showToast('Rol actualizado');
+    });
+  });
+}
+
 document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
   const rows = adminRows;
   if(rows.length === 0){ showToast('No hay datos para exportar'); return; }
@@ -879,3 +961,12 @@ document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
 </script>
 </body>
 </html>
+
+
+
+
+
+ 
+
+
+  
