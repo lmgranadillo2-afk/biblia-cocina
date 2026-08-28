@@ -289,6 +289,33 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .user-row .u-email{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); margin-top:2px;}
 .user-row .u-actions{display:flex; align-items:center; gap:8px;}
 .user-row select{width:auto; min-width:130px; padding:8px 30px 8px 10px; font-size:13px;}
+.weekly-summary{
+  display:flex; align-items:center; gap:14px; padding:16px; margin-bottom:20px;
+  border-radius:12px; border:1px solid var(--border); background:var(--surface);
+}
+.weekly-summary .ws-num{font-family:'Bebas Neue',sans-serif; font-size:40px; color:var(--accent); line-height:1;}
+.weekly-summary .ws-label{font-size:13px; color:var(--text-muted); line-height:1.4;}
+.dup-warning{
+  background:rgba(232,185,58,0.12); border:1px solid var(--warn); border-radius:9px;
+  padding:12px 14px; margin-bottom:16px; font-size:13px; color:var(--text);
+}
+.dup-warning b{color:var(--warn);}
+.dup-warning ul{margin:8px 0 0; padding-left:18px;}
+.dup-warning label{display:flex; align-items:flex-start; gap:8px; margin-top:10px; font-size:13px; cursor:pointer;}
+.sched-day{
+  border:1px solid var(--border); border-radius:10px; background:var(--surface); margin-bottom:12px; overflow:hidden;
+}
+.sched-day-header{
+  padding:10px 14px; background:var(--surface-2); font-family:'IBM Plex Mono',monospace; font-size:12px;
+  text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); display:flex; justify-content:space-between;
+}
+.sched-item{
+  padding:11px 14px; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+.sched-item .si-main{min-width:0;}
+.sched-item .si-name{font-weight:700; font-size:14px; color:var(--text);}
+.sched-item .si-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+.sched-item .si-notes{font-size:12.5px; color:var(--text-muted); margin-top:3px; font-style:italic;}
 
 /* ===== MODAL ===== */
 .modal-overlay{
@@ -369,6 +396,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     <nav class="tabs">
       <button id="tab-recetario" class="active">Recetario</button>
       <button id="tab-produccion">Producción</button>
+      <button id="tab-cronograma">Cronograma</button>
       <button id="tab-admin" style="display:none">Admin</button>
     </nav>
   </header>
@@ -421,10 +449,50 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button class="btn btn-accent btn-block" id="prodSubmitBtn">Registrar producción</button>
       </div>
       <div class="prod-history">
+        <div id="weeklySummaryBox"></div>
         <h2>Mis producciones</h2>
         <span class="sub" id="prodHistCount"></span>
         <div id="prodHistList"></div>
       </div>
+    </div>
+
+    <div id="view-cronograma" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header">
+        <h2>Cronograma de producción</h2>
+      </div>
+      <div class="admin-filters" style="align-items:flex-end;">
+        <div class="field"><label class="field-label">Semana de</label><input type="date" id="schedWeekStart"></div>
+        <button class="btn btn-ghost btn-small" id="schedPrevWeek">&larr; Semana anterior</button>
+        <button class="btn btn-ghost btn-small" id="schedNextWeek">Semana siguiente &rarr;</button>
+      </div>
+
+      <div class="prod-form" id="schedFormBox" style="display:none; margin-top:16px;">
+        <h2>Agregar al cronograma</h2>
+        <div class="field"><label class="field-label">Fecha</label><input type="date" id="schedFecha"></div>
+        <div class="field">
+          <label class="field-label">Receta</label>
+          <input type="text" id="schedReceta" list="recetaList" placeholder="Escribe para buscar...">
+        </div>
+        <div class="field">
+          <label class="field-label">Cantidad</label>
+          <select id="schedCantidad">
+            <option value="0.5">Media receta (x0.5)</option>
+            <option value="1" selected>Una receta (x1)</option>
+            <option value="1.5">Receta y media (x1.5)</option>
+            <option value="2">Dos recetas (x2)</option>
+            <option value="2.5">Dos recetas y media (x2.5)</option>
+            <option value="3">Tres recetas (x3)</option>
+            <option value="3.5">Tres recetas y media (x3.5)</option>
+            <option value="4">Cuatro recetas (x4)</option>
+            <option value="4.5">Cuatro recetas y media (x4.5)</option>
+            <option value="5">Cinco recetas (x5)</option>
+          </select>
+        </div>
+        <div class="field"><label class="field-label">Notas (opcional)</label><textarea id="schedNotas" placeholder="Ej: para el evento del sábado..."></textarea></div>
+        <button class="btn btn-accent btn-block" id="schedSubmitBtn">Agregar al cronograma</button>
+      </div>
+
+      <div id="schedDays" style="margin-top:18px;"></div>
     </div>
 
     <div id="view-admin" class="view">
@@ -474,6 +542,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div id="cmRealRow" style="display:none"><span>Rinde real</span><b id="cmReal"></b></div>
       <div id="cmObsRow" style="display:none"><span>Observación</span><b id="cmObs"></b></div>
     </div>
+    <div id="dupWarningBox"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cmCancel">Editar</button>
       <button class="btn btn-accent" id="cmConfirm">Confirmar y bloquear</button>
@@ -504,7 +573,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_ZHjOiAmgamvaTcLfluTxxA_tkhOX-Ve";
 
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const RECIPES = [{"code":"SUBC001","name":"ACEITE TRUFADO","ingredients":[{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"500","unit":"GR"},{"code":"ABA018","name":"ARMONIA TARTUFATA INS","qty":"100","unit":"GR"}],"yield_qty":"0.5","yield_unit":"KG"},{"code":"SUBC002","name":"ADEREZO CESAR","ingredients":[{"code":"FRV009","name":"AJO INS","qty":"6","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"200","unit":"GR"},{"code":"ABA101","name":"MAYONESA INS","qty":"500","unit":"GR"},{"code":"ABA111","name":"MOSTAZA INS","qty":"50","unit":"GR"},{"code":"PRO001","name":"ANCHOA INS","qty":"30","unit":"GR"},{"code":"ABA152","name":"SALSA INGLESA INS","qty":"20","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"1","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"3","unit":"GR"},{"code":"LAC017","name":"QUESO PARMESANO CUÑA INS","qty":"50","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"50","unit":"GR"}],"yield_qty":"0.67","yield_unit":"KG"},{"code":"SUBC003","name":"AROS DE QUESO","ingredients":[{"code":"LAC015","name":"QUESO MANCHEGO INS","qty":"25","unit":"GR"},{"code":"LAC019","name":"QUESO PEPPER JACK INS","qty":"26","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC004","name":"ARROZ MEXICANO","ingredients":[{"code":"ABA019","name":"ARROZ  INS","qty":"2000","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"200","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"400","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"800","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"30","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"30","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"60","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"15","unit":"GR"}],"yield_qty":"24","yield_unit":"UN"},{"code":"SUBC005","name":"AZUCAR DE CANELA","ingredients":[{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"500","unit":"GR"},{"code":"ABA032","name":"CANELA EN POLVO INS","qty":"10","unit":"GR"}],"yield_qty":"0.5","yield_unit":"KG"},{"code":"SUBC006","name":"BASE CHEESECAKE","ingredients":[{"code":"ABA159","name":"SULTANA GALLETAS INS","qty":"340","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"180","unit":"GR"},{"code":"LAC020","name":"QUESO PHILADELPHIA INS","qty":"720","unit":"GR"},{"code":"LAC001","name":"AREQUIPE  INS","qty":"250","unit":"GR"},{"code":"ABA070","name":"FECULA INS","qty":"10","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"170","unit":"GR"},{"code":"ABA089","name":"HUEVOS INS","qty":"3","unit":"UN"},{"code":"ABA068","name":"ESENCIA DE VAINILLA INS","qty":"4","unit":"GR"}],"yield_qty":"9","yield_unit":"UN"},{"code":"SUBC007","name":"SALSA BBQ GUAYABA","ingredients":[{"code":"FRV050","name":"GUAYABA INS","qty":"6000","unit":"GR"},{"code":"ABA149","name":"SALSA BBQ INS","qty":"10000","unit":"GR"},{"code":"ABA040","name":"CHILE CHIPOTLE INS","qty":"90","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"500","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"1000","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"150","unit":"GR"},{"code":"ABA153","name":"SALSA SOYA INS","qty":"1200","unit":"GR"}],"yield_qty":"22","yield_unit":"KG"},{"code":"SUBC008","name":"BIZCOCHO DE VAINILLA","ingredients":[{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"150","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"225","unit":"GR"},{"code":"ABA070","name":"FECULA INS","qty":"30","unit":"GR"},{"code":"ABA140","name":"POLVO PARA HORNEAR INS","qty":"12","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"30","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"80","unit":"GR"},{"code":"LAC005","name":"LECHE LIQUIDA ENTERA INS","qty":"125","unit":"GR"},{"code":"ABA068","name":"ESENCIA DE VAINILLA INS","qty":"40","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"3","unit":"GR"},{"code":"ABA089","name":"HUEVOS INS","qty":"6","unit":"UN"}],"yield_qty":"1.2","yield_unit":"KG"},{"code":"SUBC009","name":"CALDO DE BIRRIA","ingredients":[{"code":"ABA145","name":"SAL FINA INS","qty":"100","unit":"GR"},{"code":"ABA042","name":"CHILE GUAJILLO INS","qty":"120","unit":"GR"},{"code":"ABA040","name":"CHILE CHIPOTLE INS","qty":"90","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"3000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"2000","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"1000","unit":"GR"},{"code":"ABA123","name":"PANELA INS","qty":"400","unit":"GR"},{"code":"ABA177","name":"VINO TINTO INS","qty":"800","unit":"GR"},{"code":"ABA037","name":"CERVEZA COCINA INS","qty":"4","unit":"UN"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"ABA052","name":"CLAVOS DE OLOR INS","qty":"6","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"6","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"10","unit":"GR"},{"code":"ABA177","name":"VINO TINTO INS","qty":"2","unit":"UN"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"2","unit":"GR"}],"yield_qty":"18.5","yield_unit":"KG"},{"code":"SUBC010","name":"CAMARON AGUACHILE","ingredients":[{"code":"PRO006","name":"CAMARON INS","qty":"156","unit":"UN"}],"yield_qty":"13","yield_unit":"UN"},{"code":"SUBC011","name":"CAMARON QUINUA","ingredients":[{"code":"ABA141","name":"QUINUA INS","qty":"1000","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"10","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"10","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"30","unit":"GR"},{"code":"PRO006","name":"CAMARON INS","qty":"152","unit":"UN"},{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"300","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"50","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"10","unit":"GR"},{"code":"ABA089","name":"HUEVOS INS","qty":"12","unit":"UN"}],"yield_qty":"19","yield_unit":"UN"},{"code":"SUBC012","name":"CAMARON TACO","ingredients":[{"code":"PRO006","name":"CAMARON INS","qty":"156","unit":"UN"}],"yield_qty":"26","yield_unit":"UN"},{"code":"SUBC013","name":"CARNE AL PASTOR","ingredients":[{"code":"PRO044","name":"PIERNA DE CERDO INS","qty":"20000","unit":"GR"},{"code":"FRV078","name":"NARANJA VALENCIA INS","qty":"3000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"800","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"15","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"20","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"350","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"150","unit":"GR"},{"code":"FRV079","name":"OREGANO FRESCO INS","qty":"50","unit":"GR"},{"code":"ABA046","name":"CHILE PASILLA INS","qty":"150","unit":"GR"},{"code":"SUBC053","name":"PASTA ACHIOTE","qty":"500","unit":"GR"},{"code":"ABA052","name":"CLAVOS DE OLOR INS","qty":"2","unit":"GR"},{"code":"ABA173","name":"VINAGRE BLANCO INS","qty":"500","unit":"GR"}],"yield_qty":"20","yield_unit":"KG"},{"code":"SUBC014","name":"CARNE DE BIRRIA PORCION","ingredients":[{"code":"PRO020","name":"ESPALDILLA INS","qty":"10000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"500","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"500","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"3","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"3","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"15","unit":"GR"}],"yield_qty":"55","yield_unit":"UN"},{"code":"SUBC015","name":"CARNE DE CHIMICHANGA","ingredients":[{"code":"PRO069","name":"COPETE INS","qty":"5000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"200","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"200","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"50","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"5","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"7","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"1500","unit":"GR"},{"code":"ABA123","name":"PANELA INS","qty":"300","unit":"GR"},{"code":"ABA149","name":"SALSA BBQ INS","qty":"2000","unit":"GR"},{"code":"ABA111","name":"MOSTAZA INS","qty":"150","unit":"GR"},{"code":"ABA153","name":"SALSA SOYA INS","qty":"200","unit":"GR"},{"code":"ABA174","name":"VINAGRE DE FRUTAS  INS","qty":"200","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"5","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"50","unit":"GR"}],"yield_qty":"8","yield_unit":"KG"},{"code":"SUBC016","name":"CHIMICHANGAS","ingredients":[{"code":"SUBC015","name":"CARNE DE CHIMICHANGA","qty":"2000","unit":"GR"},{"code":"LAC012","name":"QUESO DOBLE CREMA  INS","qty":"800","unit":"GR"},{"code":"SUBC083","name":"TOCINO COCIDO X 75","qty":"11","unit":"UN"},{"code":"SUBC080","name":"SOUR CREAM","qty":"800","unit":"GR"},{"code":"SUBC043","name":"MERMELADA JALAPEÑO","qty":"800","unit":"GR"},{"code":"SUBC030","name":"GUACAMOLE","qty":"800","unit":"GR"},{"code":"SUBC066","name":"REFRITO","qty":"800","unit":"GR"},{"code":"ABA168","name":"TORTILLA DE HARINA 14 CMS INS","qty":"100","unit":"UN"}],"yield_qty":"100","yield_unit":"UN"},{"code":"SUBC017","name":"PICAÑA DE RES PORCION","ingredients":[{"code":"PRO067","name":"PICAÑA DE RES INS","qty":"350","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC018","name":"CHIPS DE PLATANO","ingredients":[{"code":"FRV094","name":"PLATANO VERDE INS","qty":"4000","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"100","unit":"GR"}],"yield_qty":"22","yield_unit":"UN"},{"code":"SUBC019","name":"CHURROS PORCION","ingredients":[{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"500","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"50","unit":"GR"},{"code":"ABA114","name":"NUEZ MOSCADA EN POLVO INS","qty":"1","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"5","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"100","unit":"GR"}],"yield_qty":"60","yield_unit":"UN"},{"code":"SUBC020","name":"COCHINITA","ingredients":[{"code":"PRO005","name":"BRAZUELO INS","qty":"30000","unit":"GR"},{"code":"FRV004","name":"AJI DULCE INS","qty":"1500","unit":"GR"},{"code":"SUBC053","name":"PASTA ACHIOTE","qty":"480","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"4000","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"300","unit":"GR"},{"code":"FRV079","name":"OREGANO FRESCO INS","qty":"300","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"200","unit":"GR"},{"code":"ABA174","name":"VINAGRE DE FRUTAS  INS","qty":"750","unit":"GR"},{"code":"FRV078","name":"NARANJA VALENCIA INS","qty":"5000","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"200","unit":"GR"},{"code":"FRV054","name":"HOJAS DE BIJAO INS","qty":"125","unit":"GR"},{"code":"ABA032","name":"CANELA EN POLVO INS","qty":"40","unit":"GR"},{"code":"ABA052","name":"CLAVOS DE OLOR INS","qty":"15","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"15","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"350","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"300","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"4000","unit":"GR"}],"yield_qty":"19","yield_unit":"KG"},{"code":"SUBC021","name":"COSTILLA BBQ PORCION","ingredients":[{"code":"PRO013","name":"COSTILLA DE CERDO INS","qty":"30000","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"400","unit":"GR"},{"code":"FRV078","name":"NARANJA VALENCIA INS","qty":"5000","unit":"GR"},{"code":"FRV055","name":"JENGIBRE INS","qty":"180","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"500","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"400","unit":"GR"}],"yield_qty":"40","yield_unit":"UN"},{"code":"SUBC022","name":"ENCURTIDO COL MORADA","ingredients":[{"code":"FRV099","name":"REPOLLO MORADO INS","qty":"5000","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"2000","unit":"GR"},{"code":"ABA052","name":"CLAVOS DE OLOR INS","qty":"15","unit":"GR"},{"code":"ABA148","name":"SAL MARINA INS","qty":"50","unit":"GR"},{"code":"ABA174","name":"VINAGRE DE FRUTAS  INS","qty":"4500","unit":"GR"}],"yield_qty":"3.8","yield_unit":"KG"},{"code":"SUBC023","name":"ESQUITES","ingredients":[{"code":"FRV066","name":"MAIZ DESGRANADO INS","qty":"10000","unit":"GR"},{"code":"FRV080","name":"PAICO INS","qty":"100","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"50","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"200","unit":"GR"}],"yield_qty":"10","yield_unit":"KG"},{"code":"SUBC024","name":"FAJITAS MIXTAS","ingredients":[{"code":"PRO055","name":"SOLOMITO SIN PORCIONAR INS","qty":"800","unit":"GR"},{"code":"PRO042","name":"PECHUGA DE POLLO INS","qty":"800","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"300","unit":"GR"},{"code":"FRV028","name":"CHAMPIÑONES INS","qty":"300","unit":"GR"}],"yield_qty":"10","yield_unit":"UN"},{"code":"SUBC025","name":"FLAUTAS DE POLLO","ingredients":[{"code":"SUBC082","name":"TINGA DE POLLO","qty":"4000","unit":"GR"},{"code":"LAC012","name":"QUESO DOBLE CREMA  INS","qty":"1000","unit":"GR"},{"code":"ABA182","name":"TORTILLA DE MAIZ 13 CM INS","qty":"195","unit":"UN"}],"yield_qty":"195","yield_unit":"UN"},{"code":"SUBC026","name":"FONDO CAZUELA","ingredients":[{"code":"ABA176","name":"VINO BLANCO INS","qty":"2000","unit":"mL"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"400","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"40","unit":"GR"},{"code":"ABA091","name":"LECHE DE COCO INS","qty":"800","unit":"GR"},{"code":"SUBC027","name":"FONDO DE MAR","qty":"1600","unit":"GR"},{"code":"SUBC054","name":"PASTA CHIPOTLE","qty":"20","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"1600","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"100","unit":"GR"}],"yield_qty":"5.5","yield_unit":"KG"},{"code":"SUBC027","name":"FONDO DE MAR","ingredients":[{"code":"ABA034","name":"CASCARA DE LANGOSTINO INS","qty":"2000","unit":"GR"},{"code":"ABA176","name":"VINO BLANCO INS","qty":"2000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"400","unit":"GR"},{"code":"FRV011","name":"APIO INS","qty":"400","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"400","unit":"GR"}],"yield_qty":"9","yield_unit":"KG"},{"code":"SUBC028","name":"FRIJOL COCIDO","ingredients":[{"code":"ABA074","name":"FRIJOL CARAOTA NEGRA INS","qty":"2000","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"10","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"30","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"30","unit":"GR"}],"yield_qty":"5.3","yield_unit":"KG"},{"code":"SUBC029","name":"GARBANZO CROCANTE","ingredients":[{"code":"ABA077","name":"GARBANZOS  INS","qty":"3000","unit":"GR"},{"code":"ABA139","name":"PIMIENTA ROJA INS","qty":"20","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"30","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"20","unit":"GR"}],"yield_qty":"3","yield_unit":"KG"},{"code":"SUBC030","name":"GUACAMOLE","ingredients":[{"code":"FRV001","name":"AGUACATE HASS INS","qty":"20000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"2000","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"4000","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"180","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"120","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"5000","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"180","unit":"GR"}],"yield_qty":"16","yield_unit":"KG"},{"code":"SUBC031","name":"LECHE DE TIGRE","ingredients":[{"code":"FRV063","name":"LIMON TAHITI INS","qty":"4000","unit":"GR"},{"code":"FRV004","name":"AJI DULCE INS","qty":"30","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"10","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"10","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"15","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"1400","unit":"GR"},{"code":"FRV011","name":"APIO INS","qty":"50","unit":"GR"}],"yield_qty":"2.1","yield_unit":"KG"},{"code":"SUBC032","name":"MACETA X UNIDAD","ingredients":[{"code":"SUBC008","name":"BIZCOCHO DE VAINILLA","qty":"90","unit":"GR"},{"code":"SUBC077","name":"SALSA YOGURT Y CHOCOLATE","qty":"150","unit":"GR"},{"code":"SUBC067","name":"ROMPOPE","qty":"80","unit":"GR"},{"code":"FRV048","name":"FRESA INS","qty":"80","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC033","name":"MANI GARRAPIÑADO","ingredients":[{"code":"ABA096","name":"MANI CRUDO INS","qty":"6000","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"4000","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"400","unit":"GR"}],"yield_qty":"7.6","yield_unit":"KG"},{"code":"SUBC034","name":"MANTEQUILLA CHIPOTLE","ingredients":[{"code":"LAC006","name":"MANTEQUILLA INS","qty":"2000","unit":"GR"},{"code":"SUBC054","name":"PASTA CHIPOTLE","qty":"500","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"20","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"20","unit":"GR"}],"yield_qty":"2.5","yield_unit":"KG"},{"code":"SUBC035","name":"MANTEQUILLA MAR Y TIERRA","ingredients":[{"code":"LAC006","name":"MANTEQUILLA INS","qty":"500","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"25","unit":"GR"},{"code":"ABA042","name":"CHILE GUAJILLO INS","qty":"5","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"70","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"10","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"2","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"2","unit":"GR"}],"yield_qty":"0.55","yield_unit":"KG"},{"code":"SUBC036","name":"MANTEQUILLA DE MARISCOS","ingredients":[{"code":"LAC006","name":"MANTEQUILLA INS","qty":"500","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"150","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"2","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"4","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"15","unit":"GR"},{"code":"ABA111","name":"MOSTAZA INS","qty":"70","unit":"GR"},{"code":"FRV079","name":"OREGANO FRESCO INS","qty":"15","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"30","unit":"GR"},{"code":"ABA032","name":"CANELA EN POLVO INS","qty":"2","unit":"GR"},{"code":"ABA177","name":"VINO TINTO INS","qty":"50","unit":"GR"},{"code":"SUBC072","name":"SALSA CHILES","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"7","unit":"GR"}],"yield_qty":"0.7","yield_unit":"KG"},{"code":"SUBC037","name":"PICAÑA DE CERDO PORCION","ingredients":[{"code":"PRO068","name":"PICAÑA DE CERDO INS","qty":"350","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC038","name":"MAYONESA DE CHIPOTLE","ingredients":[{"code":"ABA101","name":"MAYONESA INS","qty":"3000","unit":"GR"},{"code":"SUBC054","name":"PASTA CHIPOTLE","qty":"300","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"20","unit":"GR"}],"yield_qty":"3.3","yield_unit":"KG"},{"code":"SUBC039","name":"MAYONESA TRUFADA","ingredients":[{"code":"ABA101","name":"MAYONESA INS","qty":"500","unit":"GR"},{"code":"ABA018","name":"ARMONIA TARTUFATA INS","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"3","unit":"GR"}],"yield_qty":"0.6","yield_unit":"KG"},{"code":"SUBC040","name":"MAZORCA COCIDA","ingredients":[{"code":"FRV073","name":"MAZORCA DULCE INS","qty":"10000","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"100","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"10","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"300","unit":"GR"}],"yield_qty":"8","yield_unit":"KG"},{"code":"SUBC041","name":"MEDIO POLLO DS","ingredients":[{"code":"PRO045","name":"POLLO ENTERO CRUDO INS","qty":"10","unit":"UN"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"1000","unit":"GR"},{"code":"ABA148","name":"SAL MARINA INS","qty":"500","unit":"GR"},{"code":"ABA061","name":"CORIANDRO INS","qty":"10","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"5","unit":"GR"},{"code":"ABA017","name":"ANIS ESTRELLADO INS","qty":"5","unit":"GR"},{"code":"ABA136","name":"PIMIENTA DE OLOR INS","qty":"5","unit":"GR"},{"code":"ABA137","name":"PIMIENTA NEGRA ENTERA INS","qty":"10","unit":"GR"},{"code":"SUBC072","name":"SALSA CHILES","qty":"400","unit":"GR"},{"code":"ABA123","name":"PANELA INS","qty":"400","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"300","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"1300","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"300","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"60","unit":"GR"},{"code":"FRV079","name":"OREGANO FRESCO INS","qty":"150","unit":"GR"}],"yield_qty":"20","yield_unit":"UN"},{"code":"SUBC042","name":"MERMELADA FLOR DE JAMAICA","ingredients":[{"code":"FRV045","name":"FLOR DE JAMAICA INS","qty":"250","unit":"GR"},{"code":"FRV070","name":"MANZANA VERDE INS","qty":"1500","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"1000","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"300","unit":"GR"}],"yield_qty":"2.9","yield_unit":"KG"},{"code":"SUBC043","name":"MERMELADA JALAPEÑO","ingredients":[{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"3000","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"1000","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"300","unit":"GR"},{"code":"ABA172","name":"VINAGRE BALSAMICO INS","qty":"500","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"50","unit":"GR"}],"yield_qty":"4.5","yield_unit":"KG"},{"code":"SUBC044","name":"MIX CAZUELA","ingredients":[{"code":"PRO006","name":"CAMARON INS","qty":"8","unit":"UN"},{"code":"PRO030","name":"LANGOSTINO INS","qty":"2","unit":"UN"},{"code":"SUBC061","name":"PULPO COCIDO","qty":"40","unit":"GR"},{"code":"PRO066","name":"TUBOS DE CALAMAR INS","qty":"40","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC045","name":"MIX DE MARISCOS ARROZ","ingredients":[{"code":"PRO030","name":"LANGOSTINO INS","qty":"2","unit":"UN"},{"code":"PRO006","name":"CAMARON INS","qty":"6","unit":"UN"},{"code":"PRO066","name":"TUBOS DE CALAMAR INS","qty":"30","unit":"GR"},{"code":"PRO034","name":"MEJILLONES INS","qty":"70","unit":"GR"},{"code":"SUBC061","name":"PULPO COCIDO","qty":"30","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC046","name":"MIX MARISCOS WONTON","ingredients":[{"code":"PRO006","name":"CAMARON INS","qty":"4","unit":"UN"},{"code":"PRO030","name":"LANGOSTINO INS","qty":"2","unit":"UN"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC047","name":"MIX QUESOS FUERTES","ingredients":[{"code":"LAC012","name":"QUESO DOBLE CREMA  INS","qty":"5000","unit":"GR"},{"code":"LAC017","name":"QUESO PARMESANO CUÑA INS","qty":"1000","unit":"GR"},{"code":"LAC009","name":"QUESO CHEDDAR INS","qty":"2500","unit":"GR"}],"yield_qty":"72","yield_unit":"UN"},{"code":"SUBC048","name":"MIX QUESOS TACOS","ingredients":[{"code":"LAC012","name":"QUESO DOBLE CREMA  INS","qty":"5000","unit":"GR"},{"code":"LAC017","name":"QUESO PARMESANO CUÑA INS","qty":"2000","unit":"GR"}],"yield_qty":"78","yield_unit":"UN"},{"code":"SUBC049","name":"MOLE POBLANO","ingredients":[{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"1000","unit":"GR"},{"code":"ABA046","name":"CHILE PASILLA INS","qty":"150","unit":"GR"},{"code":"ABA042","name":"CHILE GUAJILLO INS","qty":"150","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"70","unit":"GR"},{"code":"ABA014","name":"ALMENDRA INS","qty":"150","unit":"GR"},{"code":"ABA027","name":"CACAHUATE INS","qty":"30","unit":"GR"},{"code":"ABA115","name":"NUEZ PECANA INS","qty":"100","unit":"GR"},{"code":"FRV103","name":"SEMILLAS DE CALABAZA INS","qty":"50","unit":"GR"},{"code":"ABA010","name":"AJONJOLI MIX INS","qty":"25","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"200","unit":"GR"},{"code":"FRV111","name":"TOMATE RIÑON INS","qty":"250","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"250","unit":"GR"},{"code":"FRV093","name":"PLATANO MADURO INS","qty":"350","unit":"GR"},{"code":"ABA171","name":"UVAS PASAS INS","qty":"135","unit":"GR"},{"code":"ABA052","name":"CLAVOS DE OLOR INS","qty":"5","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"5","unit":"GR"},{"code":"ABA136","name":"PIMIENTA DE OLOR INS","qty":"5","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"5","unit":"GR"},{"code":"ABA032","name":"CANELA EN POLVO INS","qty":"5","unit":"GR"},{"code":"ABA017","name":"ANIS ESTRELLADO INS","qty":"3","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"5","unit":"GR"},{"code":"ABA116","name":"OREGANO EN ESCAMAS INS","qty":"5","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"80","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"100","unit":"GR"},{"code":"ABA168","name":"TORTILLA DE HARINA 14 CMS INS","qty":"5","unit":"UN"},{"code":"ABA050","name":"CHOCOLATE DE MESA INS","qty":"270","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"250","unit":"GR"}],"yield_qty":"4.7","yield_unit":"KG"},{"code":"SUBC050","name":"MORRILLO COCIDO PORCION","ingredients":[{"code":"PRO035","name":"MORRILLO INS","qty":"10000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"500","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"500","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"3","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"3","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"15","unit":"GR"}],"yield_qty":"40","yield_unit":"UN"},{"code":"SUBC051","name":"OSOBUCO COCIDO","ingredients":[{"code":"PRO038","name":"OSOBUCO INS","qty":"25","unit":"UN"},{"code":"ABA148","name":"SAL MARINA INS","qty":"900","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"450","unit":"GR"},{"code":"BAR065","name":"HIELO COMUN INS","qty":"2","unit":"GR"},{"code":"ABA017","name":"ANIS ESTRELLADO INS","qty":"7","unit":"GR"},{"code":"ABA061","name":"CORIANDRO INS","qty":"7","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"5","unit":"GR"},{"code":"ABA136","name":"PIMIENTA DE OLOR INS","qty":"5","unit":"GR"},{"code":"ABA042","name":"CHILE GUAJILLO INS","qty":"35","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"50","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"1","unit":"GR"},{"code":"ABA116","name":"OREGANO EN ESCAMAS INS","qty":"150","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"15","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"75","unit":"GR"},{"code":"ABA174","name":"VINAGRE DE FRUTAS  INS","qty":"300","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"5","unit":"GR"},{"code":"FRV078","name":"NARANJA VALENCIA INS","qty":"600","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"300","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"75","unit":"GR"}],"yield_qty":"25","yield_unit":"UN"},{"code":"SUBC052","name":"PAPA CRIOLLA COCIDA","ingredients":[{"code":"FRV082","name":"PAPA CRIOLLA BALIN INS","qty":"4000","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"20","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"10","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"50","unit":"GR"}],"yield_qty":"24","yield_unit":"UN"},{"code":"SUBC053","name":"PASTA ACHIOTE","ingredients":[{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"2000","unit":"GR"},{"code":"ABA007","name":"ACHIOTE EN GRANO INS","qty":"1000","unit":"GR"}],"yield_qty":"2.8","yield_unit":"KG"},{"code":"SUBC054","name":"PASTA CHIPOTLE","ingredients":[{"code":"ABA040","name":"CHILE CHIPOTLE INS","qty":"500","unit":"GR"}],"yield_qty":"3","yield_unit":"KG"},{"code":"SUBC055","name":"PASTA DE AJO","ingredients":[{"code":"FRV009","name":"AJO INS","qty":"500","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"1000","unit":"GR"}],"yield_qty":"1.4","yield_unit":"KG"},{"code":"SUBC056","name":"PICO DE GALLO","ingredients":[{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"2000","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"4000","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"300","unit":"GR"}],"yield_qty":"4","yield_unit":"KG"},{"code":"SUBC057","name":"POLLO APANADO","ingredients":[{"code":"PRO031","name":"LOMITO DE POLLO INS X GR","qty":"2000","unit":"GR"},{"code":"ABA036","name":"CEREAL SIN AZUCAR INS","qty":"1200","unit":"GR"},{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"500","unit":"GR"},{"code":"ABA089","name":"HUEVOS INS","qty":"12","unit":"UN"},{"code":"ABA145","name":"SAL FINA INS","qty":"25","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"3","unit":"GR"},{"code":"SUBC055","name":"PASTA DE AJO","qty":"20","unit":"GR"}],"yield_qty":"60","yield_unit":"UN"},{"code":"SUBC058","name":"POLLO ENSALADA CESAR","ingredients":[{"code":"PRO042","name":"PECHUGA DE POLLO INS","qty":"20","unit":"UN"},{"code":"LAC023","name":"SALSA CHILES","qty":"200","unit":"GR"},{"code":"FRV053","name":"PANELA INS","qty":"200","unit":"GR"},{"code":"SUBC055","name":"PAPRIKA INS","qty":"100","unit":"GR"},{"code":"FRV063","name":"ACEITE DE OLIVA INS","qty":"500","unit":"GR"}],"yield_qty":"20","yield_unit":"UN"},{"code":"SUBC059","name":"PORCION SOBREBARRIGA X 100","ingredients":[{"code":"PRO069","name":"COPETE INS","qty":"10000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"500","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"500","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"3","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"3","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"15","unit":"GR"}],"yield_qty":"50","yield_unit":"UN"},{"code":"SUBC060","name":"PROVENZAL","ingredients":[{"code":"FRV089","name":"PEREJIL LISO INS","qty":"2000","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"400","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"700","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"6500","unit":"GR"}],"yield_qty":"8","yield_unit":"KG"},{"code":"SUBC061","name":"PULPO COCIDO","ingredients":[{"code":"PRO046","name":"PULPO  MEXICANO INS","qty":"20000","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"1200","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"10","unit":"GR"},{"code":"ABA148","name":"SAL MARINA INS","qty":"1000","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"20","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"600","unit":"GR"},{"code":"FRV117","name":"ZANAHORIA INS","qty":"600","unit":"GR"},{"code":"FRV011","name":"APIO INS","qty":"600","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"100","unit":"GR"},{"code":"ABA177","name":"VINO TINTO INS","qty":"1000","unit":"mL"}],"yield_qty":"8.5","yield_unit":"KG"},{"code":"SUBC062","name":"PURE DE AGUACATE","ingredients":[{"code":"FRV001","name":"AGUACATE HASS INS","qty":"1800","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"8","unit":"GR"},{"code":"LAC011","name":"QUESO CREMA INS","qty":"50","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"150","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"400","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"10","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"20","unit":"GR"}],"yield_qty":"1.3","yield_unit":"KG"},{"code":"SUBC063","name":"PURE DE PAPA","ingredients":[{"code":"FRV084","name":"PAPA NEVADA INS","qty":"8000","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"650","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"60","unit":"GR"}],"yield_qty":"33","yield_unit":"UN"},{"code":"SUBC064","name":"PURE DE PLATANO","ingredients":[{"code":"FRV093","name":"PLATANO MADURO INS","qty":"5000","unit":"GR"},{"code":"SUBC054","name":"PASTA CHIPOTLE","qty":"250","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"2500","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"20","unit":"GR"}],"yield_qty":"5","yield_unit":"KG"},{"code":"SUBC065","name":"PULPO ASADOR","ingredients":[{"code":"SUBC061","name":"PULPO COCIDO","qty":"150","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC066","name":"REFRITO","ingredients":[{"code":"ABA074","name":"FRIJOL CARAOTA NEGRA INS","qty":"2000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"1000","unit":"GR"},{"code":"ABA046","name":"CHILE PASILLA INS","qty":"100","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"300","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"5","unit":"GR"},{"code":"FRV057","name":"LAUREL INS","qty":"5","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"50","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"30","unit":"GR"}],"yield_qty":"9","yield_unit":"KG"},{"code":"SUBC067","name":"ROMPOPE","ingredients":[{"code":"LAC005","name":"LECHE LIQUIDA ENTERA INS","qty":"500","unit":"GR"},{"code":"ABA089","name":"HUEVOS INS","qty":"3","unit":"UN"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"120","unit":"GR"},{"code":"ABA068","name":"ESENCIA DE VAINILLA INS","qty":"20","unit":"GR"},{"code":"ABA142","name":"RON COCINA INS","qty":"90","unit":"mL"},{"code":"ABA032","name":"CANELA EN POLVO INS","qty":"1","unit":"GR"},{"code":"ABA114","name":"NUEZ MOSCADA EN POLVO INS","qty":"1","unit":"GR"}],"yield_qty":"0.6","yield_unit":"KG"},{"code":"SUBC068","name":"SAL PAPRIKA","ingredients":[{"code":"ABA145","name":"SAL FINA INS","qty":"500","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"50","unit":"GR"},{"code":"ABA009","name":"AJO EN POLVO INS","qty":"50","unit":"GR"}],"yield_qty":"0.56","yield_unit":"KG"},{"code":"SUBC069","name":"SALMON X 200","ingredients":[{"code":"PRO052","name":"SALMON FRESCO INS","qty":"10000","unit":"GR"}],"yield_qty":"40","yield_unit":"UN"},{"code":"SUBC070","name":"SALSA AREQUIPE","ingredients":[{"code":"LAC001","name":"AREQUIPE  INS","qty":"4000","unit":"GR"}],"yield_qty":"5.4","yield_unit":"KG"},{"code":"SUBC071","name":"SALSA CHEDDAR","ingredients":[{"code":"ABA150","name":"SALSA CHEDDAR EN LATA INS","qty":"9000","unit":"GR"},{"code":"SUBC073","name":"SALSA DOS SANTOS","qty":"750","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"4500","unit":"GR"},{"code":"ABA128","name":"PAPRIKA INS","qty":"75","unit":"GR"},{"code":"ABA009","name":"AJO EN POLVO INS","qty":"75","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"50","unit":"GR"}],"yield_qty":"14.2","yield_unit":"KG"},{"code":"SUBC072","name":"SALSA CHILES","ingredients":[{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"8000","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"3500","unit":"GR"},{"code":"ABA046","name":"CHILE PASILLA INS","qty":"600","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"800","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"300","unit":"GR"},{"code":"ABA029","name":"CALDO MAGGI INS","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"100","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"100","unit":"GR"}],"yield_qty":"9.5","yield_unit":"KG"},{"code":"SUBC073","name":"SALSA DOS SANTOS","ingredients":[{"code":"FRV090","name":"PIMENTON ROJO INS","qty":"20000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"4000","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"200","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"200","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"2500","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"300","unit":"GR"}],"yield_qty":"15","yield_unit":"KG"},{"code":"SUBC074","name":"SALSA HABANERO PIÑA","ingredients":[{"code":"FRV005","name":"AJI HABANERO INS","qty":"3000","unit":"GR"},{"code":"FRV008","name":"AJI ROCOTO INS","qty":"3000","unit":"GR"},{"code":"FRV092","name":"PIÑA ORO MIEL INS","qty":"4000","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"2000","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"30","unit":"GR"},{"code":"ABA168","name":"TORTILLA DE HARINA 14 CMS INS","qty":"10","unit":"UN"},{"code":"ABA081","name":"GOMA XANTANA INS","qty":"10","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"30","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"100","unit":"GR"}],"yield_qty":"7.1","yield_unit":"KG"},{"code":"SUBC075","name":"SALSA ROJA","ingredients":[{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"6000","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"1500","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"1500","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"200","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"800","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"40","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"100","unit":"GR"},{"code":"ABA029","name":"CALDO MAGGI INS","qty":"100","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"300","unit":"GR"}],"yield_qty":"8.2","yield_unit":"KG"},{"code":"SUBC076","name":"SALSA TOMATILLO","ingredients":[{"code":"FRV113","name":"TOMATILLO VERDE INS","qty":"5000","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"300","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"30","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"1000","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"200","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"300","unit":"GR"},{"code":"ABA059","name":"COMINO EN POLVO INS","qty":"1","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"10","unit":"GR"}],"yield_qty":"3.8","yield_unit":"KG"},{"code":"SUBC077","name":"SALSA YOGURT Y CHOCOLATE","ingredients":[{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"500","unit":"GR"},{"code":"ABA054","name":"COBERTURA DE CHOCOLATE BLANCO INS","qty":"250","unit":"GR"},{"code":"LAC023","name":"YOGUR GRIEGO INS","qty":"125","unit":"GR"}],"yield_qty":"0.55","yield_unit":"KG"},{"code":"SUBC078","name":"SOLOMITO 150","ingredients":[{"code":"PRO055","name":"SOLOMITO SIN PORCIONAR INS","qty":"5000","unit":"GR"}],"yield_qty":"30","yield_unit":"UN"},{"code":"SUBC079","name":"SOLOMITO QUESADILLA 90","ingredients":[{"code":"PRO055","name":"SOLOMITO SIN PORCIONAR INS","qty":"4000","unit":"GR"}],"yield_qty":"36","yield_unit":"UN"},{"code":"SUBC080","name":"SOUR CREAM","ingredients":[{"code":"LAC011","name":"QUESO CREMA INS","qty":"16000","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"2000","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"260","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"600","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"1500","unit":"GR"}],"yield_qty":"18.7","yield_unit":"KG"},{"code":"SUBC081","name":"TIERRA CHOCOLATE","ingredients":[{"code":"ABA057","name":"COCOA EN POLVO INS","qty":"50","unit":"GR"},{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"50","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"100","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"60","unit":"GR"}],"yield_qty":"0.2","yield_unit":"KG"},{"code":"SUBC082","name":"TINGA DE POLLO","ingredients":[{"code":"PRO042","name":"PECHUGA DE POLLO INS","qty":"20000","unit":"GR"},{"code":"FRV114","name":"TOMILLO INS","qty":"10","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"700","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"50","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"7","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"100","unit":"GR"},{"code":"ABA116","name":"OREGANO EN ESCAMAS INS","qty":"100","unit":"GR"},{"code":"FRV107","name":"TOMATE CHONTO INS","qty":"8000","unit":"GR"},{"code":"ABA040","name":"CHILE CHIPOTLE INS","qty":"100","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"150","unit":"GR"},{"code":"FRV019","name":"CEBOLLA CABEZONA INS","qty":"2000","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"100","unit":"GR"},{"code":"ABA029","name":"CALDO MAGGI INS","qty":"150","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"1500","unit":"GR"}],"yield_qty":"20","yield_unit":"KG"},{"code":"SUBC083","name":"TOCINO COCIDO X 75","ingredients":[{"code":"PRO064","name":"TOCINO BARRIGUERO INS","qty":"20000","unit":"GR"},{"code":"ABA153","name":"SALSA SOYA INS","qty":"300","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"40","unit":"GR"},{"code":"FRV055","name":"JENGIBRE INS","qty":"40","unit":"GR"},{"code":"ABA148","name":"SAL MARINA INS","qty":"4000","unit":"GR"}],"yield_qty":"185","yield_unit":"UN"},{"code":"SUBC084","name":"TOMATINA","ingredients":[{"code":"FRV111","name":"TOMATE RIÑON INS","qty":"350","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"20","unit":"GR"},{"code":"FRV006","name":"AJI JALAPEÑO INS","qty":"30","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"3","unit":"GR"},{"code":"ABA138","name":"PIMIENTA NEGRA MOLIDA INS","qty":"1","unit":"GR"}],"yield_qty":"0.15","yield_unit":"KG"},{"code":"SUBC085","name":"VEGETALES","ingredients":[{"code":"FRV119","name":"ZAPALLO INS","qty":"800","unit":"GR"},{"code":"FRV121","name":"ZUQUINI VERDE INS","qty":"1000","unit":"GR"},{"code":"FRV120","name":"ZUQUINI AMARILLO INS","qty":"1000","unit":"GR"},{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"800","unit":"GR"}],"yield_qty":"15","yield_unit":"UN"},{"code":"SUBC086","name":"VINAGRETA CLASICA","ingredients":[{"code":"ABA173","name":"VINAGRE BLANCO INS","qty":"1200","unit":"GR"},{"code":"ABA111","name":"MOSTAZA INS","qty":"1000","unit":"GR"},{"code":"ABA156","name":"SEMILLAS DE CHIA INS","qty":"250","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"50","unit":"GR"},{"code":"ABA003","name":"ACEITE DE GIRASOL INS","qty":"1600","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"1000","unit":"GR"},{"code":"ABA105","name":"MIEL DE ABEJAS INS","qty":"1400","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"20","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"800","unit":"GR"}],"yield_qty":"7.2","yield_unit":"KG"},{"code":"SUBC087","name":"DISPONIBLE","ingredients":[],"yield_qty":"","yield_unit":""},{"code":"SUBC088","name":"CREMA MASCARPONE","ingredients":[{"code":"LAC016","name":"QUESO MASCARPONE INS","qty":"200","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"400","unit":"GR"},{"code":"ABA024","name":"AZUCAR PULVERIZADA INS","qty":"80","unit":"GR"},{"code":"ABA068","name":"ESENCIA DE VAINILLA INS","qty":"4","unit":"GR"},{"code":"ABA054","name":"COBERTURA DE CHOCOLATE BLANCO INS","qty":"50","unit":"GR"}],"yield_qty":"0.6","yield_unit":"KG"},{"code":"SUBC089","name":"CRUMBLE DE ALMENDRAS","ingredients":[{"code":"ABA015","name":"ALMENDRAS LAMINADAS INS","qty":"200","unit":"GR"},{"code":"ABA085","name":"HARINA DE TRIGO INS","qty":"120","unit":"GR"},{"code":"ABA022","name":"AZUCAR BLANCA INS","qty":"100","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"140","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"2","unit":"GR"}],"yield_qty":"0.55","yield_unit":"KG"},{"code":"SUBC090","name":"FAJITA DE COSTILLA PORCION","ingredients":[],"yield_qty":"","yield_unit":""},{"code":"SUBC091","name":"SALSA BEURRE BLANC","ingredients":[{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"40","unit":"GR"},{"code":"ABA176","name":"VINO BLANCO INS","qty":"250","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"160","unit":"GR"},{"code":"LAC006","name":"MANTEQUILLA INS","qty":"320","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"80","unit":"GR"}],"yield_qty":"0.5","yield_unit":"KG"},{"code":"SUBC092","name":"MANTEQUILLA DE CHILES","ingredients":[{"code":"LAC006","name":"MANTEQUILLA INS","qty":"250","unit":"GR"},{"code":"SUBC072","name":"SALSA CHILES","qty":"100","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"7","unit":"GR"}],"yield_qty":"0.35","yield_unit":"KG"},{"code":"SUBC093","name":"POLVO DE MAIZ","ingredients":[{"code":"ABA095","name":"MAIZ SOPLADO INS","qty":"200","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"4","unit":"GR"},{"code":"ABA161","name":"TAJIN COCINA  INS","qty":"10","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"},{"code":"SUBC094","name":"PICADILLO DE MANGO Y SERRANO","ingredients":[{"code":"FRV021","name":"CEBOLLA MORADA INS","qty":"40","unit":"GR"},{"code":"FRV068","name":"MANGO TOMMY INS","qty":"500","unit":"GR"},{"code":"ABA047","name":"CHILE SERRANO INS","qty":"7","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"5","unit":"GR"},{"code":"ABA145","name":"SAL FINA INS","qty":"3","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"20","unit":"GR"},{"code":"ABA004","name":"ACEITE DE OLIVA INS","qty":"10","unit":"GR"}],"yield_qty":"0.35","yield_unit":"KG"},{"code":"SUBC095","name":"SALSA ENTRECOTE","ingredients":[{"code":"ABA101","name":"MAYONESA INS","qty":"500","unit":"GR"},{"code":"ABA011","name":"ALCAPARRAS INS","qty":"50","unit":"GR"},{"code":"FRV009","name":"AJO INS","qty":"10","unit":"GR"},{"code":"ABA111","name":"MOSTAZA INS","qty":"70","unit":"GR"},{"code":"ABA152","name":"SALSA INGLESA INS","qty":"30","unit":"GR"},{"code":"FRV024","name":"CEBOLLIN INS","qty":"20","unit":"GR"},{"code":"FRV089","name":"PEREJIL LISO INS","qty":"10","unit":"GR"},{"code":"FRV032","name":"CILANTRO INS","qty":"10","unit":"GR"},{"code":"LAC002","name":"CREMA DE LECHE  INS","qty":"100","unit":"GR"},{"code":"FRV063","name":"LIMON TAHITI INS","qty":"200","unit":"GR"}],"yield_qty":"0.75","yield_unit":"KG"},{"code":"SUBC096","name":"PASTOR X 8","ingredients":[{"code":"SUBC013","name":"CARNE AL PASTOR","qty":"400","unit":"GR"}],"yield_qty":"1","yield_unit":"UN"}];
+let RECIPES = [];
 const CANTIDAD_LABELS = {
   "0.5":"Media receta", "1":"Una receta", "1.5":"Receta y media",
   "2":"Dos recetas", "2.5":"Dos recetas y media", "3":"Tres recetas",
@@ -599,6 +668,7 @@ async function onLoggedIn(sess){
   roleBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? 'block' : 'none';
+  document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   initApp();
 }
 
@@ -611,22 +681,42 @@ async function onLoggedIn(sess){
 /* ---------- TABS ---------- */
 document.getElementById('tab-recetario').addEventListener('click', ()=>switchTab('recetario'));
 document.getElementById('tab-produccion').addEventListener('click', ()=>switchTab('produccion'));
+document.getElementById('tab-cronograma').addEventListener('click', ()=>switchTab('cronograma'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 function switchTab(name){
-  ['recetario','produccion','admin'].forEach(n=>{
+  ['recetario','produccion','cronograma','admin'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
   if(name==='admin') loadAdminHistory();
+  if(name==='cronograma') loadSchedule();
 }
 
 /* ---------- INIT ---------- */
-function initApp(){
+async function initApp(){
+  document.getElementById('recItems').innerHTML = '<div class="empty-note">Cargando recetario...</div>';
+  await loadRecipes();
   renderRecipeList();
   populateRecetaDatalist();
   loadMyProductions();
   const iso = new Date().toISOString().slice(0,10);
   document.getElementById('prodFecha').value = iso;
+}
+
+async function loadRecipes(){
+  const { data, error } = await supa.from('recipes').select('*').order('code', {ascending:true});
+  if(error){
+    RECIPES = [];
+    showToast('No se pudo cargar el recetario: ' + error.message);
+    return;
+  }
+  RECIPES = (data || []).map(r => ({
+    code: r.code,
+    name: r.name,
+    ingredients: r.ingredients || [],
+    yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
+    yield_unit: r.yield_unit || ''
+  }));
 }
 
 /* ---------- RECETARIO ---------- */
@@ -732,7 +822,7 @@ document.getElementById('prodCantidad').addEventListener('change', updateExpecte
 
 let pendingEntry = null;
 
-document.getElementById('prodSubmitBtn').addEventListener('click', ()=>{
+document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('prodFecha').value;
   const recetaName = document.getElementById('prodReceta').value.trim();
   const cantidadMult = document.getElementById('prodCantidad').value;
@@ -765,6 +855,28 @@ document.getElementById('prodSubmitBtn').addEventListener('click', ()=>{
   const obsRow = document.getElementById('cmObsRow');
   if(obs){ document.getElementById('cmObs').textContent = obs; obsRow.style.display='flex'; } else { obsRow.style.display='none'; }
 
+  const dupBox = document.getElementById('dupWarningBox');
+  const confirmBtn = document.getElementById('cmConfirm');
+  dupBox.innerHTML = '';
+  confirmBtn.disabled = false;
+
+  const { data: dups, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha });
+  if(!dupErr && dups && dups.length > 0){
+    const items = dups.map(d => {
+      const hora = new Date(d.created_at).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+      return `<li>${escapeHtml(d.responsable)} · ${escapeHtml(d.cantidad_label)} · ${hora}</li>`;
+    }).join('');
+    dupBox.innerHTML = `<div class="dup-warning">
+      <b>⚠ Esta receta ya se registró hoy (${dups.length} vez/veces):</b>
+      <ul>${items}</ul>
+      <label><input type="checkbox" id="dupOverride"> Sí, ya lo sé, quiero registrarla de todas formas</label>
+    </div>`;
+    confirmBtn.disabled = true;
+    document.getElementById('dupOverride').addEventListener('change', (e)=>{
+      confirmBtn.disabled = !e.target.checked;
+    });
+  }
+
   document.getElementById('confirmModal').classList.add('open');
 });
 
@@ -793,6 +905,33 @@ async function loadMyProductions(){
   const { data, error } = await supa.from('productions').select('*').order('created_at', {ascending:false}).limit(50);
   myProductions = error ? [] : data;
   renderProdHistory(myProductions, document.getElementById('prodHistList'), document.getElementById('prodHistCount'), false);
+  renderWeeklySummary();
+}
+
+function getWeekRange(d){
+  const date = new Date(d);
+  const day = date.getDay(); // 0=domingo
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  monday.setHours(0,0,0,0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { monday, sunday };
+}
+function toISODate(d){ return d.toISOString().slice(0,10); }
+
+function renderWeeklySummary(){
+  const { monday, sunday } = getWeekRange(new Date());
+  const mIso = toISODate(monday), sIso = toISODate(sunday);
+  const count = myProductions.filter(p => p.status==='activo' && p.fecha >= mIso && p.fecha <= sIso).length;
+  const box = document.getElementById('weeklySummaryBox');
+  if(!box) return;
+  const rango = `${monday.toLocaleDateString('es-CO',{day:'numeric',month:'short'})} – ${sunday.toLocaleDateString('es-CO',{day:'numeric',month:'short'})}`;
+  box.innerHTML = `<div class="weekly-summary">
+    <div class="ws-num">${count}</div>
+    <div class="ws-label">producción${count===1?'':'es'} registrada${count===1?'':'s'} esta semana<br>(${rango})</div>
+  </div>`;
 }
 
 function prodEntryHtml(p, isAdmin){
@@ -958,15 +1097,101 @@ document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 });
+
+/* ---------- CRONOGRAMA ---------- */
+let schedWeekStartDate = getWeekRange(new Date()).monday;
+document.getElementById('schedWeekStart').value = toISODate(schedWeekStartDate);
+
+document.getElementById('schedWeekStart').addEventListener('change', (e)=>{
+  schedWeekStartDate = getWeekRange(new Date(e.target.value + 'T00:00:00')).monday;
+  document.getElementById('schedWeekStart').value = toISODate(schedWeekStartDate);
+  loadSchedule();
+});
+document.getElementById('schedPrevWeek').addEventListener('click', ()=>{
+  const d = new Date(schedWeekStartDate); d.setDate(d.getDate() - 7);
+  schedWeekStartDate = d;
+  document.getElementById('schedWeekStart').value = toISODate(d);
+  loadSchedule();
+});
+document.getElementById('schedNextWeek').addEventListener('click', ()=>{
+  const d = new Date(schedWeekStartDate); d.setDate(d.getDate() + 7);
+  schedWeekStartDate = d;
+  document.getElementById('schedWeekStart').value = toISODate(d);
+  loadSchedule();
+});
+
+const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+async function loadSchedule(){
+  document.getElementById('schedFormBox').style.display = 'block';
+  if(document.getElementById('schedFecha').value === ''){
+    document.getElementById('schedFecha').value = toISODate(schedWeekStartDate);
+  }
+  const monday = new Date(schedWeekStartDate);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  const mIso = toISODate(monday), sIso = toISODate(sunday);
+
+  const { data, error } = await supa.from('schedule_items').select('*').gte('fecha', mIso).lte('fecha', sIso).order('fecha', {ascending:true});
+  const items = error ? [] : (data || []);
+
+  const box = document.getElementById('schedDays');
+  const isAdmin = profile && profile.role === 'admin';
+  let html = '';
+  for(let i=0;i<7;i++){
+    const d = new Date(monday); d.setDate(monday.getDate()+i);
+    const dIso = toISODate(d);
+    const dayItems = items.filter(it => it.fecha === dIso);
+    const label = `${DIAS_SEMANA[i]} · ${d.toLocaleDateString('es-CO',{day:'numeric',month:'short'})}`;
+    html += `<div class="sched-day"><div class="sched-day-header"><span>${label}</span><span>${dayItems.length} planeada${dayItems.length===1?'':'s'}</span></div>`;
+    if(dayItems.length === 0){
+      html += `<div class="sched-item"><div class="si-main"><div class="si-meta" style="font-style:italic;">Nada planeado</div></div></div>`;
+    } else {
+      dayItems.forEach(it=>{
+        html += `<div class="sched-item">
+          <div class="si-main">
+            <div class="si-name">${escapeHtml(it.recipe_name)}</div>
+            <div class="si-meta">${escapeHtml(it.cantidad_label)}</div>
+            ${it.notas ? `<div class="si-notes">${escapeHtml(it.notas)}</div>` : ''}
+          </div>
+          ${(isAdmin || it.created_by === session.user.id) ? `<button class="btn btn-ghost btn-small" data-del-sched="${it.id}">Quitar</button>` : ''}
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  }
+  box.innerHTML = html;
+
+  box.querySelectorAll('[data-del-sched]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const { error } = await supa.from('schedule_items').delete().eq('id', btn.dataset.delSched);
+      if(error){ showToast('Error al quitar: ' + error.message); return; }
+      loadSchedule();
+    });
+  });
+}
+
+document.getElementById('schedSubmitBtn').addEventListener('click', async ()=>{
+  const fecha = document.getElementById('schedFecha').value;
+  const recetaName = document.getElementById('schedReceta').value.trim();
+  const cantidadMult = document.getElementById('schedCantidad').value;
+  const notas = document.getElementById('schedNotas').value.trim();
+
+  if(!fecha || !recetaName){ showToast('Completa la fecha y la receta'); return; }
+  const match = findRecetaByName(recetaName);
+  if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
+
+  const { error } = await supa.from('schedule_items').insert({
+    fecha, recipe_code: match.code, recipe_name: match.name,
+    cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
+    notas: notas || null, created_by: session.user.id
+  });
+  if(error){ showToast('Error al agregar: ' + error.message); return; }
+  showToast('Agregado al cronograma');
+  document.getElementById('schedReceta').value = '';
+  document.getElementById('schedNotas').value = '';
+  document.getElementById('schedCantidad').value = '1';
+  loadSchedule();
+});
 </script>
 </body>
 </html>
-
-
-
-
-
- 
-
-
-  
