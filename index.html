@@ -379,6 +379,8 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .kanban-card .kc-title{font-weight:700; font-size:13.5px; color:var(--text); margin-bottom:3px;}
 .kanban-card .kc-meta{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-muted); line-height:1.5;}
 .kanban-card .kc-items{font-size:12px; color:var(--text-dim); margin-top:6px; padding-top:6px; border-top:1px dashed var(--border);}
+.kanban-card .kc-actions{margin-top:8px;}
+.kanban-card .kc-actions button{width:100%;}
 .kanban-empty{font-size:12px; color:var(--text-dim); text-align:center; padding:20px 8px;}
 @media(max-width:800px){ .kanban-board{grid-template-columns:1fr;} }
 
@@ -596,7 +598,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <h2>Pedidos de insumos</h2>
         <button class="btn btn-accent btn-small" id="orderOpenNew">+ Nuevo pedido</button>
       </div>
-      <div class="empty-note" style="margin-bottom:14px;">Pide insumos a proveedor (no incluye subrecetas, esas se hacen en el punto). Un admin revisa, corrige si hace falta, y aprueba o rechaza.</div>
+      <div class="empty-note" style="margin-bottom:14px;">Pide insumos a proveedor (no incluye subrecetas, esas se hacen en el punto). Se ve la semana actual — toca un pedido pendiente tuyo para editarlo.</div>
       <div class="kanban-board" id="orderKanban"></div>
     </div>
 
@@ -666,8 +668,36 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       </div>
 
       <div id="adminpanel-pedidos" class="adminpanel">
-        <div class="admin-header"><h2>Pedidos del punto</h2></div>
-        <div class="kanban-board" id="adminOrderKanban"></div>
+        <div class="admin-header">
+          <h2>Pedidos del punto</h2>
+          <button class="btn btn-ghost btn-small" id="adminOrderToggleView">Ver historial completo</button>
+        </div>
+
+        <div id="adminOrderWeekView">
+          <div class="empty-note" style="margin-bottom:14px;">Semana actual. Toca un pedido pendiente para revisarlo, o "Desbloquear" uno ya resuelto si necesita corrección.</div>
+          <div class="kanban-board" id="adminOrderKanban"></div>
+        </div>
+
+        <div id="adminOrderHistoryView" style="display:none;">
+          <div class="admin-filters">
+            <div class="field"><label class="field-label">Desde</label><input type="date" id="ohDesde"></div>
+            <div class="field"><label class="field-label">Hasta</label><input type="date" id="ohHasta"></div>
+            <div class="field"><label class="field-label">Categoría</label>
+              <select id="ohCategoria"><option value="">Todas</option></select>
+            </div>
+            <div class="field"><label class="field-label">Estado</label>
+              <select id="ohEstado">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="aprobado">Aprobado</option>
+                <option value="rechazado">Rechazado</option>
+              </select>
+            </div>
+            <button class="btn btn-accent btn-small" id="ohFilterApply">Filtrar</button>
+          </div>
+          <span class="sub" id="ohCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+          <div id="ohList" style="margin-top:10px;"></div>
+        </div>
       </div>
 
       <div id="adminpanel-bajas" class="adminpanel">
@@ -896,6 +926,33 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button class="btn btn-ghost" id="bajaReviewCancel">Cerrar</button>
       <button class="btn btn-danger" id="bajaReviewReject">Rechazar</button>
       <button class="btn btn-accent" id="bajaReviewApprove">Aprobar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="historicoModal">
+  <div class="modal-box" style="max-width:640px;">
+    <h3>Histórico de pedidos</h3>
+    <div class="admin-filters">
+      <div class="field"><label class="field-label">Desde</label><input type="date" id="histDesde"></div>
+      <div class="field"><label class="field-label">Hasta</label><input type="date" id="histHasta"></div>
+      <div class="field"><label class="field-label">Estado</label>
+        <select id="histEstado">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="rechazado">Rechazado</option>
+        </select>
+      </div>
+      <div class="field"><label class="field-label">Categoría</label>
+        <select id="histCategoria"><option value="">Todas</option></select>
+      </div>
+      <button class="btn btn-accent btn-small" id="histApply">Filtrar</button>
+    </div>
+    <span class="sub" id="histCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+    <div id="histList" style="margin-top:10px; max-height:50vh; overflow-y:auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost" id="histClose">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2107,6 +2164,9 @@ function readOrderRows(container){
 let orderRowCounter = 0;
 
 document.getElementById('orderOpenNew').addEventListener('click', ()=>{
+  editingOrderId = null;
+  document.querySelector('#orderModal h3').textContent = 'Nuevo pedido';
+  document.getElementById('orderSubmit').textContent = 'Enviar pedido';
   document.getElementById('orderFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('orderProveedor').value = '';
   const rowsBox = document.getElementById('orderItemsRows');
@@ -2119,6 +2179,7 @@ document.getElementById('orderAddRow').addEventListener('click', ()=>{
 });
 document.getElementById('orderCancel').addEventListener('click', ()=>{
   document.getElementById('orderModal').classList.remove('open');
+  editingOrderId = null;
 });
 
 document.getElementById('orderSubmit').addEventListener('click', async ()=>{
@@ -2128,6 +2189,20 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
 
   if(!fecha){ showToast('Selecciona la fecha'); return; }
   if(rows.length === 0){ showToast('Agrega al menos un insumo con cantidad y unidad'); return; }
+
+  if(editingOrderId){
+    const { error: updErr } = await supa.from('orders').update({ fecha, proveedor: proveedor || null }).eq('id', editingOrderId);
+    if(updErr){ showToast('Error al guardar: ' + updErr.message); return; }
+    await supa.from('order_items').delete().eq('order_id', editingOrderId);
+    const itemsToInsert = rows.map(r => ({ ...r, order_id: editingOrderId }));
+    const { error: itemsErr } = await supa.from('order_items').insert(itemsToInsert);
+    if(itemsErr){ showToast('Error al guardar los insumos: ' + itemsErr.message); return; }
+    showToast('Pedido actualizado');
+    editingOrderId = null;
+    document.getElementById('orderModal').classList.remove('open');
+    loadMyOrders();
+    return;
+  }
 
   const { data: orderData, error: orderErr } = await supa.from('orders').insert({
     location_id: currentLocation.id, fecha, proveedor: proveedor || null,
@@ -2145,9 +2220,13 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
 });
 
 async function loadMyOrders(){
-  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { monday, sunday } = getWeekRange(new Date());
+  const { data, error } = await supa.from('orders').select('*, order_items(*)')
+    .eq('location_id', currentLocation.id)
+    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
+    .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
-  renderOrderKanban(list, document.getElementById('orderKanban'), false);
+  renderOrderKanban(list, document.getElementById('orderKanban'), 'own');
 }
 
 const KANBAN_COLUMNS = [
@@ -2156,7 +2235,7 @@ const KANBAN_COLUMNS = [
   { key:'rechazado', label:'Rechazado' }
 ];
 
-function orderKanbanCardHtml(o, isAdmin){
+function orderKanbanCardHtml(o, mode){
   const items = o.order_items || [];
   const itemsPreview = items.slice(0,3).map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ') +
     (items.length > 3 ? ` y ${items.length - 3} más...` : '');
@@ -2166,20 +2245,26 @@ function orderKanbanCardHtml(o, isAdmin){
   if(o.status === 'rechazado' && o.rechazo_motivo){
     extra = `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(o.rechazo_motivo)}</div>`;
   }
-  return `<div class="kanban-card ${o.status}" data-order-id="${o.id}">
+  let actions = '';
+  if(mode === 'admin' && (o.status === 'aprobado' || o.status === 'rechazado')){
+    actions = `<div class="kc-actions"><button class="btn btn-ghost btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
+  }
+  const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
+  return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
     <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
-    <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${isAdmin ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
+    <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${mode==='admin' ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
     <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
     ${extra}
+    ${actions}
   </div>`;
 }
 
-function renderOrderKanban(list, boardEl, isAdmin){
+function renderOrderKanban(list, boardEl, mode){
   boardEl.innerHTML = KANBAN_COLUMNS.map(col => {
     const items = list.filter(o => o.status === col.key);
     const cards = items.length === 0
       ? '<div class="kanban-empty">Sin pedidos</div>'
-      : items.map(o => orderKanbanCardHtml(o, isAdmin)).join('');
+      : items.map(o => orderKanbanCardHtml(o, mode)).join('');
     return `<div>
       <div class="kanban-col-header">
         <span class="kanban-dot ${col.key}"></span>
@@ -2190,20 +2275,58 @@ function renderOrderKanban(list, boardEl, isAdmin){
     </div>`;
   }).join('');
 
-  if(isAdmin){
+  if(mode === 'admin'){
     boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
-      el.addEventListener('click', ()=>openOrderReview(el.dataset.orderId, list));
+      el.addEventListener('click', (e)=>{ if(e.target.closest('[data-unlock-id]')) return; openOrderReview(el.dataset.orderId, list); });
+    });
+    boardEl.querySelectorAll('[data-unlock-id]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{ e.stopPropagation(); unlockOrder(btn.dataset.unlockId); });
+    });
+  } else if(mode === 'own'){
+    boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
+      el.addEventListener('click', ()=>openOrderEdit(el.dataset.orderId, list));
     });
   }
+}
+
+async function unlockOrder(orderId){
+  const { error } = await supa.from('orders').update({
+    status: 'pendiente', rechazo_motivo: null, resuelto_por: null, resuelto_at: null
+  }).eq('id', orderId);
+  if(error){ showToast('Error al desbloquear: ' + error.message); return; }
+  showToast('Pedido desbloqueado, vuelve a estar pendiente');
+  loadAdminOrders();
+}
+
+/* ---------- COCINA: editar mi propio pedido pendiente ---------- */
+let editingOrderId = null;
+
+function openOrderEdit(orderId, list){
+  const order = list.find(o => o.id === orderId);
+  if(!order) return;
+  editingOrderId = orderId;
+  document.querySelector('#orderModal h3').textContent = 'Editar pedido';
+  document.getElementById('orderSubmit').textContent = 'Guardar cambios';
+  document.getElementById('orderFecha').value = order.fecha;
+  document.getElementById('orderProveedor').value = order.proveedor || '';
+  const rowsBox = document.getElementById('orderItemsRows');
+  rowsBox.innerHTML = '';
+  (order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
+  if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++)); }
+  document.getElementById('orderModal').classList.add('open');
 }
 
 /* ---------- ADMIN: revisar pedidos ---------- */
 let currentReviewOrderId = null;
 
 async function loadAdminOrders(){
-  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { monday, sunday } = getWeekRange(new Date());
+  const { data, error } = await supa.from('orders').select('*, order_items(*)')
+    .eq('location_id', currentLocation.id)
+    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
+    .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
-  renderOrderKanban(list, document.getElementById('adminOrderKanban'), true);
+  renderOrderKanban(list, document.getElementById('adminOrderKanban'), 'admin');
 }
 
 function openOrderReview(orderId, list){
@@ -2224,6 +2347,62 @@ function openOrderReview(orderId, list){
   document.getElementById('orderRejectMotivo').value = '';
   document.getElementById('orderReviewModal').classList.add('open');
 }
+
+/* ---------- ADMIN: historial completo de pedidos ---------- */
+let adminOrderHistoryCache = [];
+
+document.getElementById('adminOrderToggleView').addEventListener('click', ()=>{
+  const weekView = document.getElementById('adminOrderWeekView');
+  const histView = document.getElementById('adminOrderHistoryView');
+  const showingWeek = weekView.style.display !== 'none';
+  weekView.style.display = showingWeek ? 'none' : 'block';
+  histView.style.display = showingWeek ? 'block' : 'none';
+  document.getElementById('adminOrderToggleView').textContent = showingWeek ? 'Ver semana actual' : 'Ver historial completo';
+  if(showingWeek) loadOrderHistory();
+});
+
+async function loadOrderHistory(){
+  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  adminOrderHistoryCache = error ? [] : (data || []);
+
+  const cats = new Set();
+  adminOrderHistoryCache.forEach(o => (o.order_items||[]).forEach(it => cats.add(it.categoria)));
+  const catSelect = document.getElementById('ohCategoria');
+  const sortedCats = [...cats].sort();
+  catSelect.innerHTML = '<option value="">Todas</option>' + sortedCats.map(c => `<option value="${c}">${categoryLabel(c)}</option>`).join('');
+
+  renderOrderHistory();
+}
+
+function renderOrderHistory(){
+  const desde = document.getElementById('ohDesde').value;
+  const hasta = document.getElementById('ohHasta').value;
+  const cat = document.getElementById('ohCategoria').value;
+  const estado = document.getElementById('ohEstado').value;
+
+  let list = adminOrderHistoryCache.slice();
+  if(desde) list = list.filter(o => o.fecha >= desde);
+  if(hasta) list = list.filter(o => o.fecha <= hasta);
+  if(estado) list = list.filter(o => o.status === estado);
+  if(cat) list = list.filter(o => (o.order_items||[]).some(it => it.categoria === cat));
+
+  document.getElementById('ohCount').textContent = list.length + ' pedido' + (list.length===1?'':'s');
+  const box = document.getElementById('ohList');
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No se encontraron pedidos.</div>'; return; }
+
+  box.innerHTML = list.map(o => {
+    const items = o.order_items || [];
+    const itemsPreview = items.map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ');
+    return `<div class="kanban-card ${o.status}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')} <span class="oe-status-badge ${o.status}" style="margin-left:8px;">${o.status}</span></div>
+      <div class="kc-meta">Fecha: ${o.fecha} · ${items.length} insumo${items.length===1?'':'s'} · ${escapeHtml(o.creado_por_nombre||'')}</div>
+      <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
+      ${o.status==='rechazado' && o.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(o.rechazo_motivo)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('ohFilterApply').addEventListener('click', renderOrderHistory);
 
 document.getElementById('orderReviewCancel').addEventListener('click', ()=>{
   document.getElementById('orderReviewModal').classList.remove('open');
