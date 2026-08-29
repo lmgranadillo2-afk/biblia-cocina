@@ -1680,7 +1680,10 @@ function buildOrderRow(rowId, existing){
     </div>
     <div class="field f-unidad">
       <label class="field-label">Unidad</label>
-      <input type="text" class="row-unidad" placeholder="Ej: KG" value="${existing ? existing.unidad : ''}">
+      <select class="row-unidad">
+        <option value="UND" ${existing && existing.unidad==='UND' ? 'selected':''}>Unidades</option>
+        <option value="KG" ${!existing || existing.unidad==='KG' ? 'selected':''}>Kg</option>
+      </select>
     </div>
     <div class="field f-nota">
       <label class="field-label">Nota (opc.)</label>
