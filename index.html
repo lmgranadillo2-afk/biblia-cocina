@@ -466,6 +466,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button id="tab-produccion">Producción</button>
       <button id="tab-cronograma">Cronograma</button>
       <button id="tab-pedidos">Pedidos</button>
+      <button id="tab-bajas">Bajas</button>
       <button id="tab-admin" style="display:none">Admin</button>
     </nav>
   </header>
@@ -554,12 +555,23 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div id="orderHistList" style="margin-top:10px;"></div>
     </div>
 
+    <div id="view-bajas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header">
+        <h2>Bajas</h2>
+        <button class="btn btn-accent btn-small" id="bajaOpenNew">+ Nueva baja</button>
+      </div>
+      <div class="empty-note" style="margin-bottom:14px;">Registra la pérdida de un insumo o de una receta ya preparada, solo eligiendo de lo que ya existe en el sistema. Un admin la revisa y la aprueba o rechaza.</div>
+      <span class="sub" id="bajaHistCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+      <div id="bajaHistList" style="margin-top:10px;"></div>
+    </div>
+
     <div id="view-admin" class="view">
       <div class="admin-subtabs">
         <button id="adminsub-produccion" class="active">Producción</button>
         <button id="adminsub-usuarios">Usuarios</button>
         <button id="adminsub-puntos" style="display:none">Puntos</button>
         <button id="adminsub-pedidos">Pedidos</button>
+        <button id="adminsub-bajas">Bajas</button>
       </div>
 
       <div id="adminpanel-produccion" class="adminpanel active">
@@ -609,6 +621,34 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 
       <div id="adminpanel-pedidos" class="adminpanel">
         <div class="admin-header"><h2>Pedidos del punto</h2></div>
+
+        <div class="prod-form" style="margin-bottom:20px;">
+          <h2>Agregar insumo al catálogo</h2>
+          <div class="empty-note" style="margin-bottom:12px;">Para cosas que no están en ninguna receta (bolsas, servilletas, guantes, etc.) pero igual se piden a proveedor.</div>
+          <div class="field"><label class="field-label">Nombre del insumo</label><input type="text" id="catalogItemName" placeholder="Ej: Bolsas plásticas 20x30"></div>
+          <div class="field">
+            <label class="field-label">Código (opcional)</label>
+            <input type="text" id="catalogItemCode" placeholder="Ej: ABA190 — si lo dejas vacío se genera uno solo">
+          </div>
+          <div class="field">
+            <label class="field-label">Categoría</label>
+            <select id="catalogItemCategoria">
+              <option value="Abarrotes">Abarrotes</option>
+              <option value="Frutas y Verduras">Frutas y Verduras</option>
+              <option value="Proteínas">Proteínas</option>
+              <option value="Lácteos">Lácteos</option>
+              <option value="Barra">Barra</option>
+              <option value="Aseo">Aseo</option>
+              <option value="__otra__">Otra (escribir)</option>
+            </select>
+          </div>
+          <div class="field" id="catalogItemCategoriaOtraBox" style="display:none;">
+            <label class="field-label">Nombre de la categoría nueva</label>
+            <input type="text" id="catalogItemCategoriaOtra" placeholder="Ej: Papelería">
+          </div>
+          <button class="btn btn-accent btn-block" id="catalogItemSubmit">Agregar al catálogo</button>
+        </div>
+
         <div class="admin-filters">
           <div class="field"><label class="field-label">Estado</label>
             <select id="orderFilterStatus">
@@ -622,6 +662,23 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         </div>
         <span class="sub" id="adminOrderCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
         <div id="adminOrderList" style="margin-top:10px;"></div>
+      </div>
+
+      <div id="adminpanel-bajas" class="adminpanel">
+        <div class="admin-header"><h2>Bajas del punto</h2></div>
+        <div class="admin-filters">
+          <div class="field"><label class="field-label">Estado</label>
+            <select id="bajaFilterStatus">
+              <option value="">Todos</option>
+              <option value="pendiente" selected>Pendientes</option>
+              <option value="aprobado">Aprobados</option>
+              <option value="rechazado">Rechazados</option>
+            </select>
+          </div>
+          <button class="btn btn-accent btn-small" id="bajaFilterApply">Filtrar</button>
+        </div>
+        <span class="sub" id="adminBajaCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="adminBajaList" style="margin-top:10px;"></div>
       </div>
     </div>
   </main>
@@ -722,6 +779,77 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button class="btn btn-ghost" id="orderReviewCancel">Cerrar</button>
       <button class="btn btn-danger" id="orderReviewReject">Rechazar</button>
       <button class="btn btn-accent" id="orderReviewApprove">Aprobar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bajaModal">
+  <div class="modal-box">
+    <h3>Nueva baja</h3>
+    <div class="field"><label class="field-label">Fecha</label><input type="date" id="bajaFecha"></div>
+    <div class="field">
+      <label class="field-label">Tipo</label>
+      <select id="bajaTipo">
+        <option value="insumo">Insumo</option>
+        <option value="receta">Receta preparada</option>
+      </select>
+    </div>
+    <div id="bajaInsumoFields">
+      <div class="field">
+        <label class="field-label">Categoría</label>
+        <select id="bajaCategoria"></select>
+      </div>
+      <div class="field">
+        <label class="field-label">Insumo</label>
+        <select id="bajaInsumo"></select>
+      </div>
+    </div>
+    <div id="bajaRecetaFields" style="display:none;">
+      <div class="field">
+        <label class="field-label">Receta</label>
+        <input type="text" id="bajaReceta" list="recetaList" placeholder="Escribe para buscar...">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Cantidad</label>
+      <input type="text" id="bajaCantidad" placeholder="Ej: 2">
+    </div>
+    <div class="field">
+      <label class="field-label">Unidad</label>
+      <select id="bajaUnidad">
+        <option value="UND">Unidades</option>
+        <option value="KG" selected>Kg</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="field-label">Motivo</label>
+      <textarea id="bajaMotivo" placeholder="Ej: se dañó por corte de luz, venció, se cayó..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="bajaCancel">Cancelar</button>
+      <button class="btn btn-accent" id="bajaSubmit">Enviar baja</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bajaReviewModal">
+  <div class="modal-box">
+    <h3>Revisar baja</h3>
+    <div class="modal-summary">
+      <div><span>Tipo</span><b id="bajaReviewTipo"></b></div>
+      <div><span>Ítem</span><b id="bajaReviewItem"></b></div>
+      <div><span>Cantidad</span><b id="bajaReviewCantidad"></b></div>
+      <div><span>Motivo</span><b id="bajaReviewMotivo"></b></div>
+      <div><span>Registrado por</span><b id="bajaReviewQuien"></b></div>
+    </div>
+    <div class="field" id="bajaRejectBox" style="display:none;">
+      <label class="field-label">Motivo de rechazo</label>
+      <textarea id="bajaRejectMotivo" placeholder="Explica por qué se rechaza..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="bajaReviewCancel">Cerrar</button>
+      <button class="btn btn-danger" id="bajaReviewReject">Rechazar</button>
+      <button class="btn btn-accent" id="bajaReviewApprove">Aprobar</button>
     </div>
   </div>
 </div>
@@ -944,21 +1072,24 @@ document.getElementById('tab-recetario').addEventListener('click', ()=>switchTab
 document.getElementById('tab-produccion').addEventListener('click', ()=>switchTab('produccion'));
 document.getElementById('tab-cronograma').addEventListener('click', ()=>switchTab('cronograma'));
 document.getElementById('tab-pedidos').addEventListener('click', ()=>switchTab('pedidos'));
+document.getElementById('tab-bajas').addEventListener('click', ()=>switchTab('bajas'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','admin'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','admin'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
   if(name==='admin') loadAdminHistory();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
+  if(name==='bajas') loadMyBajas();
 }
 
 /* ---------- INIT ---------- */
 async function initApp(){
   document.getElementById('recItems').innerHTML = '<div class="empty-note">Cargando recetario...</div>';
   await loadRecipes();
+  await loadExtraCatalogItems();
   buildInsumosCatalog();
   renderRecipeList();
   populateRecetaDatalist();
@@ -1296,14 +1427,16 @@ document.getElementById('adminsub-produccion').addEventListener('click', ()=>swi
 document.getElementById('adminsub-usuarios').addEventListener('click', ()=>switchAdminSub('usuarios'));
 document.getElementById('adminsub-puntos').addEventListener('click', ()=>switchAdminSub('puntos'));
 document.getElementById('adminsub-pedidos').addEventListener('click', ()=>switchAdminSub('pedidos'));
+document.getElementById('adminsub-bajas').addEventListener('click', ()=>switchAdminSub('bajas'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','bajas'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
   if(name==='usuarios') loadUsers();
   if(name==='puntos') loadLocationsAdmin();
   if(name==='pedidos') loadAdminOrders();
+  if(name==='bajas') loadAdminBajas();
 }
 
 /* ---------- GESTIÓN DE PUNTOS (solo super admin) ---------- */
@@ -1633,6 +1766,13 @@ document.getElementById('schedSubmitBtn').addEventListener('click', async ()=>{
 const CATEGORY_LABELS = {ABA:'Abarrotes', FRV:'Frutas y Verduras', PRO:'Proteínas', LAC:'Lácteos', BAR:'Barra'};
 let INSUMOS_CATALOG = {};
 
+let EXTRA_CATALOG_ITEMS = [];
+
+async function loadExtraCatalogItems(){
+  const { data, error } = await supa.from('catalog_items').select('*').eq('location_id', currentLocation.id);
+  EXTRA_CATALOG_ITEMS = error ? [] : (data || []);
+}
+
 function buildInsumosCatalog(){
   const map = {};
   RECIPES.forEach(r=>{
@@ -1646,6 +1786,11 @@ function buildInsumosCatalog(){
       map[prefix][ing.code] = ing.name;
     });
   });
+  EXTRA_CATALOG_ITEMS.forEach(it=>{
+    const key = it.categoria;
+    if(!map[key]) map[key] = {};
+    map[key][it.code] = it.name;
+  });
   INSUMOS_CATALOG = {};
   Object.keys(map).sort().forEach(prefix=>{
     INSUMOS_CATALOG[prefix] = Object.entries(map[prefix])
@@ -1655,6 +1800,47 @@ function buildInsumosCatalog(){
 }
 
 function categoryLabel(prefix){ return CATEGORY_LABELS[prefix] || prefix; }
+
+document.getElementById('catalogItemCategoria').addEventListener('change', ()=>{
+  const isOtra = document.getElementById('catalogItemCategoria').value === '__otra__';
+  document.getElementById('catalogItemCategoriaOtraBox').style.display = isOtra ? 'block' : 'none';
+});
+
+const LABEL_TO_PREFIX = {'Abarrotes':'ABA', 'Frutas y Verduras':'FRV', 'Proteínas':'PRO', 'Lácteos':'LAC', 'Barra':'BAR'};
+
+document.getElementById('catalogItemSubmit').addEventListener('click', async ()=>{
+  const name = document.getElementById('catalogItemName').value.trim();
+  const customCode = document.getElementById('catalogItemCode').value.trim().toUpperCase();
+  const catSelectVal = document.getElementById('catalogItemCategoria').value;
+  let categoria = catSelectVal === '__otra__'
+    ? document.getElementById('catalogItemCategoriaOtra').value.trim()
+    : (LABEL_TO_PREFIX[catSelectVal] || catSelectVal);
+
+  if(!name || !categoria){ showToast('Escribe el nombre y la categoría'); return; }
+
+  const code = customCode || ('GEN-' + Date.now().toString(36).toUpperCase());
+  const { error } = await supa.from('catalog_items').insert({
+    location_id: currentLocation.id, code, name, categoria, created_by: session.user.id
+  });
+  if(error){
+    if(error.message && error.message.includes('duplicate')){
+      showToast('Ese código ya existe en este punto, usa otro');
+    } else {
+      showToast('Error al agregar: ' + error.message);
+    }
+    return;
+  }
+
+  showToast('Insumo agregado al catálogo');
+  document.getElementById('catalogItemName').value = '';
+  document.getElementById('catalogItemCode').value = '';
+  document.getElementById('catalogItemCategoria').value = 'Abarrotes';
+  document.getElementById('catalogItemCategoriaOtraBox').style.display = 'none';
+  document.getElementById('catalogItemCategoriaOtra').value = '';
+
+  await loadExtraCatalogItems();
+  buildInsumosCatalog();
+});
 
 function buildOrderRow(rowId, existing){
   const wrap = document.createElement('div');
@@ -1889,6 +2075,181 @@ document.getElementById('orderReviewReject').addEventListener('click', async ()=
   document.getElementById('orderReviewModal').classList.remove('open');
   currentReviewOrderId = null;
   loadAdminOrders();
+});
+
+/* ---------- BAJAS ---------- */
+function populateBajaCategoriaSelect(){
+  const catSelect = document.getElementById('bajaCategoria');
+  catSelect.innerHTML = Object.keys(INSUMOS_CATALOG).map(p =>
+    `<option value="${p}">${categoryLabel(p)}</option>`
+  ).join('');
+  populateBajaInsumoSelect();
+}
+function populateBajaInsumoSelect(){
+  const cat = document.getElementById('bajaCategoria').value;
+  const list = INSUMOS_CATALOG[cat] || [];
+  document.getElementById('bajaInsumo').innerHTML = list.map(it =>
+    `<option value="${it.code}">${escapeHtml(it.name)}</option>`
+  ).join('');
+}
+document.getElementById('bajaCategoria').addEventListener('change', populateBajaInsumoSelect);
+
+document.getElementById('bajaTipo').addEventListener('change', ()=>{
+  const isInsumo = document.getElementById('bajaTipo').value === 'insumo';
+  document.getElementById('bajaInsumoFields').style.display = isInsumo ? 'block' : 'none';
+  document.getElementById('bajaRecetaFields').style.display = isInsumo ? 'none' : 'block';
+});
+
+document.getElementById('bajaOpenNew').addEventListener('click', ()=>{
+  document.getElementById('bajaFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('bajaTipo').value = 'insumo';
+  document.getElementById('bajaInsumoFields').style.display = 'block';
+  document.getElementById('bajaRecetaFields').style.display = 'none';
+  populateBajaCategoriaSelect();
+  document.getElementById('bajaReceta').value = '';
+  document.getElementById('bajaCantidad').value = '';
+  document.getElementById('bajaUnidad').value = 'KG';
+  document.getElementById('bajaMotivo').value = '';
+  document.getElementById('bajaModal').classList.add('open');
+});
+document.getElementById('bajaCancel').addEventListener('click', ()=>{
+  document.getElementById('bajaModal').classList.remove('open');
+});
+
+document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
+  const fecha = document.getElementById('bajaFecha').value;
+  const tipo = document.getElementById('bajaTipo').value;
+  const cantidad = document.getElementById('bajaCantidad').value.trim();
+  const unidad = document.getElementById('bajaUnidad').value;
+  const motivo = document.getElementById('bajaMotivo').value.trim();
+
+  if(!fecha || !cantidad || !motivo){ showToast('Completa fecha, cantidad y motivo'); return; }
+
+  let itemCode, itemName, categoria = null;
+  if(tipo === 'insumo'){
+    const insumoSelect = document.getElementById('bajaInsumo');
+    itemCode = insumoSelect.value;
+    itemName = insumoSelect.options[insumoSelect.selectedIndex] ? insumoSelect.options[insumoSelect.selectedIndex].text : '';
+    categoria = document.getElementById('bajaCategoria').value;
+    if(!itemCode){ showToast('Selecciona un insumo'); return; }
+  } else {
+    const match = findRecetaByName(document.getElementById('bajaReceta').value.trim());
+    if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
+    itemCode = match.code; itemName = match.name;
+  }
+
+  const { error } = await supa.from('bajas').insert({
+    location_id: currentLocation.id, fecha, tipo, item_code: itemCode, item_name: itemName, categoria,
+    cantidad: parseFloat(cantidad.replace(',','.')) || 0, unidad, motivo,
+    created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
+  });
+  if(error){ showToast('Error al registrar la baja: ' + error.message); return; }
+
+  showToast('Baja registrada');
+  document.getElementById('bajaModal').classList.remove('open');
+  loadMyBajas();
+});
+
+async function loadMyBajas(){
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const list = error ? [] : (data || []);
+  renderBajaList(list, document.getElementById('bajaHistList'), document.getElementById('bajaHistCount'), false);
+}
+
+function bajaEntryHtml(b, isAdmin){
+  const registrada = new Date(b.created_at);
+  const hora = registrada.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+  const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
+  let extra = '';
+  if(b.status === 'rechazado' && b.rechazo_motivo){
+    extra = `<div class="oe-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>`;
+  }
+  return `<div class="order-entry ${b.status}" data-baja-id="${b.id}">
+    <div class="oe-top">
+      <div>
+        <div class="oe-title">${escapeHtml(b.item_name)}</div>
+        <div class="oe-meta">${tipoLabel} · Fecha: <b>${b.fecha}</b> · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · Registrado ${hora}${isAdmin ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
+      </div>
+      <span class="oe-status-badge ${b.status}">${b.status}</span>
+    </div>
+    <div class="oe-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
+    ${extra}
+  </div>`;
+}
+
+function renderBajaList(list, wrapEl, countEl, isAdmin){
+  if(countEl) countEl.textContent = list.length + ' baja' + (list.length===1?'':'s');
+  if(list.length === 0){ wrapEl.innerHTML = '<div class="empty-list">Aún no hay bajas registradas.</div>'; return; }
+  wrapEl.innerHTML = list.map(b => bajaEntryHtml(b, isAdmin)).join('');
+  if(isAdmin){
+    wrapEl.querySelectorAll('.order-entry.pendiente').forEach(el=>{
+      el.addEventListener('click', ()=>openBajaReview(el.dataset.bajaId, list));
+    });
+  }
+}
+
+/* ---------- ADMIN: revisar bajas ---------- */
+let currentReviewBajaId = null;
+
+document.getElementById('bajaFilterApply').addEventListener('click', loadAdminBajas);
+
+async function loadAdminBajas(){
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const all = error ? [] : (data || []);
+  const statusFilter = document.getElementById('bajaFilterStatus').value;
+  const filtered = statusFilter ? all.filter(b => b.status === statusFilter) : all;
+  renderBajaList(filtered, document.getElementById('adminBajaList'), document.getElementById('adminBajaCount'), true);
+  window._adminBajasCache = all;
+}
+
+function openBajaReview(bajaId, list){
+  const baja = list.find(b => b.id === bajaId);
+  if(!baja) return;
+  currentReviewBajaId = bajaId;
+  document.getElementById('bajaReviewTipo').textContent = baja.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
+  document.getElementById('bajaReviewItem').textContent = baja.item_name;
+  document.getElementById('bajaReviewCantidad').textContent = `${fmtQty(baja.cantidad)} ${baja.unidad}`;
+  document.getElementById('bajaReviewMotivo').textContent = baja.motivo;
+  document.getElementById('bajaReviewQuien').textContent = `${baja.creado_por_nombre || ''} · ${baja.fecha}`;
+  document.getElementById('bajaRejectBox').style.display = 'none';
+  document.getElementById('bajaRejectMotivo').value = '';
+  document.getElementById('bajaReviewModal').classList.add('open');
+}
+
+document.getElementById('bajaReviewCancel').addEventListener('click', ()=>{
+  document.getElementById('bajaReviewModal').classList.remove('open');
+  currentReviewBajaId = null;
+});
+
+document.getElementById('bajaReviewApprove').addEventListener('click', async ()=>{
+  if(!currentReviewBajaId) return;
+  const { error } = await supa.from('bajas').update({
+    status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
+  }).eq('id', currentReviewBajaId);
+  if(error){ showToast('Error al aprobar: ' + error.message); return; }
+  showToast('Baja aprobada');
+  document.getElementById('bajaReviewModal').classList.remove('open');
+  currentReviewBajaId = null;
+  loadAdminBajas();
+});
+
+document.getElementById('bajaReviewReject').addEventListener('click', async ()=>{
+  if(!currentReviewBajaId) return;
+  const rejectBox = document.getElementById('bajaRejectBox');
+  if(rejectBox.style.display === 'none'){
+    rejectBox.style.display = 'block';
+    return;
+  }
+  const motivo = document.getElementById('bajaRejectMotivo').value.trim();
+  if(!motivo){ showToast('Escribe el motivo de rechazo'); return; }
+  const { error } = await supa.from('bajas').update({
+    status: 'rechazado', rechazo_motivo: motivo, resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
+  }).eq('id', currentReviewBajaId);
+  if(error){ showToast('Error al rechazar: ' + error.message); return; }
+  showToast('Baja rechazada');
+  document.getElementById('bajaReviewModal').classList.remove('open');
+  currentReviewBajaId = null;
+  loadAdminBajas();
 });
 </script>
 </body>
