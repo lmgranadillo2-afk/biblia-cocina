@@ -2387,7 +2387,7 @@ function orderKanbanCardHtml(o, mode){
   if(mode === 'admin' && (o.status === 'aprobado' || o.status === 'rechazado')){
     actions += `<div class="kc-actions"><button class="btn btn-ghost btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
   }
-  if(o.status === 'aprobado' && (o.proveedor_telefono || o.proveedor_correo)){
+  if(mode === 'own' && o.status === 'aprobado' && (o.proveedor_telefono || o.proveedor_correo)){
     let sendBtns = '<div class="kc-actions" style="display:flex; gap:6px;">';
     if(o.proveedor_telefono) sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
     if(o.proveedor_correo) sendBtns += `<button class="btn btn-ghost btn-small" data-mail-id="${o.id}" style="flex:1;">Correo</button>`;
