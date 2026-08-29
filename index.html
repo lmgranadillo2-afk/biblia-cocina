@@ -1638,6 +1638,7 @@ function buildInsumosCatalog(){
   RECIPES.forEach(r=>{
     r.ingredients.forEach(ing=>{
       if(ing.code.toUpperCase().startsWith('SUBC')) return;
+      if(ing.code.toUpperCase().startsWith('AGUA')) return;
       const m = ing.code.match(/^([A-Za-z]+)/);
       if(!m) return;
       const prefix = m[1].toUpperCase();
