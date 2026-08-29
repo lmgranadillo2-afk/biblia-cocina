@@ -2404,13 +2404,22 @@ function orderKanbanCardHtml(o, mode){
   </div>`;
 }
 
+function saludoSegunHora(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Buenos días';
+  if(h < 18) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 function buildPedidoMessage(o){
   const items = sortByCategoria(o.order_items || []);
   const lines = [];
+  const hoy = new Date().toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'});
+  const hoyCap = hoy.charAt(0).toUpperCase() + hoy.slice(1);
+  lines.push(`${saludoSegunHora()}, les escribimos de ${currentLocation ? currentLocation.name : ''}.`);
+  lines.push('');
   lines.push(`Pedido ${o.codigo || ''} - ${o.proveedor || ''}`);
-  if(o.semana_inicio){
-    lines.push('Semana del ' + new Date(o.semana_inicio+'T00:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'}));
-  }
+  lines.push(hoyCap);
   let lastCat = null;
   items.forEach(it=>{
     if(it.categoria !== lastCat){
