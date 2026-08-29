@@ -620,6 +620,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button id="adminsub-pedidos">Pedidos</button>
         <button id="adminsub-bajas">Bajas</button>
         <button id="adminsub-insumos">Insumos</button>
+        <button id="adminsub-proveedores">Proveedores</button>
       </div>
 
       <div id="adminpanel-produccion" class="adminpanel active">
@@ -756,6 +757,21 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <span class="sub" id="giCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
         <div id="giList" style="margin-top:10px;"></div>
       </div>
+
+      <div id="adminpanel-proveedores" class="adminpanel">
+        <div class="admin-header"><h2>Proveedores del punto</h2></div>
+        <div class="prod-form" style="margin-bottom:20px;">
+          <h2>Agregar proveedor</h2>
+          <div class="field"><label class="field-label">Nombre</label><input type="text" id="provName" placeholder="Ej: Distrialimentos SAS"></div>
+          <div class="field">
+            <label class="field-label">Teléfono de WhatsApp (opcional)</label>
+            <input type="text" id="provPhone" placeholder="Ej: 573001234567 (con indicativo de país, sin +)">
+          </div>
+          <div class="field"><label class="field-label">Correo (opcional)</label><input type="text" id="provEmail" placeholder="pedidos@proveedor.com"></div>
+          <button class="btn btn-accent btn-block" id="provSubmit">Agregar proveedor</button>
+        </div>
+        <div id="provList"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -830,7 +846,19 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
   <div class="modal-box" style="max-width:520px;">
     <h3>Nuevo pedido</h3>
     <div class="field"><label class="field-label">Fecha</label><input type="date" id="orderFecha"></div>
-    <div class="field"><label class="field-label">Proveedor (opcional)</label><input type="text" id="orderProveedor" placeholder="Nombre del proveedor"></div>
+    <div class="field">
+      <label class="field-label">Proveedor (opcional)</label>
+      <select id="orderProveedor">
+        <option value="">Sin proveedor</option>
+      </select>
+      <div class="field-help"><a href="#" id="orderProvAddNewLink" style="color:var(--accent);">+ Agregar proveedor nuevo</a></div>
+    </div>
+    <div id="orderProvNewBox" style="display:none; padding:12px; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); margin-bottom:12px;">
+      <div class="field"><label class="field-label">Nombre</label><input type="text" id="orderProvNewName" placeholder="Ej: Distrialimentos SAS"></div>
+      <div class="field"><label class="field-label">Teléfono WhatsApp (opcional)</label><input type="text" id="orderProvNewPhone" placeholder="Ej: 573001234567"></div>
+      <div class="field"><label class="field-label">Correo (opcional)</label><input type="text" id="orderProvNewEmail" placeholder="pedidos@proveedor.com"></div>
+      <button type="button" class="btn btn-accent btn-small" id="orderProvNewSave">Guardar proveedor</button>
+    </div>
     <div class="section-label" style="margin-top:16px;">Insumos</div>
     <div id="orderItemsRows"></div>
     <button class="btn btn-ghost btn-small" id="orderAddRow" style="margin-top:8px;">+ Agregar insumo</button>
@@ -1248,9 +1276,81 @@ async function initApp(){
   renderRecipeList();
   populateRecetaDatalist();
   loadMyProductions();
+  await loadProveedores();
   const iso = new Date().toISOString().slice(0,10);
   document.getElementById('prodFecha').value = iso;
 }
+
+/* ---------- PROVEEDORES ---------- */
+let PROVEEDORES = [];
+
+async function loadProveedores(){
+  const { data, error } = await supa.from('proveedores').select('*').eq('location_id', currentLocation.id).order('nombre', {ascending:true});
+  PROVEEDORES = error ? [] : (data || []);
+  populateProveedorSelect();
+}
+
+function populateProveedorSelect(selectedId){
+  const sel = document.getElementById('orderProveedor');
+  sel.innerHTML = '<option value="">Sin proveedor</option>' +
+    PROVEEDORES.map(p => `<option value="${p.id}" ${selectedId===p.id?'selected':''}>${escapeHtml(p.nombre)}</option>`).join('');
+}
+
+document.getElementById('orderProvAddNewLink').addEventListener('click', (e)=>{
+  e.preventDefault();
+  document.getElementById('orderProvNewBox').style.display = 'block';
+});
+
+document.getElementById('orderProvNewSave').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('orderProvNewName').value.trim();
+  const telefono = document.getElementById('orderProvNewPhone').value.trim();
+  const correo = document.getElementById('orderProvNewEmail').value.trim();
+  if(!nombre){ showToast('Escribe el nombre del proveedor'); return; }
+  const { data, error } = await supa.from('proveedores').insert({
+    location_id: currentLocation.id, nombre, telefono: telefono || null, correo: correo || null, created_by: session.user.id
+  }).select().single();
+  if(error){ showToast('Error al agregar proveedor: ' + error.message); return; }
+  PROVEEDORES.push(data);
+  PROVEEDORES.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  populateProveedorSelect(data.id);
+  document.getElementById('orderProvNewBox').style.display = 'none';
+  document.getElementById('orderProvNewName').value = '';
+  document.getElementById('orderProvNewPhone').value = '';
+  document.getElementById('orderProvNewEmail').value = '';
+  showToast('Proveedor agregado');
+});
+
+/* ---------- ADMIN: gestión de proveedores ---------- */
+document.getElementById('provSubmit').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('provName').value.trim();
+  const telefono = document.getElementById('provPhone').value.trim();
+  const correo = document.getElementById('provEmail').value.trim();
+  if(!nombre){ showToast('Escribe el nombre del proveedor'); return; }
+  const { error } = await supa.from('proveedores').insert({
+    location_id: currentLocation.id, nombre, telefono: telefono || null, correo: correo || null, created_by: session.user.id
+  });
+  if(error){ showToast('Error: ' + error.message); return; }
+  showToast('Proveedor agregado');
+  document.getElementById('provName').value = '';
+  document.getElementById('provPhone').value = '';
+  document.getElementById('provEmail').value = '';
+  await loadProveedores();
+  renderProveedoresAdmin();
+});
+
+function renderProveedoresAdmin(){
+  const box = document.getElementById('provList');
+  if(PROVEEDORES.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay proveedores registrados.</div>'; return; }
+  box.innerHTML = PROVEEDORES.map(p => `
+    <div class="gi-row">
+      <div class="gi-main">
+        <div class="gi-name">${escapeHtml(p.nombre)}</div>
+        <div class="gi-meta">${p.telefono ? '📱 ' + escapeHtml(p.telefono) : 'Sin teléfono'} ${p.correo ? ' · ✉ ' + escapeHtml(p.correo) : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 
 async function loadRecipes(){
   const { data, error } = await supa.from('recipes').select('*').eq('location_id', currentLocation.id).order('code', {ascending:true});
@@ -1583,8 +1683,9 @@ document.getElementById('adminsub-puntos').addEventListener('click', ()=>switchA
 document.getElementById('adminsub-pedidos').addEventListener('click', ()=>switchAdminSub('pedidos'));
 document.getElementById('adminsub-bajas').addEventListener('click', ()=>switchAdminSub('bajas'));
 document.getElementById('adminsub-insumos').addEventListener('click', ()=>switchAdminSub('insumos'));
+document.getElementById('adminsub-proveedores').addEventListener('click', ()=>switchAdminSub('proveedores'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos','bajas','insumos'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
@@ -1593,6 +1694,7 @@ function switchAdminSub(name){
   if(name==='pedidos') loadAdminOrders();
   if(name==='bajas') loadAdminBajas();
   if(name==='insumos') loadGroupIngredientsAdmin();
+  if(name==='proveedores') renderProveedoresAdmin();
 }
 
 /* ---------- GESTIÓN DE PUNTOS (solo super admin) ---------- */
@@ -2193,7 +2295,8 @@ document.getElementById('orderOpenNew').addEventListener('click', ()=>{
   document.querySelector('#orderModal h3').textContent = 'Nuevo pedido';
   document.getElementById('orderSubmit').textContent = 'Enviar pedido';
   document.getElementById('orderFecha').value = new Date().toISOString().slice(0,10);
-  document.getElementById('orderProveedor').value = '';
+  populateProveedorSelect(null);
+  document.getElementById('orderProvNewBox').style.display = 'none';
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
   rowsBox.appendChild(buildOrderRow(orderRowCounter++));
@@ -2209,7 +2312,12 @@ document.getElementById('orderCancel').addEventListener('click', ()=>{
 
 document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   const fecha = document.getElementById('orderFecha').value;
-  const proveedor = document.getElementById('orderProveedor').value.trim();
+  const provSelect = document.getElementById('orderProveedor');
+  const proveedorId = provSelect.value || null;
+  const proveedorObj = proveedorId ? PROVEEDORES.find(p => p.id === proveedorId) : null;
+  const proveedor = proveedorObj ? proveedorObj.nombre : null;
+  const proveedorTelefono = proveedorObj ? proveedorObj.telefono : null;
+  const proveedorCorreo = proveedorObj ? proveedorObj.correo : null;
   const rows = readOrderRows(document.getElementById('orderItemsRows'));
 
   if(!fecha){ showToast('Selecciona la fecha'); return; }
@@ -2218,7 +2326,9 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   const semanaInicio = toISODate(getWeekRange(new Date(fecha + 'T00:00:00')).monday);
 
   if(editingOrderId){
-    const { error: updErr } = await supa.from('orders').update({ fecha, proveedor: proveedor || null, semana_inicio: semanaInicio }).eq('id', editingOrderId);
+    const { error: updErr } = await supa.from('orders').update({
+      fecha, proveedor, proveedor_id: proveedorId, proveedor_telefono: proveedorTelefono, proveedor_correo: proveedorCorreo, semana_inicio: semanaInicio
+    }).eq('id', editingOrderId);
     if(updErr){ showToast('Error al guardar: ' + updErr.message); return; }
     await supa.from('order_items').delete().eq('order_id', editingOrderId);
     const itemsToInsert = rows.map(r => ({ ...r, order_id: editingOrderId }));
@@ -2232,7 +2342,8 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   }
 
   const { data: orderData, error: orderErr } = await supa.from('orders').insert({
-    location_id: currentLocation.id, fecha, proveedor: proveedor || null, semana_inicio: semanaInicio,
+    location_id: currentLocation.id, fecha, proveedor, proveedor_id: proveedorId,
+    proveedor_telefono: proveedorTelefono, proveedor_correo: proveedorCorreo, semana_inicio: semanaInicio,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
   }).select().single();
   if(orderErr){ showToast('Error al crear el pedido: ' + orderErr.message); return; }
@@ -2274,7 +2385,14 @@ function orderKanbanCardHtml(o, mode){
   }
   let actions = '';
   if(mode === 'admin' && (o.status === 'aprobado' || o.status === 'rechazado')){
-    actions = `<div class="kc-actions"><button class="btn btn-ghost btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
+    actions += `<div class="kc-actions"><button class="btn btn-ghost btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
+  }
+  if(o.status === 'aprobado' && (o.proveedor_telefono || o.proveedor_correo)){
+    let sendBtns = '<div class="kc-actions" style="display:flex; gap:6px;">';
+    if(o.proveedor_telefono) sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
+    if(o.proveedor_correo) sendBtns += `<button class="btn btn-ghost btn-small" data-mail-id="${o.id}" style="flex:1;">Correo</button>`;
+    sendBtns += '</div>';
+    actions += sendBtns;
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
   return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
@@ -2284,6 +2402,39 @@ function orderKanbanCardHtml(o, mode){
     ${extra}
     ${actions}
   </div>`;
+}
+
+function buildPedidoMessage(o){
+  const items = sortByCategoria(o.order_items || []);
+  const lines = [];
+  lines.push(`Pedido ${o.codigo || ''} - ${o.proveedor || ''}`);
+  if(o.semana_inicio){
+    lines.push('Semana del ' + new Date(o.semana_inicio+'T00:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'}));
+  }
+  let lastCat = null;
+  items.forEach(it=>{
+    if(it.categoria !== lastCat){
+      lines.push('');
+      lines.push(categoryLabel(it.categoria).toUpperCase());
+      lastCat = it.categoria;
+    }
+    lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}`);
+  });
+  return lines.join('\n');
+}
+
+function sendPedidoWhatsApp(o){
+  if(!o.proveedor_telefono){ showToast('Este proveedor no tiene teléfono registrado'); return; }
+  const phone = o.proveedor_telefono.replace(/\D/g,'');
+  const msg = encodeURIComponent(buildPedidoMessage(o));
+  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+}
+
+function sendPedidoEmail(o){
+  if(!o.proveedor_correo){ showToast('Este proveedor no tiene correo registrado'); return; }
+  const subject = encodeURIComponent('Pedido ' + (o.codigo || ''));
+  const body = encodeURIComponent(buildPedidoMessage(o));
+  window.location.href = `mailto:${o.proveedor_correo}?subject=${subject}&body=${body}`;
 }
 
 function renderOrderKanban(list, boardEl, mode){
@@ -2314,6 +2465,21 @@ function renderOrderKanban(list, boardEl, mode){
       el.addEventListener('click', ()=>openOrderEdit(el.dataset.orderId, list));
     });
   }
+
+  boardEl.querySelectorAll('[data-wa-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const order = list.find(o => o.id === btn.dataset.waId);
+      if(order) sendPedidoWhatsApp(order);
+    });
+  });
+  boardEl.querySelectorAll('[data-mail-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const order = list.find(o => o.id === btn.dataset.mailId);
+      if(order) sendPedidoEmail(order);
+    });
+  });
 }
 
 async function unlockOrder(orderId){
@@ -2335,7 +2501,8 @@ function openOrderEdit(orderId, list){
   document.querySelector('#orderModal h3').textContent = 'Editar pedido ' + (order.codigo || '');
   document.getElementById('orderSubmit').textContent = 'Guardar cambios';
   document.getElementById('orderFecha').value = order.fecha;
-  document.getElementById('orderProveedor').value = order.proveedor || '';
+  populateProveedorSelect(order.proveedor_id || null);
+  document.getElementById('orderProvNewBox').style.display = 'none';
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
   sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
