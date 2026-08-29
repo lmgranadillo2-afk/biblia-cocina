@@ -1971,6 +1971,10 @@ function buildInsumosCatalog(){
 
 function categoryLabel(prefix){ return CATEGORY_LABELS[prefix] || prefix; }
 
+function sortByCategoria(items){
+  return items.slice().sort((a,b) => categoryLabel(a.categoria).localeCompare(categoryLabel(b.categoria)) || a.ingredient_name.localeCompare(b.ingredient_name));
+}
+
 /* ---------- ADMIN: catálogo de insumos del grupo ---------- */
 let ALL_GROUP_INGREDIENTS = [];
 let LOCATION_ACTIVATION_MAP = {};
@@ -2079,13 +2083,20 @@ function buildOrderRow(rowId, existing){
   wrap.className = 'order-row';
   wrap.dataset.rowId = rowId;
 
+  const catOptions = Object.keys(INSUMOS_CATALOG).map(p =>
+    `<option value="${p}" ${existing && existing.categoria===p ? 'selected':''}>${categoryLabel(p)}</option>`
+  ).join('');
+
   wrap.innerHTML = `
+    <div class="field f-cat">
+      <label class="field-label">Categoría</label>
+      <select class="row-cat"><option value="">Elige...</option>${catOptions}</select>
+    </div>
     <div class="field f-insumo-search">
       <label class="field-label">Insumo</label>
-      <input type="text" class="row-insumo-search" placeholder="Buscar insumo... (ej. camarón, aceite)" autocomplete="off" value="${existing ? escapeHtml(existing.ingredient_name) : ''}">
+      <input type="text" class="row-insumo-search" placeholder="Elige categoría primero..." autocomplete="off" disabled value="${existing ? escapeHtml(existing.ingredient_name) : ''}">
       <div class="insumo-suggestions" style="display:none;"></div>
       <input type="hidden" class="row-insumo-code" value="${existing ? existing.ingredient_code : ''}">
-      <input type="hidden" class="row-cat" value="${existing ? existing.categoria : ''}">
     </div>
     <div class="field f-cant">
       <label class="field-label">Cant.</label>
@@ -2105,28 +2116,43 @@ function buildOrderRow(rowId, existing){
     <button type="button" class="order-row-remove" title="Quitar">&times;</button>
   `;
 
+  const catSelect = wrap.querySelector('.row-cat');
   const searchInput = wrap.querySelector('.row-insumo-search');
   const suggBox = wrap.querySelector('.insumo-suggestions');
   const codeInput = wrap.querySelector('.row-insumo-code');
-  const catInput = wrap.querySelector('.row-cat');
 
-  const flatList = [];
-  Object.keys(INSUMOS_CATALOG).forEach(cat=>{
-    INSUMOS_CATALOG[cat].forEach(it => flatList.push({ code: it.code, name: it.name, categoria: cat }));
+  function refreshSearchState(){
+    const cat = catSelect.value;
+    if(!cat){
+      searchInput.disabled = true;
+      searchInput.placeholder = 'Elige categoría primero...';
+      searchInput.value = '';
+      codeInput.value = '';
+    } else {
+      searchInput.disabled = false;
+      searchInput.placeholder = 'Buscar insumo en ' + categoryLabel(cat) + '...';
+    }
+  }
+  catSelect.addEventListener('change', ()=>{
+    if(!existing || catSelect.value !== existing.categoria){ searchInput.value=''; codeInput.value=''; }
+    refreshSearchState();
   });
+  if(!existing) refreshSearchState(); else { searchInput.disabled = false; }
 
   searchInput.addEventListener('input', ()=>{
+    const cat = catSelect.value;
     const q = searchInput.value.trim().toUpperCase();
     codeInput.value = '';
-    if(!q){ suggBox.style.display='none'; suggBox.innerHTML=''; return; }
-    const matches = flatList.filter(it => it.name.toUpperCase().includes(q) || it.code.toUpperCase().includes(q)).slice(0,8);
+    if(!cat || !q){ suggBox.style.display='none'; suggBox.innerHTML=''; return; }
+    const list = INSUMOS_CATALOG[cat] || [];
+    const matches = list.filter(it => it.name.toUpperCase().includes(q) || it.code.toUpperCase().includes(q)).slice(0,8);
     if(matches.length === 0){
-      suggBox.innerHTML = '<div class="insumo-sugg-empty">Sin resultados</div>';
+      suggBox.innerHTML = '<div class="insumo-sugg-empty">Sin resultados en esta categoría</div>';
       suggBox.style.display = 'block';
       return;
     }
     suggBox.innerHTML = matches.map(m =>
-      `<div class="insumo-sugg-item" data-code="${m.code}" data-cat="${m.categoria}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}<span class="insumo-sugg-cat">${categoryLabel(m.categoria)}</span></div>`
+      `<div class="insumo-sugg-item" data-code="${m.code}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</div>`
     ).join('');
     suggBox.style.display = 'block';
     suggBox.querySelectorAll('.insumo-sugg-item').forEach(el=>{
@@ -2134,7 +2160,6 @@ function buildOrderRow(rowId, existing){
         e.preventDefault();
         searchInput.value = el.dataset.name;
         codeInput.value = el.dataset.code;
-        catInput.value = el.dataset.cat;
         suggBox.style.display = 'none';
       });
     });
@@ -2190,8 +2215,10 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   if(!fecha){ showToast('Selecciona la fecha'); return; }
   if(rows.length === 0){ showToast('Agrega al menos un insumo con cantidad y unidad'); return; }
 
+  const semanaInicio = toISODate(getWeekRange(new Date(fecha + 'T00:00:00')).monday);
+
   if(editingOrderId){
-    const { error: updErr } = await supa.from('orders').update({ fecha, proveedor: proveedor || null }).eq('id', editingOrderId);
+    const { error: updErr } = await supa.from('orders').update({ fecha, proveedor: proveedor || null, semana_inicio: semanaInicio }).eq('id', editingOrderId);
     if(updErr){ showToast('Error al guardar: ' + updErr.message); return; }
     await supa.from('order_items').delete().eq('order_id', editingOrderId);
     const itemsToInsert = rows.map(r => ({ ...r, order_id: editingOrderId }));
@@ -2205,7 +2232,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   }
 
   const { data: orderData, error: orderErr } = await supa.from('orders').insert({
-    location_id: currentLocation.id, fecha, proveedor: proveedor || null,
+    location_id: currentLocation.id, fecha, proveedor: proveedor || null, semana_inicio: semanaInicio,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
   }).select().single();
   if(orderErr){ showToast('Error al crear el pedido: ' + orderErr.message); return; }
@@ -2236,7 +2263,7 @@ const KANBAN_COLUMNS = [
 ];
 
 function orderKanbanCardHtml(o, mode){
-  const items = o.order_items || [];
+  const items = sortByCategoria(o.order_items || []);
   const itemsPreview = items.slice(0,3).map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ') +
     (items.length > 3 ? ` y ${items.length - 3} más...` : '');
   const registrada = new Date(o.created_at);
@@ -2251,7 +2278,7 @@ function orderKanbanCardHtml(o, mode){
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
   return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
-    <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
+    <div class="kc-title">${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
     <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${mode==='admin' ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
     <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
     ${extra}
@@ -2305,13 +2332,13 @@ function openOrderEdit(orderId, list){
   const order = list.find(o => o.id === orderId);
   if(!order) return;
   editingOrderId = orderId;
-  document.querySelector('#orderModal h3').textContent = 'Editar pedido';
+  document.querySelector('#orderModal h3').textContent = 'Editar pedido ' + (order.codigo || '');
   document.getElementById('orderSubmit').textContent = 'Guardar cambios';
   document.getElementById('orderFecha').value = order.fecha;
   document.getElementById('orderProveedor').value = order.proveedor || '';
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
-  (order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
+  sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
   if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++)); }
   document.getElementById('orderModal').classList.add('open');
 }
@@ -2333,11 +2360,12 @@ function openOrderReview(orderId, list){
   const order = list.find(o => o.id === orderId);
   if(!order) return;
   currentReviewOrderId = orderId;
+  const semanaTxt = order.semana_inicio ? ' · Semana del ' + new Date(order.semana_inicio+'T00:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'}) : '';
   document.getElementById('orderReviewMeta').textContent =
-    `${order.proveedor || 'Sin proveedor'} · Fecha ${order.fecha} · Pedido por ${order.creado_por_nombre || ''}`;
+    `${order.codigo || ''} · ${order.proveedor || 'Sin proveedor'} · Fecha ${order.fecha}${semanaTxt} · Pedido por ${order.creado_por_nombre || ''}`;
   const rowsBox = document.getElementById('orderReviewRows');
   rowsBox.innerHTML = '';
-  (order.order_items || []).forEach(it=>{
+  sortByCategoria(order.order_items || []).forEach(it=>{
     rowsBox.appendChild(buildOrderRow(orderRowCounter++, it));
   });
   if((order.order_items || []).length === 0){
@@ -2391,10 +2419,10 @@ function renderOrderHistory(){
   if(list.length === 0){ box.innerHTML = '<div class="empty-list">No se encontraron pedidos.</div>'; return; }
 
   box.innerHTML = list.map(o => {
-    const items = o.order_items || [];
+    const items = sortByCategoria(o.order_items || []);
     const itemsPreview = items.map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ');
     return `<div class="kanban-card ${o.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')} <span class="oe-status-badge ${o.status}" style="margin-left:8px;">${o.status}</span></div>
+      <div class="kc-title">${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')} <span class="oe-status-badge ${o.status}" style="margin-left:8px;">${o.status}</span></div>
       <div class="kc-meta">Fecha: ${o.fecha} · ${items.length} insumo${items.length===1?'':'s'} · ${escapeHtml(o.creado_por_nombre||'')}</div>
       <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
       ${o.status==='rechazado' && o.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(o.rechazo_motivo)}</div>` : ''}
@@ -2546,7 +2574,7 @@ function bajaEntryHtml(b, isAdmin){
   return `<div class="order-entry ${b.status}" data-baja-id="${b.id}">
     <div class="oe-top">
       <div>
-        <div class="oe-title">${escapeHtml(b.item_name)}</div>
+        <div class="oe-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)}</div>
         <div class="oe-meta">${tipoLabel} · Fecha: <b>${b.fecha}</b> · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · Registrado ${hora}${isAdmin ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
       </div>
       <span class="oe-status-badge ${b.status}">${b.status}</span>
