@@ -1500,7 +1500,7 @@ function renderProveedoresAdmin(){
 
 
 async function loadRecipes(){
-  const { data, error } = await supa.from('recipes').select('*').eq('location_id', currentLocation.id).order('code', {ascending:true});
+  const { data, error } = await supa.from('recipes').select('*').eq('area_id', currentArea.id).order('code', {ascending:true});
   if(error){
     RECIPES = [];
     showToast('No se pudo cargar el recetario: ' + error.message);
@@ -1576,7 +1576,7 @@ async function renderDetail(r){
     </div>
   `;
 
-  const { data: obsList, error } = await supa.from('observations').select('*').eq('recipe_code', r.code).eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { data: obsList, error } = await supa.from('observations').select('*').eq('recipe_code', r.code).eq('area_id', currentArea.id).order('created_at', {ascending:false});
   const box = document.getElementById('obsListBox');
   if(error){ box.innerHTML = '<div class="empty-note">No se pudieron cargar las observaciones.</div>'; }
   else if(!obsList || obsList.length===0){ box.innerHTML = '<div class="empty-note">Sin observaciones registradas para esta receta.</div>'; }
@@ -1592,7 +1592,7 @@ async function renderDetail(r){
     if(!text){ showToast('Escribe la observación'); return; }
     const { error } = await supa.from('observations').insert({
       recipe_code: r.code, author: profile.name || session.user.email, note: text, created_by: session.user.id,
-      location_id: currentLocation.id
+      location_id: currentLocation.id, area_id: currentArea.id
     });
     if(error){ showToast('Error al guardar: ' + error.message); return; }
     showToast('Observación guardada');
@@ -1641,7 +1641,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
     cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
     rendimiento_esperado: expectedYieldStr, responsable,
     rendimiento_real: realYield, observacion: obs,
-    created_by: session.user.id, location_id: currentLocation.id
+    created_by: session.user.id, location_id: currentLocation.id, area_id: currentArea.id
   };
 
   document.getElementById('cmFecha').textContent = fecha;
@@ -1659,7 +1659,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   dupBox.innerHTML = '';
   confirmBtn.disabled = false;
 
-  const { data: dups, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_location_id: currentLocation.id });
+  const { data: dups, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_area_id: currentArea.id });
   if(!dupErr && dups && dups.length > 0){
     const items = dups.map(d => {
       const hora = new Date(d.created_at).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
@@ -1701,7 +1701,7 @@ document.getElementById('cmConfirm').addEventListener('click', async ()=>{
 });
 
 async function loadMyProductions(){
-  const { data, error } = await supa.from('productions').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false}).limit(50);
+  const { data, error } = await supa.from('productions').select('*').eq('area_id', currentArea.id).order('created_at', {ascending:false}).limit(50);
   myProductions = error ? [] : data;
   renderProdHistory(myProductions, document.getElementById('prodHistList'), document.getElementById('prodHistCount'), false);
   renderWeeklySummary();
@@ -1781,7 +1781,7 @@ let adminRows = [];
 let pendingVoidId = null;
 
 async function loadAdminHistory(){
-  const { data, error } = await supa.from('productions').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { data, error } = await supa.from('productions').select('*').eq('area_id', currentArea.id).order('created_at', {ascending:false});
   adminRows = error ? [] : data;
   applyAdminFilters();
 }
@@ -2047,12 +2047,12 @@ async function loadCalendarMonth(){
   const startIso = dateKey(monthStart), endIso = dateKey(monthEnd);
 
   const { data: schedData, error: schedErr } = await supa.from('schedule_items')
-    .select('*').eq('location_id', currentLocation.id)
+    .select('*').eq('area_id', currentArea.id)
     .gte('fecha', startIso).lte('fecha', endIso);
   calScheduleItems = schedErr ? [] : (schedData || []);
 
   const { data: prodData, error: prodErr } = await supa.from('productions')
-    .select('fecha, recipe_code').eq('location_id', currentLocation.id).eq('status', 'activo')
+    .select('fecha, recipe_code').eq('area_id', currentArea.id).eq('status', 'activo')
     .gte('fecha', startIso).lte('fecha', endIso);
   calProducedSet = new Set((prodErr ? [] : (prodData || [])).map(p => p.fecha + '::' + p.recipe_code));
 
@@ -2175,7 +2175,7 @@ document.getElementById('schedSubmitBtn').addEventListener('click', async ()=>{
   const { error } = await supa.from('schedule_items').insert({
     fecha, recipe_code: match.code, recipe_name: match.name,
     cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
-    notas: notas || null, created_by: session.user.id, location_id: currentLocation.id
+    notas: notas || null, created_by: session.user.id, location_id: currentLocation.id, area_id: currentArea.id
   });
   if(error){ showToast('Error al agregar: ' + error.message); return; }
   showToast('Agregado al cronograma');
