@@ -577,9 +577,24 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       </div>
       <div class="prod-history">
         <div id="weeklySummaryBox"></div>
-        <h2>Mis producciones</h2>
-        <span class="sub" id="prodHistCount"></span>
-        <div id="prodHistList"></div>
+        <div class="admin-header" style="margin-bottom:4px;">
+          <h2>Mis producciones</h2>
+          <button class="btn btn-ghost btn-small" id="prodToggleHistView">Ver historial completo</button>
+        </div>
+        <div id="prodRecentView">
+          <span class="sub" id="prodHistCount"></span>
+          <div id="prodHistList"></div>
+        </div>
+        <div id="prodFullHistView" style="display:none;">
+          <div class="admin-filters">
+            <div class="field"><label class="field-label">Desde</label><input type="date" id="pfhDesde"></div>
+            <div class="field"><label class="field-label">Hasta</label><input type="date" id="pfhHasta"></div>
+            <div class="field"><label class="field-label">Receta</label><input type="text" id="pfhReceta" placeholder="Nombre o código"></div>
+            <button class="btn btn-accent btn-small" id="pfhFilterApply">Filtrar</button>
+          </div>
+          <span class="sub" id="pfhCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+          <div id="pfhList" style="margin-top:10px;"></div>
+        </div>
       </div>
     </div>
 
@@ -605,19 +620,63 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     <div id="view-pedidos" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header">
         <h2>Pedidos de insumos</h2>
-        <button class="btn btn-accent btn-small" id="orderOpenNew">+ Nuevo pedido</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-small" id="myOrderToggleHist">Ver mi historial completo</button>
+          <button class="btn btn-accent btn-small" id="orderOpenNew">+ Nuevo pedido</button>
+        </div>
       </div>
       <div class="empty-note" style="margin-bottom:14px;">Pide insumos a proveedor (no incluye subrecetas, esas se hacen en el punto). Se ve la semana actual — toca un pedido pendiente tuyo para editarlo.</div>
-      <div class="kanban-board" id="orderKanban"></div>
+      <div id="myOrderWeekView">
+        <div class="kanban-board" id="orderKanban"></div>
+      </div>
+      <div id="myOrderHistView" style="display:none;">
+        <div class="admin-filters">
+          <div class="field"><label class="field-label">Desde</label><input type="date" id="mohDesde"></div>
+          <div class="field"><label class="field-label">Hasta</label><input type="date" id="mohHasta"></div>
+          <div class="field"><label class="field-label">Estado</label>
+            <select id="mohEstado">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+          </div>
+          <button class="btn btn-accent btn-small" id="mohFilterApply">Filtrar</button>
+        </div>
+        <span class="sub" id="mohCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="mohList" style="margin-top:10px;"></div>
+      </div>
     </div>
 
     <div id="view-bajas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header">
         <h2>Bajas</h2>
-        <button class="btn btn-accent btn-small" id="bajaOpenNew">+ Nueva baja</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-small" id="myBajaToggleHist">Ver mi historial completo</button>
+          <button class="btn btn-accent btn-small" id="bajaOpenNew">+ Nueva baja</button>
+        </div>
       </div>
       <div class="empty-note" style="margin-bottom:14px;">Registra la pérdida de un insumo o de una receta ya preparada, solo eligiendo de lo que ya existe en el sistema. Un admin la revisa y la aprueba o rechaza. Se ve la semana actual.</div>
-      <div class="kanban-board" id="bajaKanban"></div>
+      <div id="myBajaWeekView">
+        <div class="kanban-board" id="bajaKanban"></div>
+      </div>
+      <div id="myBajaHistView" style="display:none;">
+        <div class="admin-filters">
+          <div class="field"><label class="field-label">Desde</label><input type="date" id="mbhDesde"></div>
+          <div class="field"><label class="field-label">Hasta</label><input type="date" id="mbhHasta"></div>
+          <div class="field"><label class="field-label">Estado</label>
+            <select id="mbhEstado">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+          </div>
+          <button class="btn btn-accent btn-small" id="mbhFilterApply">Filtrar</button>
+        </div>
+        <span class="sub" id="mbhCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="mbhList" style="margin-top:10px;"></div>
+      </div>
     </div>
 
     <div id="view-inventario" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
@@ -1832,6 +1891,42 @@ function renderWeeklySummary(){
   </div>`;
 }
 
+/* ---------- MI HISTORIAL COMPLETO: producción ---------- */
+let myProdHistoryCache = [];
+
+document.getElementById('prodToggleHistView').addEventListener('click', ()=>{
+  const recentView = document.getElementById('prodRecentView');
+  const fullView = document.getElementById('prodFullHistView');
+  const showingRecent = fullView.style.display === 'none';
+  recentView.style.display = showingRecent ? 'none' : 'block';
+  fullView.style.display = showingRecent ? 'block' : 'none';
+  document.getElementById('prodToggleHistView').textContent = showingRecent ? 'Ver recientes' : 'Ver historial completo';
+  if(showingRecent) loadMyProdHistory();
+});
+
+async function loadMyProdHistory(){
+  const { data, error } = await supa.from('productions').select('*').eq('area_id', currentArea.id).eq('created_by', session.user.id).order('created_at', {ascending:false});
+  myProdHistoryCache = error ? [] : (data || []);
+  renderMyProdHistory();
+}
+
+function renderMyProdHistory(){
+  const desde = document.getElementById('pfhDesde').value;
+  const hasta = document.getElementById('pfhHasta').value;
+  const receta = document.getElementById('pfhReceta').value.trim().toUpperCase();
+
+  let list = myProdHistoryCache.slice();
+  if(desde) list = list.filter(p => p.fecha >= desde);
+  if(hasta) list = list.filter(p => p.fecha <= hasta);
+  if(receta) list = list.filter(p => p.recipe_name.toUpperCase().includes(receta) || p.recipe_code.toUpperCase().includes(receta));
+
+  document.getElementById('pfhCount').textContent = list.length + ' registro' + (list.length===1?'':'s');
+  const box = document.getElementById('pfhList');
+  renderProdHistory(list, box, null, false);
+}
+
+document.getElementById('pfhFilterApply').addEventListener('click', renderMyProdHistory);
+
 function prodEntryHtml(p, isAdmin){
   const registrada = new Date(p.created_at);
   const hora = registrada.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
@@ -3009,6 +3104,53 @@ function renderOrderHistory(){
 
 document.getElementById('ohFilterApply').addEventListener('click', renderOrderHistory);
 
+/* ---------- MI HISTORIAL COMPLETO: pedidos ---------- */
+let myOrderHistoryCache = [];
+
+document.getElementById('myOrderToggleHist').addEventListener('click', ()=>{
+  const weekView = document.getElementById('myOrderWeekView');
+  const histView = document.getElementById('myOrderHistView');
+  const showingWeek = histView.style.display === 'none';
+  weekView.style.display = showingWeek ? 'none' : 'block';
+  histView.style.display = showingWeek ? 'block' : 'none';
+  document.getElementById('myOrderToggleHist').textContent = showingWeek ? 'Ver semana actual' : 'Ver mi historial completo';
+  if(showingWeek) loadMyOrderHistory();
+});
+
+async function loadMyOrderHistory(){
+  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('area_id', currentArea.id).eq('created_by', session.user.id).order('created_at', {ascending:false});
+  myOrderHistoryCache = error ? [] : (data || []);
+  renderMyOrderHistory();
+}
+
+function renderMyOrderHistory(){
+  const desde = document.getElementById('mohDesde').value;
+  const hasta = document.getElementById('mohHasta').value;
+  const estado = document.getElementById('mohEstado').value;
+
+  let list = myOrderHistoryCache.slice();
+  if(desde) list = list.filter(o => o.fecha >= desde);
+  if(hasta) list = list.filter(o => o.fecha <= hasta);
+  if(estado) list = list.filter(o => o.status === estado);
+
+  document.getElementById('mohCount').textContent = list.length + ' pedido' + (list.length===1?'':'s');
+  const box = document.getElementById('mohList');
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No se encontraron pedidos.</div>'; return; }
+
+  box.innerHTML = list.map(o => {
+    const items = sortByCategoria(o.order_items || []);
+    const itemsPreview = items.map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ');
+    return `<div class="kanban-card ${o.status}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-title">${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')} <span class="oe-status-badge ${o.status}" style="margin-left:8px;">${o.status}</span></div>
+      <div class="kc-meta">Fecha: ${o.fecha} · ${items.length} insumo${items.length===1?'':'s'}</div>
+      <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
+      ${o.status==='rechazado' && o.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(o.rechazo_motivo)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('mohFilterApply').addEventListener('click', renderMyOrderHistory);
+
 document.getElementById('orderReviewCancel').addEventListener('click', ()=>{
   document.getElementById('orderReviewModal').classList.remove('open');
   currentReviewOrderId = null;
@@ -3294,6 +3436,52 @@ function renderBajaHistory(){
 }
 
 document.getElementById('bhFilterApply').addEventListener('click', renderBajaHistory);
+
+/* ---------- MI HISTORIAL COMPLETO: bajas ---------- */
+let myBajaHistoryCache = [];
+
+document.getElementById('myBajaToggleHist').addEventListener('click', ()=>{
+  const weekView = document.getElementById('myBajaWeekView');
+  const histView = document.getElementById('myBajaHistView');
+  const showingWeek = histView.style.display === 'none';
+  weekView.style.display = showingWeek ? 'none' : 'block';
+  histView.style.display = showingWeek ? 'block' : 'none';
+  document.getElementById('myBajaToggleHist').textContent = showingWeek ? 'Ver semana actual' : 'Ver mi historial completo';
+  if(showingWeek) loadMyBajaHistory();
+});
+
+async function loadMyBajaHistory(){
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).eq('created_by', session.user.id).order('created_at', {ascending:false});
+  myBajaHistoryCache = error ? [] : (data || []);
+  renderMyBajaHistory();
+}
+
+function renderMyBajaHistory(){
+  const desde = document.getElementById('mbhDesde').value;
+  const hasta = document.getElementById('mbhHasta').value;
+  const estado = document.getElementById('mbhEstado').value;
+
+  let list = myBajaHistoryCache.slice();
+  if(desde) list = list.filter(b => b.fecha >= desde);
+  if(hasta) list = list.filter(b => b.fecha <= hasta);
+  if(estado) list = list.filter(b => b.status === estado);
+
+  document.getElementById('mbhCount').textContent = list.length + ' baja' + (list.length===1?'':'s');
+  const box = document.getElementById('mbhList');
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No se encontraron bajas.</div>'; return; }
+
+  box.innerHTML = list.map(b => {
+    const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
+    return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${b.status}</span></div>
+      <div class="kc-meta">${tipoLabel} · Fecha: ${b.fecha} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</div>
+      <div class="kc-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
+      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('mbhFilterApply').addEventListener('click', renderMyBajaHistory);
 
 document.getElementById('bhDownloadCsv').addEventListener('click', ()=>{
   if(adminBajaHistoryCache.length === 0){ showToast('No hay datos para exportar'); return; }
