@@ -1868,6 +1868,10 @@ async function loadUsers(){
           <option value="cocina" ${u.role==='cocina'?'selected':''}>Cocina</option>
           <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
         </select>
+        <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-muted); cursor:pointer;">
+          <input type="checkbox" data-super-for="${u.id}" ${u.is_super_admin?'checked':''} style="width:auto;">
+          Super admin
+        </label>
         <button class="btn btn-accent btn-small" data-save-role="${u.id}">Guardar</button>
       </div>
     </div>
@@ -1876,15 +1880,22 @@ async function loadUsers(){
     btn.addEventListener('click', async ()=>{
       const id = btn.dataset.saveRole;
       const select = wrap.querySelector(`[data-role-for="${id}"]`);
+      const superCb = wrap.querySelector(`[data-super-for="${id}"]`);
       const newRole = select.value;
+      const newSuper = superCb.checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole }).eq('id', id);
+      if(id === session.user.id && !newSuper){
+        showToast('No puedes quitarte tu propio permiso de super admin desde aquí');
+        superCb.checked = true;
+        return;
+      }
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
-      showToast('Rol actualizado');
+      showToast('Usuario actualizado');
     });
   });
 }
