@@ -616,9 +616,8 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <h2>Bajas</h2>
         <button class="btn btn-accent btn-small" id="bajaOpenNew">+ Nueva baja</button>
       </div>
-      <div class="empty-note" style="margin-bottom:14px;">Registra la pérdida de un insumo o de una receta ya preparada, solo eligiendo de lo que ya existe en el sistema. Un admin la revisa y la aprueba o rechaza.</div>
-      <span class="sub" id="bajaHistCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
-      <div id="bajaHistList" style="margin-top:10px;"></div>
+      <div class="empty-note" style="margin-bottom:14px;">Registra la pérdida de un insumo o de una receta ya preparada, solo eligiendo de lo que ya existe en el sistema. Un admin la revisa y la aprueba o rechaza. Se ve la semana actual.</div>
+      <div class="kanban-board" id="bajaKanban"></div>
     </div>
 
     <div id="view-inventario" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
@@ -731,20 +730,41 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       </div>
 
       <div id="adminpanel-bajas" class="adminpanel">
-        <div class="admin-header"><h2>Bajas del punto</h2></div>
-        <div class="admin-filters">
-          <div class="field"><label class="field-label">Estado</label>
-            <select id="bajaFilterStatus">
-              <option value="">Todos</option>
-              <option value="pendiente" selected>Pendientes</option>
-              <option value="aprobado">Aprobados</option>
-              <option value="rechazado">Rechazados</option>
-            </select>
-          </div>
-          <button class="btn btn-accent btn-small" id="bajaFilterApply">Filtrar</button>
+        <div class="admin-header">
+          <h2>Bajas del área</h2>
+          <button class="btn btn-ghost btn-small" id="bajaToggleView">Ver historial completo</button>
         </div>
-        <span class="sub" id="adminBajaCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
-        <div id="adminBajaList" style="margin-top:10px;"></div>
+
+        <div id="bajaWeekView">
+          <div class="empty-note" style="margin-bottom:14px;">Semana actual. Toca una baja pendiente para revisarla.</div>
+          <div class="kanban-board" id="adminBajaKanban"></div>
+        </div>
+
+        <div id="bajaHistoryView" style="display:none;">
+          <div class="admin-filters">
+            <div class="field"><label class="field-label">Desde</label><input type="date" id="bhDesde"></div>
+            <div class="field"><label class="field-label">Hasta</label><input type="date" id="bhHasta"></div>
+            <div class="field"><label class="field-label">Tipo</label>
+              <select id="bhTipo">
+                <option value="">Todos</option>
+                <option value="insumo">Insumo</option>
+                <option value="receta">Receta preparada</option>
+              </select>
+            </div>
+            <div class="field"><label class="field-label">Estado</label>
+              <select id="bhEstado">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="aprobado">Aprobado</option>
+                <option value="rechazado">Rechazado</option>
+              </select>
+            </div>
+            <button class="btn btn-accent btn-small" id="bhFilterApply">Filtrar</button>
+            <button class="btn btn-ghost btn-small" id="bhDownloadCsv">Descargar CSV</button>
+          </div>
+          <span class="sub" id="bhCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+          <div id="bhList" style="margin-top:10px;"></div>
+        </div>
       </div>
 
       <div id="adminpanel-insumos" class="adminpanel">
@@ -3115,38 +3135,50 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
 });
 
 async function loadMyBajas(){
-  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { monday, sunday } = getWeekRange(new Date());
+  const { data, error } = await supa.from('bajas').select('*')
+    .eq('location_id', currentLocation.id)
+    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
+    .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
-  renderBajaList(list, document.getElementById('bajaHistList'), document.getElementById('bajaHistCount'), false);
+  renderBajaKanban(list, document.getElementById('bajaKanban'), 'own');
 }
 
-function bajaEntryHtml(b, isAdmin){
-  const registrada = new Date(b.created_at);
-  const hora = registrada.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+function bajaKanbanCardHtml(b, mode){
   const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
+  const registrada = new Date(b.created_at);
+  const fechaCorta = registrada.toLocaleDateString('es-CO', {day:'numeric', month:'short'});
   let extra = '';
   if(b.status === 'rechazado' && b.rechazo_motivo){
-    extra = `<div class="oe-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>`;
+    extra = `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(b.rechazo_motivo)}</div>`;
   }
-  return `<div class="order-entry ${b.status}" data-baja-id="${b.id}">
-    <div class="oe-top">
-      <div>
-        <div class="oe-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)}</div>
-        <div class="oe-meta">${tipoLabel} · Fecha: <b>${b.fecha}</b> · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · Registrado ${hora}${isAdmin ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
-      </div>
-      <span class="oe-status-badge ${b.status}">${b.status}</span>
-    </div>
-    <div class="oe-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
+  const clickable = mode === 'admin' && b.status === 'pendiente';
+  return `<div class="kanban-card ${b.status}" data-baja-id="${b.id}" style="${clickable?'':'cursor:default;'}">
+    <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)}</div>
+    <div class="kc-meta">${tipoLabel} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · ${fechaCorta}${mode==='admin' ? '<br>' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
+    <div class="kc-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
     ${extra}
   </div>`;
 }
 
-function renderBajaList(list, wrapEl, countEl, isAdmin){
-  if(countEl) countEl.textContent = list.length + ' baja' + (list.length===1?'':'s');
-  if(list.length === 0){ wrapEl.innerHTML = '<div class="empty-list">Aún no hay bajas registradas.</div>'; return; }
-  wrapEl.innerHTML = list.map(b => bajaEntryHtml(b, isAdmin)).join('');
-  if(isAdmin){
-    wrapEl.querySelectorAll('.order-entry.pendiente').forEach(el=>{
+function renderBajaKanban(list, boardEl, mode){
+  boardEl.innerHTML = KANBAN_COLUMNS.map(col => {
+    const items = list.filter(b => b.status === col.key);
+    const cards = items.length === 0
+      ? '<div class="kanban-empty">Sin bajas</div>'
+      : items.map(b => bajaKanbanCardHtml(b, mode)).join('');
+    return `<div>
+      <div class="kanban-col-header">
+        <span class="kanban-dot ${col.key}"></span>
+        <span class="kanban-col-title">${col.label}</span>
+        <span class="kanban-col-count">${items.length}</span>
+      </div>
+      ${cards}
+    </div>`;
+  }).join('');
+
+  if(mode === 'admin'){
+    boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
       el.addEventListener('click', ()=>openBajaReview(el.dataset.bajaId, list));
     });
   }
@@ -3155,15 +3187,14 @@ function renderBajaList(list, wrapEl, countEl, isAdmin){
 /* ---------- ADMIN: revisar bajas ---------- */
 let currentReviewBajaId = null;
 
-document.getElementById('bajaFilterApply').addEventListener('click', loadAdminBajas);
-
 async function loadAdminBajas(){
-  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
-  const all = error ? [] : (data || []);
-  const statusFilter = document.getElementById('bajaFilterStatus').value;
-  const filtered = statusFilter ? all.filter(b => b.status === statusFilter) : all;
-  renderBajaList(filtered, document.getElementById('adminBajaList'), document.getElementById('adminBajaCount'), true);
-  window._adminBajasCache = all;
+  const { monday, sunday } = getWeekRange(new Date());
+  const { data, error } = await supa.from('bajas').select('*')
+    .eq('location_id', currentLocation.id)
+    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
+    .order('created_at', {ascending:false});
+  const list = error ? [] : (data || []);
+  renderBajaKanban(list, document.getElementById('adminBajaKanban'), 'admin');
 }
 
 function openBajaReview(bajaId, list){
@@ -3214,6 +3245,75 @@ document.getElementById('bajaReviewReject').addEventListener('click', async ()=>
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
   loadAdminBajas();
+});
+
+/* ---------- ADMIN: historial completo de bajas ---------- */
+let adminBajaHistoryCache = [];
+
+document.getElementById('bajaToggleView').addEventListener('click', ()=>{
+  const weekView = document.getElementById('bajaWeekView');
+  const histView = document.getElementById('bajaHistoryView');
+  const showingWeek = weekView.style.display !== 'none';
+  weekView.style.display = showingWeek ? 'none' : 'block';
+  histView.style.display = showingWeek ? 'block' : 'none';
+  document.getElementById('bajaToggleView').textContent = showingWeek ? 'Ver semana actual' : 'Ver historial completo';
+  if(showingWeek) loadBajaHistory();
+});
+
+async function loadBajaHistory(){
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  adminBajaHistoryCache = error ? [] : (data || []);
+  renderBajaHistory();
+}
+
+function renderBajaHistory(){
+  const desde = document.getElementById('bhDesde').value;
+  const hasta = document.getElementById('bhHasta').value;
+  const tipo = document.getElementById('bhTipo').value;
+  const estado = document.getElementById('bhEstado').value;
+
+  let list = adminBajaHistoryCache.slice();
+  if(desde) list = list.filter(b => b.fecha >= desde);
+  if(hasta) list = list.filter(b => b.fecha <= hasta);
+  if(tipo) list = list.filter(b => b.tipo === tipo);
+  if(estado) list = list.filter(b => b.status === estado);
+
+  document.getElementById('bhCount').textContent = list.length + ' baja' + (list.length===1?'':'s');
+  const box = document.getElementById('bhList');
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No se encontraron bajas.</div>'; return; }
+
+  box.innerHTML = list.map(b => {
+    const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
+    return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${b.status}</span></div>
+      <div class="kc-meta">${tipoLabel} · Fecha: ${b.fecha} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · ${escapeHtml(b.creado_por_nombre||'')}</div>
+      <div class="kc-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
+      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('bhFilterApply').addEventListener('click', renderBajaHistory);
+
+document.getElementById('bhDownloadCsv').addEventListener('click', ()=>{
+  if(adminBajaHistoryCache.length === 0){ showToast('No hay datos para exportar'); return; }
+  const headers = ['codigo','tipo','item','cantidad','unidad','fecha','motivo','estado','registrado_por','anulado_por','motivo_rechazo','registrado_en'];
+  const lines = [headers.join(',')];
+  adminBajaHistoryCache.forEach(b=>{
+    const row = [
+      b.codigo||'', b.tipo, b.item_name, b.cantidad, b.unidad, b.fecha,
+      (b.motivo||'').replace(/,/g,';').replace(/\n/g,' '), b.status,
+      b.creado_por_nombre||'', b.resuelto_por||'',
+      (b.rechazo_motivo||'').replace(/,/g,';').replace(/\n/g,' '), b.created_at
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`);
+    lines.push(row.join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `bajas_${currentLocation.name.replace(/\s+/g,'_')}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 /* ---------- INVENTARIO ---------- */
