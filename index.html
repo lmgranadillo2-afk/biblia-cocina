@@ -981,6 +981,12 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     <div class="section-label" style="margin-top:16px;">Insumos</div>
     <div id="orderItemsRows"></div>
     <button class="btn btn-ghost btn-small" id="orderAddRow" style="margin-top:8px;">+ Agregar insumo</button>
+    <div id="orderUrgenteBox" style="margin-top:16px; padding:12px; border:1px solid var(--warn); border-radius:9px; background:rgba(232,185,58,0.1);">
+      <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--text);">
+        <input type="checkbox" id="orderUrgente" style="width:auto; margin-top:2px;">
+        <span><b style="color:var(--warn);">Marcar como urgente</b> — se aprueba solo, sin esperar revisión del admin, y ya lo puedes enviar por WhatsApp de una vez. Úsalo solo si de verdad no puede esperar.</span>
+      </label>
+    </div>
     <div class="modal-actions" style="margin-top:18px;">
       <button class="btn btn-ghost" id="orderCancel">Cancelar</button>
       <button class="btn btn-accent" id="orderSubmit">Enviar pedido</button>
@@ -2643,6 +2649,8 @@ document.getElementById('orderOpenNew').addEventListener('click', ()=>{
   document.getElementById('orderFecha').value = new Date().toISOString().slice(0,10);
   populateProveedorSelect(null);
   document.getElementById('orderProvNewBox').style.display = 'none';
+  document.getElementById('orderUrgenteBox').style.display = 'block';
+  document.getElementById('orderUrgente').checked = false;
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
   rowsBox.appendChild(buildOrderRow(orderRowCounter++));
@@ -2687,18 +2695,27 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
     return;
   }
 
-  const { data: orderData, error: orderErr } = await supa.from('orders').insert({
+  const isUrgente = document.getElementById('orderUrgente').checked;
+  const orderPayload = {
     location_id: currentLocation.id, area_id: currentArea.id, fecha, proveedor, proveedor_id: proveedorId,
     proveedor_telefono: proveedorTelefono, proveedor_correo: proveedorCorreo, semana_inicio: semanaInicio,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
-  }).select().single();
+  };
+  if(isUrgente){
+    orderPayload.urgente = true;
+    orderPayload.status = 'aprobado';
+    orderPayload.resuelto_por = profile.name || session.user.email;
+    orderPayload.resuelto_at = new Date().toISOString();
+  }
+
+  const { data: orderData, error: orderErr } = await supa.from('orders').insert(orderPayload).select().single();
   if(orderErr){ showToast('Error al crear el pedido: ' + orderErr.message); return; }
 
   const itemsToInsert = rows.map(r => ({ ...r, order_id: orderData.id }));
   const { error: itemsErr } = await supa.from('order_items').insert(itemsToInsert);
   if(itemsErr){ showToast('Error al guardar los insumos: ' + itemsErr.message); return; }
 
-  showToast('Pedido enviado');
+  showToast(isUrgente ? 'Pedido urgente aprobado automáticamente' : 'Pedido enviado');
   document.getElementById('orderModal').classList.remove('open');
   loadMyOrders();
 });
@@ -2747,7 +2764,7 @@ function orderKanbanCardHtml(o, mode){
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
   return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
-    <div class="kc-title">${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
+    <div class="kc-title">${o.urgente ? '<span style="color:var(--warn);">🔴 Urgente</span> · ' : ''}${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
     <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${mode==='admin' ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
     <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
     ${extra}
@@ -2875,6 +2892,7 @@ function openOrderEdit(orderId, list){
   document.getElementById('orderFecha').value = order.fecha;
   populateProveedorSelect(order.proveedor_id || null);
   document.getElementById('orderProvNewBox').style.display = 'none';
+  document.getElementById('orderUrgenteBox').style.display = 'none';
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
   sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
