@@ -2076,11 +2076,25 @@ document.getElementById('newLocSubmit').addEventListener('click', async ()=>{
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') + '-' + Date.now().toString(36);
 
-  const { error } = await supa.from('locations').insert({
+  const { data: newLoc, error } = await supa.from('locations').insert({
     slug, name, logo_data_url: logoDataUrl, color_bg: bg, color_accent: accent, color_accent_2: accent2
-  });
+  }).select().single();
   if(error){ showToast('Error al crear el punto: ' + error.message); return; }
-  showToast('Punto creado: ' + name);
+
+  // Te da acceso al punto de una vez, y crea su área "Cocina" con
+  // todos los módulos, para que se pueda entrar de inmediato
+  await supa.from('user_locations').insert({ user_id: session.user.id, location_id: newLoc.id });
+
+  const { data: newArea, error: areaErr } = await supa.from('areas').insert({
+    location_id: newLoc.id, name: 'Cocina',
+    modules: ['recetario','produccion','cronograma','pedidos','bajas','inventario']
+  }).select().single();
+
+  if(!areaErr && newArea){
+    await supa.from('user_areas').insert({ user_id: session.user.id, area_id: newArea.id });
+  }
+
+  showToast('Punto creado con su área Cocina, ya puedes entrar');
   document.getElementById('newLocName').value = '';
   fileInput.value = '';
   loadLocationsAdmin();
