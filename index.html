@@ -515,6 +515,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button id="tab-cronograma">Cronograma</button>
       <button id="tab-pedidos">Pedidos</button>
       <button id="tab-bajas">Bajas</button>
+      <button id="tab-inventario">Inventario</button>
       <button id="tab-admin" style="display:none">Admin</button>
     </nav>
   </header>
@@ -612,6 +613,23 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div id="bajaHistList" style="margin-top:10px;"></div>
     </div>
 
+    <div id="view-inventario" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header"><h2>Inventario</h2></div>
+      <div class="empty-note" style="margin-bottom:14px;">Elige un día para hacer el conteo. Una vez guardado, queda bloqueado — el admin lo puede desbloquear si hace falta corregir.</div>
+
+      <div class="cal-nav">
+        <button class="btn btn-ghost btn-small" id="invPrevMonth">&larr;</button>
+        <div class="cal-month-label" id="invMonthLabel"></div>
+        <button class="btn btn-ghost btn-small" id="invNextMonth">&rarr;</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+      </div>
+      <div id="invCalGrid" class="cal-grid"></div>
+
+      <div id="invDayPanel" style="margin-top:18px;"></div>
+    </div>
+
     <div id="view-admin" class="view">
       <div class="admin-subtabs">
         <button id="adminsub-produccion" class="active">Producción</button>
@@ -621,6 +639,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button id="adminsub-bajas">Bajas</button>
         <button id="adminsub-insumos">Insumos</button>
         <button id="adminsub-proveedores">Proveedores</button>
+        <button id="adminsub-invcatalogo">Cat. Inventario</button>
       </div>
 
       <div id="adminpanel-produccion" class="adminpanel active">
@@ -771,6 +790,28 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
           <button class="btn btn-accent btn-block" id="provSubmit">Agregar proveedor</button>
         </div>
         <div id="provList"></div>
+      </div>
+
+      <div id="adminpanel-invcatalogo" class="adminpanel">
+        <div class="admin-header"><h2>Catálogo de inventario del punto</h2></div>
+        <div class="empty-note" style="margin-bottom:14px;">Esta es la lista fija que se usa para contar inventario en este punto — solo estos ítems aparecen, ni uno más.</div>
+        <div class="prod-form" style="margin-bottom:20px;">
+          <h2>Agregar ítem</h2>
+          <div class="field"><label class="field-label">Nombre</label><input type="text" id="icName" placeholder="Ej: Aceite de girasol"></div>
+          <div class="field"><label class="field-label">Código</label><input type="text" id="icCode" placeholder="Ej: ABA003"></div>
+          <div class="field">
+            <label class="field-label">Unidad</label>
+            <select id="icUnidad">
+              <option value="KG" selected>KG</option>
+              <option value="L">L</option>
+              <option value="UN">UN</option>
+            </select>
+          </div>
+          <button class="btn btn-accent btn-block" id="icSubmit">Agregar al catálogo</button>
+        </div>
+        <div class="field"><label class="field-label">Buscar</label><input type="text" id="icSearch" placeholder="Nombre o código..."></div>
+        <span class="sub" id="icCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="icList" style="margin-top:10px;"></div>
       </div>
     </div>
   </main>
@@ -1254,9 +1295,10 @@ document.getElementById('tab-produccion').addEventListener('click', ()=>switchTa
 document.getElementById('tab-cronograma').addEventListener('click', ()=>switchTab('cronograma'));
 document.getElementById('tab-pedidos').addEventListener('click', ()=>switchTab('pedidos'));
 document.getElementById('tab-bajas').addEventListener('click', ()=>switchTab('bajas'));
+document.getElementById('tab-inventario').addEventListener('click', ()=>switchTab('inventario'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','admin'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','admin'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -1264,6 +1306,7 @@ function switchTab(name){
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
+  if(name==='inventario') loadInventarioMonth();
 }
 
 /* ---------- INIT ---------- */
@@ -1360,11 +1403,13 @@ async function loadRecipes(){
     return;
   }
   RECIPES = (data || []).map(r => ({
+    id: r.id,
     code: r.code,
     name: r.name,
     ingredients: r.ingredients || [],
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
-    yield_unit: r.yield_unit || ''
+    yield_unit: r.yield_unit || '',
+    activo_inventario: r.activo_inventario !== false
   }));
 }
 
@@ -1684,8 +1729,9 @@ document.getElementById('adminsub-pedidos').addEventListener('click', ()=>switch
 document.getElementById('adminsub-bajas').addEventListener('click', ()=>switchAdminSub('bajas'));
 document.getElementById('adminsub-insumos').addEventListener('click', ()=>switchAdminSub('insumos'));
 document.getElementById('adminsub-proveedores').addEventListener('click', ()=>switchAdminSub('proveedores'));
+document.getElementById('adminsub-invcatalogo').addEventListener('click', ()=>switchAdminSub('invcatalogo'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
@@ -1695,6 +1741,7 @@ function switchAdminSub(name){
   if(name==='bajas') loadAdminBajas();
   if(name==='insumos') loadGroupIngredientsAdmin();
   if(name==='proveedores') renderProveedoresAdmin();
+  if(name==='invcatalogo') loadInventoryCatalogAdmin();
 }
 
 /* ---------- GESTIÓN DE PUNTOS (solo super admin) ---------- */
@@ -2177,6 +2224,61 @@ function renderGiList(){
   });
 }
 
+/* ---------- ADMIN: catálogo fijo de inventario ---------- */
+let INVENTORY_CATALOG_ITEMS = [];
+
+async function loadInventoryCatalogAdmin(){
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('name', {ascending:true});
+  INVENTORY_CATALOG_ITEMS = error ? [] : (data || []);
+  renderInvCatalogList();
+}
+
+function renderInvCatalogList(){
+  const q = document.getElementById('icSearch').value.trim().toUpperCase();
+  const list = INVENTORY_CATALOG_ITEMS.filter(it => !q || it.name.toUpperCase().includes(q) || it.code.toUpperCase().includes(q));
+  document.getElementById('icCount').textContent = list.length + ' ítem' + (list.length===1?'':'s');
+  const box = document.getElementById('icList');
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No hay ítems en el catálogo de inventario de este punto.</div>'; return; }
+  box.innerHTML = list.map(it => `
+    <div class="gi-row">
+      <div class="gi-main">
+        <div class="gi-name">${escapeHtml(it.name)}</div>
+        <div class="gi-meta">${it.code} · ${it.unidad}</div>
+      </div>
+      <button class="btn btn-ghost btn-small" data-del-ic="${it.id}">Quitar</button>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-del-ic]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const { error } = await supa.from('inventory_catalog').delete().eq('id', btn.dataset.delIc);
+      if(error){ showToast('Error: ' + error.message); return; }
+      showToast('Quitado del catálogo de inventario');
+      loadInventoryCatalogAdmin();
+    });
+  });
+}
+
+document.getElementById('icSearch').addEventListener('input', renderInvCatalogList);
+
+document.getElementById('icSubmit').addEventListener('click', async ()=>{
+  const name = document.getElementById('icName').value.trim();
+  const code = document.getElementById('icCode').value.trim().toUpperCase();
+  const unidad = document.getElementById('icUnidad').value;
+  if(!name || !code){ showToast('Escribe el nombre y el código'); return; }
+  const { error } = await supa.from('inventory_catalog').insert({
+    location_id: currentLocation.id, code, name, unidad, bodega: 'Cocina'
+  });
+  if(error){
+    showToast(error.message.includes('duplicate') ? 'Ese código ya está en el catálogo' : 'Error: ' + error.message);
+    return;
+  }
+  showToast('Agregado al catálogo de inventario');
+  document.getElementById('icName').value = '';
+  document.getElementById('icCode').value = '';
+  document.getElementById('icUnidad').value = 'KG';
+  loadInventoryCatalogAdmin();
+});
+
 document.getElementById('giSearch').addEventListener('input', renderGiList);
 document.getElementById('giFilterCategoria').addEventListener('change', renderGiList);
 
@@ -2387,12 +2489,17 @@ function orderKanbanCardHtml(o, mode){
   if(mode === 'admin' && (o.status === 'aprobado' || o.status === 'rechazado')){
     actions += `<div class="kc-actions"><button class="btn btn-ghost btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
   }
-  if(mode === 'own' && o.status === 'aprobado' && (o.proveedor_telefono || o.proveedor_correo)){
-    let sendBtns = '<div class="kc-actions" style="display:flex; gap:6px;">';
-    if(o.proveedor_telefono) sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
-    if(o.proveedor_correo) sendBtns += `<button class="btn btn-ghost btn-small" data-mail-id="${o.id}" style="flex:1;">Correo</button>`;
-    sendBtns += '</div>';
-    actions += sendBtns;
+  if(mode === 'own' && o.status === 'aprobado'){
+    if(o.enviado){
+      const enviadoHora = o.enviado_at ? new Date(o.enviado_at).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+      actions += `<div class="kc-actions"><span class="oe-status-badge aprobado">✓ Enviado ${enviadoHora}</span></div>`;
+    } else if(o.proveedor_telefono || o.proveedor_correo){
+      let sendBtns = '<div class="kc-actions" style="display:flex; gap:6px;">';
+      if(o.proveedor_telefono) sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
+      if(o.proveedor_correo) sendBtns += `<button class="btn btn-ghost btn-small" data-mail-id="${o.id}" style="flex:1;">Correo</button>`;
+      sendBtns += '</div>';
+      actions += sendBtns;
+    }
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
   return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
@@ -2432,18 +2539,29 @@ function buildPedidoMessage(o){
   return lines.join('\n');
 }
 
+async function markOrderAsSent(orderId){
+  await supa.from('orders').update({
+    enviado: true, enviado_at: new Date().toISOString(), enviado_por: profile.name || session.user.email
+  }).eq('id', orderId);
+  loadMyOrders();
+}
+
 function sendPedidoWhatsApp(o){
+  if(o.enviado){ showToast('Este pedido ya fue enviado'); return; }
   if(!o.proveedor_telefono){ showToast('Este proveedor no tiene teléfono registrado'); return; }
   const phone = o.proveedor_telefono.replace(/\D/g,'');
   const msg = encodeURIComponent(buildPedidoMessage(o));
   window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  markOrderAsSent(o.id);
 }
 
 function sendPedidoEmail(o){
+  if(o.enviado){ showToast('Este pedido ya fue enviado'); return; }
   if(!o.proveedor_correo){ showToast('Este proveedor no tiene correo registrado'); return; }
   const subject = encodeURIComponent('Pedido ' + (o.codigo || ''));
   const body = encodeURIComponent(buildPedidoMessage(o));
   window.location.href = `mailto:${o.proveedor_correo}?subject=${subject}&body=${body}`;
+  markOrderAsSent(o.id);
 }
 
 function renderOrderKanban(list, boardEl, mode){
@@ -2493,7 +2611,8 @@ function renderOrderKanban(list, boardEl, mode){
 
 async function unlockOrder(orderId){
   const { error } = await supa.from('orders').update({
-    status: 'pendiente', rechazo_motivo: null, resuelto_por: null, resuelto_at: null
+    status: 'pendiente', rechazo_motivo: null, resuelto_por: null, resuelto_at: null,
+    enviado: false, enviado_at: null, enviado_por: null
   }).eq('id', orderId);
   if(error){ showToast('Error al desbloquear: ' + error.message); return; }
   showToast('Pedido desbloqueado, vuelve a estar pendiente');
@@ -2833,6 +2952,207 @@ document.getElementById('bajaReviewReject').addEventListener('click', async ()=>
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
   loadAdminBajas();
+});
+
+/* ---------- INVENTARIO ---------- */
+let invMonth = new Date();
+invMonth.setDate(1);
+let invSelectedDate = null;
+let invSessionsThisMonth = [];
+
+async function loadInventarioMonth(){
+  const year = invMonth.getFullYear(), month = invMonth.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const startIso = dateKey(monthStart), endIso = dateKey(monthEnd);
+
+  const { data, error } = await supa.from('inventory_sessions').select('*')
+    .eq('location_id', currentLocation.id)
+    .gte('fecha', startIso).lte('fecha', endIso);
+  invSessionsThisMonth = error ? [] : (data || []);
+
+  renderInvCalendarGrid();
+  if(invSelectedDate) renderInvDayPanel(); else document.getElementById('invDayPanel').innerHTML = '';
+}
+
+function renderInvCalendarGrid(){
+  const year = invMonth.getFullYear(), month = invMonth.getMonth();
+  document.getElementById('invMonthLabel').textContent = MESES[month] + ' ' + year;
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = dateKey(new Date());
+
+  const grid = document.getElementById('invCalGrid');
+  let html = '';
+  for(let i=0;i<startWeekday;i++){ html += '<div class="cal-cell empty"></div>'; }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const cellDate = new Date(year, month, d);
+    const key = dateKey(cellDate);
+    const daySession = invSessionsThisMonth.find(s => s.fecha === key);
+    const classes = ['cal-cell'];
+    if(key === todayKey) classes.push('today');
+    if(key === invSelectedDate) classes.push('selected');
+
+    let badge = '';
+    if(daySession){
+      const cls = daySession.status === 'cerrado' ? 'complete' : 'pending';
+      const label = daySession.status === 'cerrado' ? '🔒' : '✎';
+      badge = `<span class="cal-badge ${cls}">${label}</span>`;
+    }
+    html += `<div class="${classes.join(' ')}" data-key="${key}"><span class="cal-num">${d}</span>${badge}</div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-cell:not(.empty)').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      invSelectedDate = cell.dataset.key;
+      renderInvCalendarGrid();
+      renderInvDayPanel();
+    });
+  });
+}
+
+async function buildInventarioItemList(){
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('name', {ascending:true});
+  if(error){ showToast('No se pudo cargar el catálogo de inventario: ' + error.message); return []; }
+  return (data || []).map(it => ({ code: it.code, name: it.name, unidad: it.unidad }));
+}
+
+async function renderInvDayPanel(){
+  const box = document.getElementById('invDayPanel');
+  const d = new Date(invSelectedDate + 'T00:00:00');
+  const label = d.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'});
+  const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+
+  const existingSession = invSessionsThisMonth.find(s => s.fecha === invSelectedDate);
+
+  if(!existingSession){
+    const items = await buildInventarioItemList();
+    let html = `<div class="day-detail-box"><div class="day-detail-title">${labelCap}</div>`;
+    html += `<div class="empty-note" style="margin-bottom:12px;">Aún no hay inventario para este día. Llena las cantidades y guarda.</div>`;
+    items.forEach(it=>{
+      html += `<div class="day-detail-item">
+        <div>
+          <div class="di-name">${escapeHtml(it.name)}</div>
+          <div class="di-meta">${it.code}</div>
+        </div>
+        <input type="number" step="0.001" placeholder="0" data-inv-code="${escapeHtml(it.code)}" data-inv-name="${escapeHtml(it.name)}" data-inv-unidad="${it.unidad}" style="width:90px; text-align:right;">
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); width:28px;">${it.unidad}</span>
+      </div>`;
+    });
+    html += `<button class="btn btn-accent btn-block" id="invSaveBtn" style="margin-top:14px;">Guardar y bloquear</button></div>`;
+    box.innerHTML = html;
+
+    document.getElementById('invSaveBtn').addEventListener('click', async ()=>{
+      const inputs = box.querySelectorAll('[data-inv-code]');
+      const rows = [];
+      inputs.forEach(inp=>{
+        rows.push({
+          item_code: inp.dataset.invCode, item_name: inp.dataset.invName, unidad: inp.dataset.invUnidad,
+          cantidad: inp.value === '' ? null : parseFloat(inp.value), bodega: 'Cocina'
+        });
+      });
+      const { data: sessData, error: sessErr } = await supa.from('inventory_sessions').insert({
+        location_id: currentLocation.id, fecha: invSelectedDate, status: 'cerrado',
+        cerrado_por: profile.name || session.user.email, cerrado_at: new Date().toISOString(),
+        created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
+      }).select().single();
+      if(sessErr){ showToast('Error al guardar: ' + sessErr.message); return; }
+      const itemsToInsert = rows.map(r => ({ ...r, session_id: sessData.id }));
+      const { error: itemsErr } = await supa.from('inventory_items').insert(itemsToInsert);
+      if(itemsErr){ showToast('Error al guardar los renglones: ' + itemsErr.message); return; }
+      showToast('Inventario guardado y bloqueado');
+      loadInventarioMonth();
+    });
+    return;
+  }
+
+  const { data: itemsData, error: itemsErr } = await supa.from('inventory_items').select('*').eq('session_id', existingSession.id).order('item_name', {ascending:true});
+  const items = itemsErr ? [] : (itemsData || []);
+
+  const isLocked = existingSession.status === 'cerrado';
+  let html = `<div class="day-detail-box"><div class="day-detail-title">${labelCap}</div>`;
+  html += `<div class="empty-note" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+    <span>${isLocked ? '🔒 Bloqueado' : '✎ Abierto para edición'} · ${escapeHtml(existingSession.creado_por_nombre||'')}</span>
+    <span style="display:flex; gap:8px;">
+      ${isLocked ? `<button class="btn btn-ghost btn-small" id="invDownloadBtn">Descargar CSV</button>` : ''}
+      ${isLocked && isAdminRole() ? `<button class="btn btn-ghost btn-small" id="invUnlockBtn">Desbloquear</button>` : ''}
+    </span>
+  </div>`;
+
+  items.forEach(it=>{
+    html += `<div class="day-detail-item">
+      <div>
+        <div class="di-name">${escapeHtml(it.item_name)}</div>
+        <div class="di-meta">${it.item_code}</div>
+      </div>
+      ${isLocked
+        ? `<span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text);">${it.cantidad !== null ? fmtQty(it.cantidad) : '—'} ${it.unidad}</span>`
+        : `<input type="number" step="0.001" value="${it.cantidad !== null ? it.cantidad : ''}" data-inv-item-id="${it.id}" style="width:90px; text-align:right;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); width:28px;">${it.unidad}</span>`
+      }
+    </div>`;
+  });
+
+  if(!isLocked){
+    html += `<button class="btn btn-accent btn-block" id="invResaveBtn" style="margin-top:14px;">Guardar y bloquear</button>`;
+  }
+  html += `</div>`;
+  box.innerHTML = html;
+
+  const dlBtn = document.getElementById('invDownloadBtn');
+  if(dlBtn) dlBtn.addEventListener('click', ()=>downloadInventarioCsv(existingSession, items));
+
+  const unlockBtn = document.getElementById('invUnlockBtn');
+  if(unlockBtn) unlockBtn.addEventListener('click', async ()=>{
+    const { error } = await supa.from('inventory_sessions').update({ status:'abierto', cerrado_por:null, cerrado_at:null }).eq('id', existingSession.id);
+    if(error){ showToast('Error al desbloquear: ' + error.message); return; }
+    showToast('Inventario desbloqueado');
+    loadInventarioMonth();
+  });
+
+  const resaveBtn = document.getElementById('invResaveBtn');
+  if(resaveBtn) resaveBtn.addEventListener('click', async ()=>{
+    const inputs = box.querySelectorAll('[data-inv-item-id]');
+    for(const inp of inputs){
+      const val = inp.value === '' ? null : parseFloat(inp.value);
+      await supa.from('inventory_items').update({ cantidad: val }).eq('id', inp.dataset.invItemId);
+    }
+    const { error } = await supa.from('inventory_sessions').update({
+      status:'cerrado', cerrado_por: profile.name || session.user.email, cerrado_at: new Date().toISOString()
+    }).eq('id', existingSession.id);
+    if(error){ showToast('Error al guardar: ' + error.message); return; }
+    showToast('Inventario guardado y bloqueado');
+    loadInventarioMonth();
+  });
+}
+
+function downloadInventarioCsv(session, items){
+  const headers = ['Ingrediente','Código','Cantidad','Medida','Bodega'];
+  const lines = [headers.join(',')];
+  items.forEach(it=>{
+    const row = [
+      it.item_name, it.item_code, it.cantidad !== null ? it.cantidad : '', it.unidad, it.bodega
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`);
+    lines.push(row.join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `inventario_${currentLocation.name.replace(/\s+/g,'_')}_${session.fecha}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('invPrevMonth').addEventListener('click', ()=>{
+  invMonth.setMonth(invMonth.getMonth() - 1);
+  loadInventarioMonth();
+});
+document.getElementById('invNextMonth').addEventListener('click', ()=>{
+  invMonth.setMonth(invMonth.getMonth() + 1);
+  loadInventarioMonth();
 });
 </script>
 </body>
