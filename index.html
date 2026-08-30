@@ -903,6 +903,21 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 </div>
 
 <!-- Modal anular (admin) -->
+<div class="modal-overlay" id="deleteLocationModal">
+  <div class="modal-box danger">
+    <h3>Eliminar punto</h3>
+    <div class="modal-sub">Esto borra <b id="delLocName" style="color:var(--text);"></b> y TODO lo que tenga adentro: recetas, producciones, cronograma, pedidos, bajas, inventario y áreas. No se puede deshacer.</div>
+    <div class="field">
+      <label class="field-label">Escribe el nombre del punto para confirmar</label>
+      <input type="text" id="delLocConfirmInput" placeholder="">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="delLocCancel">Cancelar</button>
+      <button class="btn btn-danger" id="delLocConfirmBtn" disabled>Eliminar definitivamente</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="voidModal">
   <div class="modal-box danger">
     <h3>Anular registro</h3>
@@ -1264,7 +1279,7 @@ async function onLoggedIn(sess){
     showToast('No se pudieron cargar tus puntos asignados.');
     return;
   }
-  const locations = (locRows || []).map(r => r.locations).filter(Boolean);
+  const locations = (locRows || []).map(r => r.locations).filter(loc => loc && loc.activo !== false);
 
   if(locations.length === 0){
     document.getElementById('loginScreen').style.display='none';
@@ -1960,16 +1975,67 @@ async function loadLocationsAdmin(){
   if(allLocations.length === 0){
     listBox.innerHTML = '<div class="empty-note">Aún no hay puntos creados.</div>';
   } else {
-    listBox.innerHTML = allLocations.map(loc => `
-      <div class="location-card" style="cursor:default;">
-        ${loc.logo_data_url ? `<img src="${loc.logo_data_url}" alt="">` : ''}
-        <div class="lc-name">${escapeHtml(loc.name)}</div>
-      </div>
-    `).join('');
+    listBox.innerHTML = allLocations.map(loc => {
+      const isActive = loc.activo !== false;
+      return `
+      <div class="location-card" style="cursor:default; justify-content:space-between; ${isActive?'':'opacity:0.55;'}">
+        <div style="display:flex; align-items:center; gap:12px;">
+          ${loc.logo_data_url ? `<img src="${loc.logo_data_url}" alt="">` : ''}
+          <div class="lc-name">${escapeHtml(loc.name)} ${isActive?'':'<span style="font-size:11px; color:var(--danger);">(inactivo)</span>'}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-small" data-toggle-loc="${loc.id}" data-toggle-loc-active="${isActive}">${isActive ? 'Desactivar' : 'Activar'}</button>
+          ${profile.is_super_admin ? `<button class="btn btn-danger btn-small" data-del-loc="${loc.id}" data-del-loc-name="${escapeHtml(loc.name)}">Eliminar</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    listBox.querySelectorAll('[data-del-loc]').forEach(btn=>{
+      btn.addEventListener('click', ()=>openDeleteLocationModal(btn.dataset.delLoc, btn.dataset.delLocName));
+    });
+    listBox.querySelectorAll('[data-toggle-loc]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const locId = btn.dataset.toggleLoc;
+        const wasActive = btn.dataset.toggleLocActive === 'true';
+        const { error } = await supa.from('locations').update({ activo: !wasActive }).eq('id', locId);
+        if(error){ showToast('Error: ' + error.message); return; }
+        showToast(wasActive ? 'Punto desactivado' : 'Punto activado');
+        loadLocationsAdmin();
+      });
+    });
   }
 
   await loadAccessMatrix();
 }
+
+let pendingDeleteLocationId = null;
+
+function openDeleteLocationModal(locId, locName){
+  pendingDeleteLocationId = locId;
+  document.getElementById('delLocName').textContent = locName;
+  document.getElementById('delLocConfirmInput').value = '';
+  document.getElementById('delLocConfirmBtn').disabled = true;
+  document.getElementById('deleteLocationModal').classList.add('open');
+}
+
+document.getElementById('delLocConfirmInput').addEventListener('input', (e)=>{
+  const expected = document.getElementById('delLocName').textContent.trim();
+  document.getElementById('delLocConfirmBtn').disabled = e.target.value.trim() !== expected;
+});
+
+document.getElementById('delLocCancel').addEventListener('click', ()=>{
+  document.getElementById('deleteLocationModal').classList.remove('open');
+  pendingDeleteLocationId = null;
+});
+
+document.getElementById('delLocConfirmBtn').addEventListener('click', async ()=>{
+  if(!pendingDeleteLocationId) return;
+  const { error } = await supa.rpc('delete_location_cascade', { p_location_id: pendingDeleteLocationId });
+  document.getElementById('deleteLocationModal').classList.remove('open');
+  if(error){ showToast('Error al eliminar: ' + error.message); return; }
+  showToast('Punto eliminado');
+  pendingDeleteLocationId = null;
+  loadLocationsAdmin();
+});
 
 async function loadAccessMatrix(){
   const box = document.getElementById('accessMatrix');
