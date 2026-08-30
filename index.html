@@ -1402,6 +1402,46 @@ function enterLocation(loc){
   pickAreaForLocation(loc);
 }
 
+/* ---------- SUPER ADMIN: entrar directo a cualquier punto ---------- */
+async function superAdminEnterLocation(locId){
+  const loc = allLocations.find(l => l.id === locId);
+  if(!loc){ showToast('No se encontró el punto'); return; }
+
+  await supa.from('user_locations').insert({ user_id: session.user.id, location_id: loc.id }).select();
+
+  const { data: areasData, error: areasErr } = await supa.from('areas').select('*').eq('location_id', loc.id).order('created_at', {ascending:true});
+  const areas = areasErr ? [] : (areasData || []);
+
+  if(areas.length === 0){
+    showToast('Este punto todavía no tiene ninguna área creada');
+    return;
+  }
+
+  currentLocation = loc;
+  applyLocationTheme(loc);
+
+  if(areas.length === 1){
+    await supa.from('user_areas').insert({ user_id: session.user.id, area_id: areas[0].id }).select();
+    enterArea(loc, areas[0]);
+    return;
+  }
+
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('areaScreen').style.display = 'flex';
+  document.getElementById('areaList').innerHTML = areas.map(a => `
+    <div class="location-card" data-super-area-id="${a.id}">
+      <div class="lc-name">${escapeHtml(a.name)}</div>
+    </div>
+  `).join('');
+  document.getElementById('areaList').querySelectorAll('[data-super-area-id]').forEach(card=>{
+    card.addEventListener('click', async ()=>{
+      const area = areas.find(a => a.id === card.dataset.superAreaId);
+      await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
+      enterArea(loc, area);
+    });
+  });
+}
+
 async function pickAreaForLocation(loc){
   const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
   if(error){
@@ -2119,6 +2159,7 @@ async function loadLocationsAdmin(){
           <div class="lc-name">${escapeHtml(loc.name)} ${isActive?'':'<span style="font-size:11px; color:var(--danger);">(inactivo)</span>'}</div>
         </div>
         <div style="display:flex; gap:8px;">
+          ${profile.is_super_admin ? `<button class="btn btn-accent btn-small" data-enter-loc="${loc.id}">Entrar</button>` : ''}
           <button class="btn btn-ghost btn-small" data-toggle-loc="${loc.id}" data-toggle-loc-active="${isActive}">${isActive ? 'Desactivar' : 'Activar'}</button>
           ${profile.is_super_admin ? `<button class="btn btn-danger btn-small" data-del-loc="${loc.id}" data-del-loc-name="${escapeHtml(loc.name)}">Eliminar</button>` : ''}
         </div>
@@ -2126,6 +2167,9 @@ async function loadLocationsAdmin(){
     }).join('');
     listBox.querySelectorAll('[data-del-loc]').forEach(btn=>{
       btn.addEventListener('click', ()=>openDeleteLocationModal(btn.dataset.delLoc, btn.dataset.delLocName));
+    });
+    listBox.querySelectorAll('[data-enter-loc]').forEach(btn=>{
+      btn.addEventListener('click', ()=>superAdminEnterLocation(btn.dataset.enterLoc));
     });
     listBox.querySelectorAll('[data-toggle-loc]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
