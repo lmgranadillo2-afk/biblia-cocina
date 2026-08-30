@@ -2228,7 +2228,7 @@ function renderGiList(){
 let INVENTORY_CATALOG_ITEMS = [];
 
 async function loadInventoryCatalogAdmin(){
-  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('name', {ascending:true});
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
   INVENTORY_CATALOG_ITEMS = error ? [] : (data || []);
   renderInvCatalogList();
 }
@@ -2265,8 +2265,9 @@ document.getElementById('icSubmit').addEventListener('click', async ()=>{
   const code = document.getElementById('icCode').value.trim().toUpperCase();
   const unidad = document.getElementById('icUnidad').value;
   if(!name || !code){ showToast('Escribe el nombre y el código'); return; }
+  const maxOrden = INVENTORY_CATALOG_ITEMS.reduce((max, it) => Math.max(max, it.orden || 0), 0);
   const { error } = await supa.from('inventory_catalog').insert({
-    location_id: currentLocation.id, code, name, unidad, bodega: 'Cocina'
+    location_id: currentLocation.id, code, name, unidad, bodega: 'Cocina', orden: maxOrden + 1
   });
   if(error){
     showToast(error.message.includes('duplicate') ? 'Ese código ya está en el catálogo' : 'Error: ' + error.message);
@@ -3016,7 +3017,7 @@ function renderInvCalendarGrid(){
 }
 
 async function buildInventarioItemList(){
-  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('name', {ascending:true});
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
   if(error){ showToast('No se pudo cargar el catálogo de inventario: ' + error.message); return []; }
   return (data || []).map(it => ({ code: it.code, name: it.name, unidad: it.unidad }));
 }
