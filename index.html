@@ -649,6 +649,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button id="adminsub-proveedores">Proveedores</button>
         <button id="adminsub-invcatalogo">Cat. Inventario</button>
         <button id="adminsub-areas">Áreas</button>
+        <button id="adminsub-consolidado">Consolidado</button>
       </div>
 
       <div id="adminpanel-produccion" class="adminpanel active">
@@ -787,18 +788,21 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       </div>
 
       <div id="adminpanel-proveedores" class="adminpanel">
-        <div class="admin-header"><h2>Proveedores del punto</h2></div>
+        <div class="admin-header"><h2>Proveedores del grupo</h2></div>
+        <div class="empty-note" style="margin-bottom:14px;">El catálogo de proveedores es compartido entre todos los puntos y áreas. Activa cada uno solo donde de verdad se use — por ejemplo, un proveedor de licores solo en Barra.</div>
         <div class="prod-form" style="margin-bottom:20px;">
-          <h2>Agregar proveedor</h2>
+          <h2>Agregar proveedor nuevo</h2>
           <div class="field"><label class="field-label">Nombre</label><input type="text" id="provName" placeholder="Ej: Distrialimentos SAS"></div>
           <div class="field">
             <label class="field-label">Teléfono de WhatsApp (opcional)</label>
             <input type="text" id="provPhone" placeholder="Ej: 573001234567 (con indicativo de país, sin +)">
           </div>
           <div class="field"><label class="field-label">Correo (opcional)</label><input type="text" id="provEmail" placeholder="pedidos@proveedor.com"></div>
-          <button class="btn btn-accent btn-block" id="provSubmit">Agregar proveedor</button>
+          <button class="btn btn-accent btn-block" id="provSubmit">Agregar y activar en esta área</button>
         </div>
-        <div id="provList"></div>
+        <div class="field"><label class="field-label">Buscar</label><input type="text" id="provSearch" placeholder="Nombre del proveedor..."></div>
+        <span class="sub" id="provCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
+        <div id="provList" style="margin-top:10px;"></div>
       </div>
 
       <div id="adminpanel-invcatalogo" class="adminpanel">
@@ -861,6 +865,16 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 
         <div class="section-label" style="margin-top:24px;">Accesos por usuario</div>
         <div id="areaAccessMatrix"></div>
+      </div>
+
+      <div id="adminpanel-consolidado" class="adminpanel">
+        <div class="admin-header"><h2>Pedido consolidado</h2></div>
+        <div class="empty-note" style="margin-bottom:14px;">Junta en un solo mensaje los pedidos ya aprobados de Cocina, Barra y Servicio para Chemestry, y los marca como enviados de una vez.</div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; font-size:15px; font-weight:700; color:var(--text);">
+          <span style="color:var(--accent);">📦</span> Chemestry
+        </div>
+        <div id="consOrdersList" style="margin-top:6px;"></div>
+        <button class="btn btn-accent btn-block" id="consSendBtn" style="margin-top:14px; display:none;">Generar y enviar por WhatsApp</button>
       </div>
     </div>
   </main>
@@ -1432,8 +1446,8 @@ async function initApp(){
 let PROVEEDORES = [];
 
 async function loadProveedores(){
-  const { data, error } = await supa.from('proveedores').select('*').eq('location_id', currentLocation.id).order('nombre', {ascending:true});
-  PROVEEDORES = error ? [] : (data || []);
+  const { data, error } = await supa.from('area_proveedores').select('proveedor_id, proveedores(*)').eq('area_id', currentArea.id);
+  PROVEEDORES = error ? [] : (data || []).map(r => r.proveedores).filter(Boolean).sort((a,b)=>a.nombre.localeCompare(b.nombre));
   populateProveedorSelect();
 }
 
@@ -1457,6 +1471,7 @@ document.getElementById('orderProvNewSave').addEventListener('click', async ()=>
     location_id: currentLocation.id, nombre, telefono: telefono || null, correo: correo || null, created_by: session.user.id
   }).select().single();
   if(error){ showToast('Error al agregar proveedor: ' + error.message); return; }
+  await supa.from('area_proveedores').insert({ area_id: currentArea.id, proveedor_id: data.id });
   PROVEEDORES.push(data);
   PROVEEDORES.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   populateProveedorSelect(data.id);
@@ -1464,39 +1479,82 @@ document.getElementById('orderProvNewSave').addEventListener('click', async ()=>
   document.getElementById('orderProvNewName').value = '';
   document.getElementById('orderProvNewPhone').value = '';
   document.getElementById('orderProvNewEmail').value = '';
-  showToast('Proveedor agregado');
+  showToast('Proveedor agregado y activado en esta área');
 });
 
-/* ---------- ADMIN: gestión de proveedores ---------- */
+/* ---------- ADMIN: gestión del catálogo de proveedores (compartido) ---------- */
+let ALL_PROVEEDORES = [];
+let AREA_PROVEEDORES_MAP = {};
+
 document.getElementById('provSubmit').addEventListener('click', async ()=>{
   const nombre = document.getElementById('provName').value.trim();
   const telefono = document.getElementById('provPhone').value.trim();
   const correo = document.getElementById('provEmail').value.trim();
   if(!nombre){ showToast('Escribe el nombre del proveedor'); return; }
-  const { error } = await supa.from('proveedores').insert({
+  const { data, error } = await supa.from('proveedores').insert({
     location_id: currentLocation.id, nombre, telefono: telefono || null, correo: correo || null, created_by: session.user.id
-  });
+  }).select().single();
   if(error){ showToast('Error: ' + error.message); return; }
-  showToast('Proveedor agregado');
+  await supa.from('area_proveedores').insert({ area_id: currentArea.id, proveedor_id: data.id });
+  showToast('Proveedor agregado y activado en esta área');
   document.getElementById('provName').value = '';
   document.getElementById('provPhone').value = '';
   document.getElementById('provEmail').value = '';
-  await loadProveedores();
-  renderProveedoresAdmin();
+  loadProveedoresAdmin();
 });
 
+async function loadProveedoresAdmin(){
+  const { data: provData, error: provErr } = await supa.from('proveedores').select('*').order('nombre', {ascending:true});
+  ALL_PROVEEDORES = provErr ? [] : (provData || []);
+
+  const { data: apData, error: apErr } = await supa.from('area_proveedores').select('*').eq('area_id', currentArea.id);
+  AREA_PROVEEDORES_MAP = {};
+  if(!apErr){ (apData||[]).forEach(r => { AREA_PROVEEDORES_MAP[r.proveedor_id] = true; }); }
+
+  renderProveedoresAdmin();
+  loadProveedores();
+}
+
 function renderProveedoresAdmin(){
+  const q = document.getElementById('provSearch').value.trim().toUpperCase();
+  const list = ALL_PROVEEDORES.filter(p => !q || p.nombre.toUpperCase().includes(q));
+  document.getElementById('provCount').textContent = list.length + ' proveedor' + (list.length===1?'':'es');
   const box = document.getElementById('provList');
-  if(PROVEEDORES.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay proveedores registrados.</div>'; return; }
-  box.innerHTML = PROVEEDORES.map(p => `
-    <div class="gi-row">
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay proveedores en el catálogo del grupo.</div>'; return; }
+  box.innerHTML = list.map(p => {
+    const isActive = AREA_PROVEEDORES_MAP[p.id] === true;
+    return `<div class="gi-row">
       <div class="gi-main">
         <div class="gi-name">${escapeHtml(p.nombre)}</div>
         <div class="gi-meta">${p.telefono ? '📱 ' + escapeHtml(p.telefono) : 'Sin teléfono'} ${p.correo ? ' · ✉ ' + escapeHtml(p.correo) : ''}</div>
       </div>
-    </div>
-  `).join('');
+      <label class="gi-toggle">
+        <input type="checkbox" data-prov-id="${p.id}" ${isActive?'checked':''}>
+        <span>${isActive ? 'Activo en esta área' : 'Inactivo'}</span>
+      </label>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('input[data-prov-id]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const provId = cb.dataset.provId;
+      const active = cb.checked;
+      if(active){
+        const { error } = await supa.from('area_proveedores').insert({ area_id: currentArea.id, proveedor_id: provId });
+        if(error){ showToast('Error: ' + error.message); cb.checked = false; return; }
+      } else {
+        const { error } = await supa.from('area_proveedores').delete().eq('area_id', currentArea.id).eq('proveedor_id', provId);
+        if(error){ showToast('Error: ' + error.message); cb.checked = true; return; }
+      }
+      AREA_PROVEEDORES_MAP[provId] = active;
+      cb.nextElementSibling.textContent = active ? 'Activo en esta área' : 'Inactivo';
+      showToast('Actualizado');
+      loadProveedores();
+    });
+  });
 }
+
+document.getElementById('provSearch').addEventListener('input', renderProveedoresAdmin);
 
 
 async function loadRecipes(){
@@ -1835,8 +1893,9 @@ document.getElementById('adminsub-insumos').addEventListener('click', ()=>switch
 document.getElementById('adminsub-proveedores').addEventListener('click', ()=>switchAdminSub('proveedores'));
 document.getElementById('adminsub-invcatalogo').addEventListener('click', ()=>switchAdminSub('invcatalogo'));
 document.getElementById('adminsub-areas').addEventListener('click', ()=>switchAdminSub('areas'));
+document.getElementById('adminsub-consolidado').addEventListener('click', ()=>switchAdminSub('consolidado'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo','areas'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo','areas','consolidado'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
@@ -1845,9 +1904,10 @@ function switchAdminSub(name){
   if(name==='pedidos') loadAdminOrders();
   if(name==='bajas') loadAdminBajas();
   if(name==='insumos') loadGroupIngredientsAdmin();
-  if(name==='proveedores') renderProveedoresAdmin();
+  if(name==='proveedores') loadProveedoresAdmin();
   if(name==='invcatalogo') loadInventoryCatalogAdmin();
   if(name==='areas') loadAreasAdmin();
+  if(name==='consolidado') loadConsolidadoProveedores();
 }
 
 /* ---------- GESTIÓN DE PUNTOS (solo super admin) ---------- */
@@ -3384,6 +3444,96 @@ async function loadAreaAccessMatrix(){
     });
   });
 }
+
+/* ---------- ADMIN: pedido consolidado por proveedor (varias áreas del mismo punto) ---------- */
+let consolidadoOrders = [];
+
+let currentConsolidadoProveedor = null;
+
+async function loadConsolidadoProveedores(){
+  const { data, error } = await supa.from('proveedores').select('*').ilike('nombre', 'chemestry').limit(1);
+  currentConsolidadoProveedor = (!error && data && data.length > 0) ? data[0] : null;
+
+  if(!currentConsolidadoProveedor){
+    document.getElementById('consOrdersList').innerHTML = '<div class="empty-list">No se encontró el proveedor Chemestry. Créalo en Admin → Proveedores.</div>';
+    document.getElementById('consSendBtn').style.display = 'none';
+    return;
+  }
+  loadConsolidadoOrders();
+}
+
+async function loadConsolidadoOrders(){
+  const box = document.getElementById('consOrdersList');
+  const sendBtn = document.getElementById('consSendBtn');
+  if(!currentConsolidadoProveedor){ box.innerHTML = ''; sendBtn.style.display = 'none'; return; }
+
+  const { data, error } = await supa.from('orders').select('*, order_items(*), areas(name)')
+    .eq('location_id', currentLocation.id)
+    .eq('proveedor_id', currentConsolidadoProveedor.id)
+    .eq('status', 'aprobado')
+    .eq('enviado', false);
+  consolidadoOrders = error ? [] : (data || []);
+
+  if(consolidadoOrders.length === 0){
+    box.innerHTML = '<div class="empty-list">No hay pedidos aprobados y sin enviar para Chemestry en ninguna área.</div>';
+    sendBtn.style.display = 'none';
+    return;
+  }
+
+  box.innerHTML = consolidadoOrders.map(o => {
+    const items = o.order_items || [];
+    const areaName = o.areas ? o.areas.name : '';
+    return `<label class="gi-row" style="cursor:pointer;">
+      <input type="checkbox" class="cons-order-cb" value="${o.id}" checked style="width:auto; margin-right:10px;">
+      <div class="gi-main">
+        <div class="gi-name">${escapeHtml(areaName)} — ${o.codigo || ''}</div>
+        <div class="gi-meta">${items.length} insumo${items.length===1?'':'s'} · Fecha ${o.fecha}</div>
+      </div>
+    </label>`;
+  }).join('');
+  sendBtn.style.display = 'block';
+}
+
+document.getElementById('consSendBtn').addEventListener('click', async ()=>{
+  if(!currentConsolidadoProveedor || !currentConsolidadoProveedor.telefono){ showToast('Chemestry no tiene teléfono registrado'); return; }
+
+  const selectedIds = Array.from(document.querySelectorAll('.cons-order-cb:checked')).map(cb => cb.value);
+  if(selectedIds.length === 0){ showToast('Marca al menos un pedido'); return; }
+  const selectedOrders = consolidadoOrders.filter(o => selectedIds.includes(o.id));
+
+  const lines = [];
+  lines.push(`${saludoSegunHora()}, les escribimos de ${currentLocation.name}.`);
+  lines.push('Pedido consolidado — Chemestry');
+  const hoy = new Date().toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'});
+  lines.push(hoy.charAt(0).toUpperCase() + hoy.slice(1));
+
+  selectedOrders.forEach(o=>{
+    const areaName = o.areas ? o.areas.name : '';
+    lines.push('');
+    lines.push(`— ${areaName.toUpperCase()} (${o.codigo || ''}) —`);
+    const items = sortByCategoria(o.order_items || []);
+    let lastCat = null;
+    items.forEach(it=>{
+      if(it.categoria !== lastCat){
+        lines.push(categoryLabel(it.categoria).toUpperCase());
+        lastCat = it.categoria;
+      }
+      lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}`);
+    });
+  });
+
+  const phone = currentConsolidadoProveedor.telefono.replace(/\D/g,'');
+  const msg = encodeURIComponent(lines.join('\n'));
+  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+
+  for(const id of selectedIds){
+    await supa.from('orders').update({
+      enviado: true, enviado_at: new Date().toISOString(), enviado_por: profile.name || session.user.email
+    }).eq('id', id);
+  }
+  showToast('Pedido consolidado enviado y marcado en las ' + selectedIds.length + ' áreas');
+  loadConsolidadoOrders();
+});
 </script>
 </body>
 </html>
