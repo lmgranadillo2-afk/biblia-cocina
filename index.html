@@ -497,6 +497,14 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
   </div>
 </div>
 
+<div id="areaScreen" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;">
+  <div class="login-box" style="max-width:440px;">
+    <div class="login-brand" style="font-size:24px; margin-bottom:6px;">Elige tu área</div>
+    <div class="login-sub" style="margin-bottom:20px;">¿Con cuál área quieres trabajar?</div>
+    <div id="areaList"></div>
+  </div>
+</div>
+
 <!-- ============== APP ============== -->
 <div id="app" style="display:none">
 
@@ -508,7 +516,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button class="logout-btn" id="logoutBtn">Salir</button>
       </div>
     </div>
-    <div class="brand-sub">Recetario &amp; Producción</div>
+    <div class="brand-sub">Recetario &amp; Producción <span id="whoArea" style="color:var(--accent);"></span></div>
     <nav class="tabs">
       <button id="tab-recetario" class="active">Recetario</button>
       <button id="tab-produccion">Producción</button>
@@ -640,6 +648,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <button id="adminsub-insumos">Insumos</button>
         <button id="adminsub-proveedores">Proveedores</button>
         <button id="adminsub-invcatalogo">Cat. Inventario</button>
+        <button id="adminsub-areas">Áreas</button>
       </div>
 
       <div id="adminpanel-produccion" class="adminpanel active">
@@ -812,6 +821,46 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <div class="field"><label class="field-label">Buscar</label><input type="text" id="icSearch" placeholder="Nombre o código..."></div>
         <span class="sub" id="icCount" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);"></span>
         <div id="icList" style="margin-top:10px;"></div>
+      </div>
+
+      <div id="adminpanel-areas" class="adminpanel">
+        <div class="admin-header"><h2>Áreas del punto</h2></div>
+        <div class="empty-note" style="margin-bottom:14px;">Cada área tiene sus propios módulos habilitados, y solo entra quien tú le des acceso — igual que con los puntos.</div>
+
+        <div class="prod-form" style="margin-bottom:20px;">
+          <h2>Crear área nueva</h2>
+          <div class="field">
+            <label class="field-label">Nombre</label>
+            <select id="areaName">
+              <option value="Cocina">Cocina</option>
+              <option value="Barra">Barra</option>
+              <option value="Servicio">Servicio</option>
+              <option value="__otra__">Otra (escribir)</option>
+            </select>
+          </div>
+          <div class="field" id="areaNameOtraBox" style="display:none;">
+            <label class="field-label">Nombre del área nueva</label>
+            <input type="text" id="areaNameOtra" placeholder="Ej: Panadería">
+          </div>
+          <div class="field">
+            <label class="field-label">Módulos habilitados</label>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="recetario" checked style="width:auto;"> Recetario</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="produccion" checked style="width:auto;"> Producción</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="cronograma" checked style="width:auto;"> Cronograma</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="pedidos" checked style="width:auto;"> Pedidos</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="bajas" checked style="width:auto;"> Bajas</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="inventario" checked style="width:auto;"> Inventario</label>
+            </div>
+          </div>
+          <button class="btn btn-accent btn-block" id="areaSubmit" style="margin-top:12px;">Crear área</button>
+        </div>
+
+        <div class="section-label">Áreas existentes</div>
+        <div id="areasAdminList"></div>
+
+        <div class="section-label" style="margin-top:24px;">Accesos por usuario</div>
+        <div id="areaAccessMatrix"></div>
       </div>
     </div>
   </main>
@@ -1049,6 +1098,7 @@ let session = null;
 let profile = null;
 let myProductions = [];
 let currentLocation = null;
+let currentArea = null;
 
 /* ---------- COLOR: deriva la paleta completa a partir de 3 colores ---------- */
 function hexToHsl(hex){
@@ -1179,9 +1229,10 @@ document.getElementById('loginSubmit').addEventListener('click', async ()=>{
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   if(realtimeChannel){ supa.removeChannel(realtimeChannel); realtimeChannel = null; }
   await supa.auth.signOut();
-  session = null; profile = null; currentLocation = null;
+  session = null; profile = null; currentLocation = null; currentArea = null;
   document.getElementById('app').style.display='none';
   document.getElementById('locationScreen').style.display='none';
+  document.getElementById('areaScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
 });
 
@@ -1234,14 +1285,67 @@ function enterLocation(loc){
   applyLocationTheme(loc);
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('locationScreen').style.display='none';
+  pickAreaForLocation(loc);
+}
+
+async function pickAreaForLocation(loc){
+  const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
+  if(error){
+    showToast('No se pudieron cargar tus áreas.');
+    return;
+  }
+  const areas = (data || []).map(r => r.areas).filter(a => a && a.location_id === loc.id);
+
+  if(areas.length === 0){
+    document.getElementById('areaScreen').style.display = 'flex';
+    document.getElementById('areaList').innerHTML = '<div class="empty-note">Tu cuenta todavía no tiene ningún área asignada en este punto. Pide al administrador que te dé acceso.</div>';
+    return;
+  }
+
+  if(areas.length === 1){
+    enterArea(loc, areas[0]);
+    return;
+  }
+
+  document.getElementById('areaScreen').style.display = 'flex';
+  document.getElementById('areaList').innerHTML = areas.map(a => `
+    <div class="location-card" data-area-id="${a.id}">
+      <div class="lc-name">${escapeHtml(a.name)}</div>
+    </div>
+  `).join('');
+  document.getElementById('areaList').querySelectorAll('.location-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const area = areas.find(a => a.id === card.dataset.areaId);
+      enterArea(loc, area);
+    });
+  });
+}
+
+const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario'];
+
+function applyAreaModuleVisibility(modules){
+  MODULE_TABS.forEach(m=>{
+    const tabBtn = document.getElementById('tab-'+m);
+    if(tabBtn) tabBtn.style.display = modules.includes(m) ? '' : 'none';
+  });
+  const firstAvailable = MODULE_TABS.find(m => modules.includes(m));
+  if(firstAvailable) switchTab(firstAvailable);
+}
+
+function enterArea(loc, area){
+  currentLocation = loc;
+  currentArea = area;
+  document.getElementById('areaScreen').style.display = 'none';
   document.getElementById('app').style.display='flex';
   document.getElementById('whoName').textContent = profile.name || session.user.email;
+  document.getElementById('whoArea').textContent = '· ' + area.name;
   const roleBadge = document.getElementById('whoRole');
   roleBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? 'block' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
+  applyAreaModuleVisibility(area.modules || MODULE_TABS);
   initApp();
   setupRealtime();
 }
@@ -1730,8 +1834,9 @@ document.getElementById('adminsub-bajas').addEventListener('click', ()=>switchAd
 document.getElementById('adminsub-insumos').addEventListener('click', ()=>switchAdminSub('insumos'));
 document.getElementById('adminsub-proveedores').addEventListener('click', ()=>switchAdminSub('proveedores'));
 document.getElementById('adminsub-invcatalogo').addEventListener('click', ()=>switchAdminSub('invcatalogo'));
+document.getElementById('adminsub-areas').addEventListener('click', ()=>switchAdminSub('areas'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo','areas'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
@@ -1742,6 +1847,7 @@ function switchAdminSub(name){
   if(name==='insumos') loadGroupIngredientsAdmin();
   if(name==='proveedores') renderProveedoresAdmin();
   if(name==='invcatalogo') loadInventoryCatalogAdmin();
+  if(name==='areas') loadAreasAdmin();
 }
 
 /* ---------- GESTIÓN DE PUNTOS (solo super admin) ---------- */
@@ -3166,6 +3272,118 @@ document.getElementById('invNextMonth').addEventListener('click', ()=>{
   invMonth.setMonth(invMonth.getMonth() + 1);
   loadInventarioMonth();
 });
+
+/* ---------- ADMIN: gestión de Áreas ---------- */
+let AREAS_THIS_LOCATION = [];
+
+document.getElementById('areaName').addEventListener('change', ()=>{
+  const isOtra = document.getElementById('areaName').value === '__otra__';
+  document.getElementById('areaNameOtraBox').style.display = isOtra ? 'block' : 'none';
+});
+
+document.getElementById('areaSubmit').addEventListener('click', async ()=>{
+  const nameSelectVal = document.getElementById('areaName').value;
+  const name = nameSelectVal === '__otra__'
+    ? document.getElementById('areaNameOtra').value.trim()
+    : nameSelectVal;
+  const modules = Array.from(document.querySelectorAll('.area-module-cb:checked')).map(cb => cb.value);
+
+  if(!name){ showToast('Escribe el nombre del área'); return; }
+  if(modules.length === 0){ showToast('Elige al menos un módulo'); return; }
+
+  const { data, error } = await supa.from('areas').insert({
+    location_id: currentLocation.id, name, modules
+  }).select().single();
+  if(error){
+    showToast(error.message.includes('duplicate') ? 'Ya existe un área con ese nombre en este punto' : 'Error: ' + error.message);
+    return;
+  }
+
+  await supa.from('user_areas').insert({ user_id: session.user.id, area_id: data.id });
+
+  showToast('Área creada');
+  document.getElementById('areaName').value = 'Cocina';
+  document.getElementById('areaNameOtraBox').style.display = 'none';
+  document.getElementById('areaNameOtra').value = '';
+  document.querySelectorAll('.area-module-cb').forEach(cb => cb.checked = true);
+  loadAreasAdmin();
+});
+
+async function loadAreasAdmin(){
+  const { data, error } = await supa.from('areas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:true});
+  AREAS_THIS_LOCATION = error ? [] : (data || []);
+  renderAreasAdminList();
+  await loadAreaAccessMatrix();
+}
+
+function renderAreasAdminList(){
+  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario'};
+  const box = document.getElementById('areasAdminList');
+  if(AREAS_THIS_LOCATION.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay áreas creadas en este punto.</div>'; return; }
+  box.innerHTML = AREAS_THIS_LOCATION.map(a => `
+    <div class="gi-row">
+      <div class="gi-main">
+        <div class="gi-name">${escapeHtml(a.name)}</div>
+        <div class="gi-meta">${(a.modules||[]).map(m => MODULE_LABELS[m] || m).join(', ')}</div>
+      </div>
+      <button class="btn btn-ghost btn-small" data-del-area="${a.id}">Eliminar</button>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-del-area]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const { error } = await supa.from('areas').delete().eq('id', btn.dataset.delArea);
+      if(error){ showToast('Error: ' + error.message); return; }
+      showToast('Área eliminada');
+      loadAreasAdmin();
+    });
+  });
+}
+
+async function loadAreaAccessMatrix(){
+  const box = document.getElementById('areaAccessMatrix');
+  if(AREAS_THIS_LOCATION.length === 0){
+    box.innerHTML = '<div class="empty-note">Crea al menos un área para poder asignar accesos.</div>';
+    return;
+  }
+  const { data: users, error: uErr } = await supa.from('profiles').select('*').order('created_at', {ascending:true});
+  const areaIds = AREAS_THIS_LOCATION.map(a=>a.id);
+  const { data: accessRows, error: aErr } = await supa.from('user_areas').select('*').in('area_id', areaIds);
+  if(uErr || aErr){ box.innerHTML = '<div class="empty-note">No se pudo cargar la lista de accesos.</div>'; return; }
+
+  const accessSet = new Set((accessRows||[]).map(r => r.user_id + '::' + r.area_id));
+
+  box.innerHTML = (users||[]).map(u => `
+    <div class="user-row" style="flex-direction:column; align-items:stretch;">
+      <div class="u-main" style="margin-bottom:8px;">
+        <div class="u-name">${escapeHtml(u.name || '(sin nombre)')}</div>
+        <div class="u-email">${escapeHtml(u.email || '')}</div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px;">
+        ${AREAS_THIS_LOCATION.map(a => {
+          const checked = accessSet.has(u.id + '::' + a.id);
+          return `<label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); cursor:pointer;">
+            <input type="checkbox" data-area-user="${u.id}" data-area-id="${a.id}" ${checked?'checked':''}>
+            ${escapeHtml(a.name)}
+          </label>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const userId = cb.dataset.areaUser, areaId = cb.dataset.areaId;
+      if(cb.checked){
+        const { error } = await supa.from('user_areas').insert({ user_id: userId, area_id: areaId });
+        if(error){ showToast('Error: ' + error.message); cb.checked = false; return; }
+      } else {
+        const { error } = await supa.from('user_areas').delete().eq('user_id', userId).eq('area_id', areaId);
+        if(error){ showToast('Error: ' + error.message); cb.checked = true; return; }
+      }
+      showToast('Acceso actualizado');
+    });
+  });
+}
 </script>
 </body>
 </html>
