@@ -698,7 +698,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 
       <div id="adminpanel-pedidos" class="adminpanel">
         <div class="admin-header">
-          <h2>Pedidos del punto</h2>
+          <h2>Pedidos del área</h2>
           <button class="btn btn-ghost btn-small" id="adminOrderToggleView">Ver historial completo</button>
         </div>
 
@@ -802,7 +802,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       </div>
 
       <div id="adminpanel-invcatalogo" class="adminpanel">
-        <div class="admin-header"><h2>Catálogo de inventario del punto</h2></div>
+        <div class="admin-header"><h2>Catálogo de inventario del área</h2></div>
         <div class="empty-note" style="margin-bottom:14px;">Esta es la lista fija que se usa para contar inventario en este punto — solo estos ítems aparecen, ni uno más.</div>
         <div class="prod-form" style="margin-bottom:20px;">
           <h2>Agregar ítem</h2>
@@ -1355,15 +1355,15 @@ let realtimeChannel = null;
 
 function setupRealtime(){
   if(realtimeChannel){ supa.removeChannel(realtimeChannel); realtimeChannel = null; }
-  realtimeChannel = supa.channel('loc-' + currentLocation.id)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'orders', filter:`location_id=eq.${currentLocation.id}` }, payload=>{
+  realtimeChannel = supa.channel('loc-' + currentLocation.id + '-area-' + currentArea.id)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'orders', filter:`area_id=eq.${currentArea.id}` }, payload=>{
       if(profile.role === 'admin' && payload.new.created_by !== session.user.id){
         showToast('📦 Nuevo pedido: ' + (payload.new.proveedor || 'sin proveedor'));
       }
       loadMyOrders();
       if(document.getElementById('adminpanel-pedidos') && document.getElementById('adminpanel-pedidos').classList.contains('active')) loadAdminOrders();
     })
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'orders', filter:`location_id=eq.${currentLocation.id}` }, payload=>{
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'orders', filter:`area_id=eq.${currentArea.id}` }, payload=>{
       if(payload.new.created_by === session.user.id && payload.old.status !== payload.new.status){
         showToast(payload.new.status === 'aprobado' ? '✅ Tu pedido fue aprobado' : '❌ Tu pedido fue rechazado');
       }
@@ -2345,7 +2345,7 @@ function renderGiList(){
 let INVENTORY_CATALOG_ITEMS = [];
 
 async function loadInventoryCatalogAdmin(){
-  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('area_id', currentArea.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
   INVENTORY_CATALOG_ITEMS = error ? [] : (data || []);
   renderInvCatalogList();
 }
@@ -2355,7 +2355,7 @@ function renderInvCatalogList(){
   const list = INVENTORY_CATALOG_ITEMS.filter(it => !q || it.name.toUpperCase().includes(q) || it.code.toUpperCase().includes(q));
   document.getElementById('icCount').textContent = list.length + ' ítem' + (list.length===1?'':'s');
   const box = document.getElementById('icList');
-  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No hay ítems en el catálogo de inventario de este punto.</div>'; return; }
+  if(list.length === 0){ box.innerHTML = '<div class="empty-list">No hay ítems en el catálogo de inventario de esta área.</div>'; return; }
   box.innerHTML = list.map(it => `
     <div class="gi-row">
       <div class="gi-main">
@@ -2384,7 +2384,7 @@ document.getElementById('icSubmit').addEventListener('click', async ()=>{
   if(!name || !code){ showToast('Escribe el nombre y el código'); return; }
   const maxOrden = INVENTORY_CATALOG_ITEMS.reduce((max, it) => Math.max(max, it.orden || 0), 0);
   const { error } = await supa.from('inventory_catalog').insert({
-    location_id: currentLocation.id, code, name, unidad, bodega: 'Cocina', orden: maxOrden + 1
+    location_id: currentLocation.id, area_id: currentArea.id, code, name, unidad, bodega: 'Cocina', orden: maxOrden + 1
   });
   if(error){
     showToast(error.message.includes('duplicate') ? 'Ese código ya está en el catálogo' : 'Error: ' + error.message);
@@ -2562,7 +2562,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   }
 
   const { data: orderData, error: orderErr } = await supa.from('orders').insert({
-    location_id: currentLocation.id, fecha, proveedor, proveedor_id: proveedorId,
+    location_id: currentLocation.id, area_id: currentArea.id, fecha, proveedor, proveedor_id: proveedorId,
     proveedor_telefono: proveedorTelefono, proveedor_correo: proveedorCorreo, semana_inicio: semanaInicio,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
   }).select().single();
@@ -2580,7 +2580,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
 async function loadMyOrders(){
   const { monday, sunday } = getWeekRange(new Date());
   const { data, error } = await supa.from('orders').select('*, order_items(*)')
-    .eq('location_id', currentLocation.id)
+    .eq('area_id', currentArea.id)
     .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
     .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
@@ -2762,7 +2762,7 @@ let currentReviewOrderId = null;
 async function loadAdminOrders(){
   const { monday, sunday } = getWeekRange(new Date());
   const { data, error } = await supa.from('orders').select('*, order_items(*)')
-    .eq('location_id', currentLocation.id)
+    .eq('area_id', currentArea.id)
     .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
     .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
@@ -2803,7 +2803,7 @@ document.getElementById('adminOrderToggleView').addEventListener('click', ()=>{
 });
 
 async function loadOrderHistory(){
-  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { data, error } = await supa.from('orders').select('*, order_items(*)').eq('area_id', currentArea.id).order('created_at', {ascending:false});
   adminOrderHistoryCache = error ? [] : (data || []);
 
   const cats = new Set();
@@ -3085,7 +3085,7 @@ async function loadInventarioMonth(){
   const startIso = dateKey(monthStart), endIso = dateKey(monthEnd);
 
   const { data, error } = await supa.from('inventory_sessions').select('*')
-    .eq('location_id', currentLocation.id)
+    .eq('area_id', currentArea.id)
     .gte('fecha', startIso).lte('fecha', endIso);
   invSessionsThisMonth = error ? [] : (data || []);
 
@@ -3134,7 +3134,7 @@ function renderInvCalendarGrid(){
 }
 
 async function buildInventarioItemList(){
-  const { data, error } = await supa.from('inventory_catalog').select('*').eq('location_id', currentLocation.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
+  const { data, error } = await supa.from('inventory_catalog').select('*').eq('area_id', currentArea.id).order('orden', {ascending:true, nullsFirst:false}).order('name', {ascending:true});
   if(error){ showToast('No se pudo cargar el catálogo de inventario: ' + error.message); return []; }
   return (data || []).map(it => ({ code: it.code, name: it.name, unidad: it.unidad }));
 }
@@ -3174,7 +3174,7 @@ async function renderInvDayPanel(){
         });
       });
       const { data: sessData, error: sessErr } = await supa.from('inventory_sessions').insert({
-        location_id: currentLocation.id, fecha: invSelectedDate, status: 'cerrado',
+        location_id: currentLocation.id, area_id: currentArea.id, fecha: invSelectedDate, status: 'cerrado',
         cerrado_por: profile.name || session.user.email, cerrado_at: new Date().toISOString(),
         created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
       }).select().single();
@@ -3259,7 +3259,7 @@ function downloadInventarioCsv(session, items){
   const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `inventario_${currentLocation.name.replace(/\s+/g,'_')}_${session.fecha}.csv`;
+  a.href = url; a.download = `inventario_${currentLocation.name.replace(/\s+/g,'_')}_${currentArea.name.replace(/\s+/g,'_')}_${session.fecha}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
