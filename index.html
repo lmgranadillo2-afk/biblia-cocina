@@ -3988,10 +3988,13 @@ function renderAreasAdminList(){
   box.innerHTML = AREAS_THIS_LOCATION.map(a => `
     <div class="gi-row">
       <div class="gi-main">
-        <div class="gi-name">${escapeHtml(a.name)}</div>
+        <div class="gi-name">${escapeHtml(a.name)}${currentArea && currentArea.id===a.id ? ' <span style="font-size:11px; color:var(--accent-2);">(aquí estás)</span>' : ''}</div>
         <div class="gi-meta">${(a.modules||[]).map(m => MODULE_LABELS[m] || m).join(', ')}</div>
       </div>
-      <button class="btn btn-ghost btn-small" data-del-area="${a.id}">Eliminar</button>
+      <div style="display:flex; gap:8px;">
+        ${currentArea && currentArea.id===a.id ? '' : `<button class="btn btn-accent btn-small" data-enter-area="${a.id}">Entrar</button>`}
+        <button class="btn btn-ghost btn-small" data-del-area="${a.id}">Eliminar</button>
+      </div>
     </div>
   `).join('');
   box.querySelectorAll('[data-del-area]').forEach(btn=>{
@@ -4002,6 +4005,23 @@ function renderAreasAdminList(){
       loadAreasAdmin();
     });
   });
+  box.querySelectorAll('[data-enter-area]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const area = AREAS_THIS_LOCATION.find(a => a.id === btn.dataset.enterArea);
+      if(area) switchToArea(area);
+    });
+  });
+}
+
+/* ---------- Cambiar de área sin salir del punto ---------- */
+async function switchToArea(area){
+  await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
+  currentArea = area;
+  document.getElementById('whoArea').textContent = '· ' + area.name;
+  applyAreaModuleVisibility(area.modules || MODULE_TABS);
+  showToast('Entraste a ' + area.name);
+  initApp();
+  setupRealtime();
 }
 
 async function loadAreaAccessMatrix(){
