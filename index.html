@@ -2909,6 +2909,16 @@ const KANBAN_COLUMNS = [
   { key:'rechazado', label:'Rechazado' }
 ];
 
+function semaforoEnvio(o){
+  if(o.status !== 'aprobado' || o.enviado || !o.resuelto_at) return '';
+  const horas = (Date.now() - new Date(o.resuelto_at).getTime()) / 3600000;
+  let dot, titulo;
+  if(horas < 2){ dot = '🟢'; titulo = 'Aprobado hace menos de 2 horas'; }
+  else if(horas <= 5){ dot = '🟡'; titulo = 'Aprobado hace ' + Math.round(horas) + ' horas, sin enviar'; }
+  else { dot = '🔴'; titulo = 'Aprobado hace ' + Math.round(horas) + ' horas — ¡falta enviarlo!'; }
+  return `<span title="${titulo}">${dot}</span> `;
+}
+
 function orderKanbanCardHtml(o, mode){
   const items = sortByCategoria(o.order_items || []);
   const itemsPreview = items.slice(0,3).map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ') +
@@ -2937,7 +2947,7 @@ function orderKanbanCardHtml(o, mode){
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
   return `<div class="kanban-card ${o.status}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}">
-    <div class="kc-title">${o.urgente ? '<span style="color:var(--warn);">🔴 Urgente</span> · ' : ''}${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
+    <div class="kc-title">${semaforoEnvio(o)}${o.urgente ? '<span style="color:var(--warn);">🔴 Urgente</span> · ' : ''}${o.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${o.codigo}</span> · ` : ''}${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
     <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${mode==='admin' ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
     <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
     ${extra}
