@@ -360,6 +360,11 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .gi-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; flex-shrink:0;}
 .gi-toggle input{width:auto; margin:0;}
 .gi-toggle span{font-size:12px; color:var(--text-muted);}
+.presentacion-chip{
+  display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:14px;
+  background:var(--surface-2); border:1px solid var(--border); font-size:12.5px; color:var(--text);
+}
+.presentacion-chip button{background:none; border:none; color:var(--danger); cursor:pointer; font-size:14px; padding:0; line-height:1;}
 
 .kanban-board{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
 .kanban-col-header{display:flex; align-items:center; gap:7px; margin-bottom:10px;}
@@ -846,6 +851,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
               <option value="LAC">Lácteos</option>
               <option value="BAR">Barra</option>
               <option value="ASE">Aseo</option>
+              <option value="QUI">Químicos</option>
               <option value="__otra__">Otra (escribir)</option>
             </select>
           </div>
@@ -982,6 +988,38 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 </div>
 
 <!-- Modal anular (admin) -->
+<div class="modal-overlay" id="editInsumoModal">
+  <div class="modal-box">
+    <h3>Editar insumo</h3>
+    <input type="hidden" id="editGiId">
+    <div class="field"><label class="field-label">Nombre</label><input type="text" id="editGiName"></div>
+    <div class="field"><label class="field-label">Categoría</label>
+      <select id="editGiCategoria">
+        <option value="ABA">Abarrotes</option>
+        <option value="FRV">Frutas y Verduras</option>
+        <option value="PRO">Proteínas</option>
+        <option value="LAC">Lácteos</option>
+        <option value="BAR">Barra</option>
+        <option value="ASE">Aseo</option>
+        <option value="QUI">Químicos</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="field-label">Presentaciones de compra</label>
+      <div class="field-help" style="margin-bottom:8px;">Escribe la presentación exacta tal como la pides al proveedor (ej. "Bidón x 20 litros", "Caja x 24 unidades", "Kg").</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="text" id="editGiPresentacionInput" placeholder="Ej: Bidón x 20 litros">
+        <button type="button" class="btn btn-ghost btn-small" id="editGiPresentacionAdd" style="flex-shrink:0;">Agregar</button>
+      </div>
+      <div id="editGiPresentacionesList" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="editGiCancel">Cancelar</button>
+      <button class="btn btn-accent" id="editGiSave">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="deleteLocationModal">
   <div class="modal-box danger">
     <h3>Eliminar punto</h3>
@@ -2490,7 +2528,7 @@ document.getElementById('schedSubmitBtn').addEventListener('click', async ()=>{
 });
 
 /* ---------- PEDIDOS DE INSUMOS ---------- */
-const CATEGORY_LABELS = {ABA:'Abarrotes', FRV:'Frutas y Verduras', PRO:'Proteínas', LAC:'Lácteos', BAR:'Barra', ASE:'Aseo'};
+const CATEGORY_LABELS = {ABA:'Abarrotes', FRV:'Frutas y Verduras', PRO:'Proteínas', LAC:'Lácteos', BAR:'Barra', ASE:'Aseo', QUI:'Químicos'};
 let INSUMOS_CATALOG = {};
 
 let EXTRA_CATALOG_ITEMS = [];
@@ -2509,6 +2547,10 @@ async function loadGroupCatalogActive(){
   GROUP_ACTIVE_ITEMS = error ? [] : (data || []).map(r => r.group_ingredients).filter(Boolean);
 }
 
+const DEFAULT_UNIDADES_COMPRA = ['UND','KG'];
+const UNIDADES_COMPRA_ALL = ['UND','KG','L','Bidón','Caja','Bolsa','Galón','Paquete'];
+const UNIDADES_COMPRA_LABELS = {UND:'Unidades', KG:'Kg', L:'Litros', 'Bidón':'Bidón', Caja:'Caja', Bolsa:'Bolsa', 'Galón':'Galón', Paquete:'Paquete'};
+
 function buildInsumosCatalog(){
   const map = {};
   RECIPES.forEach(r=>{
@@ -2519,23 +2561,23 @@ function buildInsumosCatalog(){
       if(!m) return;
       const prefix = m[1].toUpperCase();
       if(!map[prefix]) map[prefix] = {};
-      map[prefix][ing.code] = ing.name;
+      if(!map[prefix][ing.code]) map[prefix][ing.code] = { name: ing.name, unidades: DEFAULT_UNIDADES_COMPRA };
     });
   });
   GROUP_ACTIVE_ITEMS.forEach(it=>{
     const key = it.categoria;
     if(!map[key]) map[key] = {};
-    map[key][it.code] = it.name;
+    map[key][it.code] = { name: it.name, unidades: (it.unidades_compra && it.unidades_compra.length) ? it.unidades_compra : DEFAULT_UNIDADES_COMPRA };
   });
   EXTRA_CATALOG_ITEMS.forEach(it=>{
     const key = it.categoria;
     if(!map[key]) map[key] = {};
-    map[key][it.code] = it.name;
+    if(!map[key][it.code]) map[key][it.code] = { name: it.name, unidades: DEFAULT_UNIDADES_COMPRA };
   });
   INSUMOS_CATALOG = {};
   Object.keys(map).sort().forEach(prefix=>{
     INSUMOS_CATALOG[prefix] = Object.entries(map[prefix])
-      .map(([code,name])=>({code,name}))
+      .map(([code,info])=>({code, name: info.name, unidades: info.unidades}))
       .sort((a,b)=>a.name.localeCompare(b.name));
   });
 }
@@ -2622,8 +2664,9 @@ function renderGiList(){
     return `<div class="gi-row">
       <div class="gi-main">
         <div class="gi-name">${escapeHtml(g.name)}</div>
-        <div class="gi-meta">${g.code} · ${categoryLabel(g.categoria)}</div>
+        <div class="gi-meta">${g.code} · ${categoryLabel(g.categoria)} · Compra: ${(g.unidades_compra||['UND','KG']).join(', ')}</div>
       </div>
+      <button class="btn btn-ghost btn-small" data-edit-gi="${g.id}">Editar</button>
       <label class="gi-toggle">
         <input type="checkbox" data-gi-id="${g.id}" ${isActive?'checked':''}>
         <span>${isActive ? 'Activo en este punto' : 'Inactivo'}</span>
@@ -2644,7 +2687,75 @@ function renderGiList(){
       buildInsumosCatalog();
     });
   });
+
+  box.querySelectorAll('[data-edit-gi]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openEditInsumoModal(btn.dataset.editGi));
+  });
 }
+
+/* ---------- EDITAR INSUMO (nombre, categoría, unidades de compra) ---------- */
+let editGiPresentaciones = [];
+
+function renderEditGiPresentaciones(){
+  const box = document.getElementById('editGiPresentacionesList');
+  if(editGiPresentaciones.length === 0){
+    box.innerHTML = '<span style="font-size:12px; color:var(--text-dim);">Sin presentaciones todavía — agrega al menos una.</span>';
+    return;
+  }
+  box.innerHTML = editGiPresentaciones.map((p,i) =>
+    `<span class="presentacion-chip">${escapeHtml(p)}<button type="button" data-remove-pres="${i}">&times;</button></span>`
+  ).join('');
+  box.querySelectorAll('[data-remove-pres]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editGiPresentaciones.splice(parseInt(btn.dataset.removePres), 1);
+      renderEditGiPresentaciones();
+    });
+  });
+}
+
+document.getElementById('editGiPresentacionAdd').addEventListener('click', ()=>{
+  const input = document.getElementById('editGiPresentacionInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(!editGiPresentaciones.includes(val)) editGiPresentaciones.push(val);
+  input.value = '';
+  renderEditGiPresentaciones();
+});
+document.getElementById('editGiPresentacionInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('editGiPresentacionAdd').click(); }
+});
+
+function openEditInsumoModal(giId){
+  const item = ALL_GROUP_INGREDIENTS.find(g => g.id === giId);
+  if(!item) return;
+  document.getElementById('editGiId').value = item.id;
+  document.getElementById('editGiName').value = item.name;
+  document.getElementById('editGiCategoria').value = item.categoria;
+  editGiPresentaciones = (item.unidades_compra && item.unidades_compra.length) ? [...item.unidades_compra] : [...DEFAULT_UNIDADES_COMPRA];
+  renderEditGiPresentaciones();
+  document.getElementById('editGiPresentacionInput').value = '';
+  document.getElementById('editInsumoModal').classList.add('open');
+}
+
+document.getElementById('editGiCancel').addEventListener('click', ()=>{
+  document.getElementById('editInsumoModal').classList.remove('open');
+});
+
+document.getElementById('editGiSave').addEventListener('click', async ()=>{
+  const giId = document.getElementById('editGiId').value;
+  const name = document.getElementById('editGiName').value.trim();
+  const categoria = document.getElementById('editGiCategoria').value.trim().toUpperCase();
+  if(!name || !categoria){ showToast('Escribe el nombre y la categoría'); return; }
+  if(editGiPresentaciones.length === 0){ showToast('Agrega al menos una presentación de compra'); return; }
+
+  const { error } = await supa.from('group_ingredients').update({ name, categoria, unidades_compra: editGiPresentaciones }).eq('id', giId);
+  if(error){ showToast('Error al guardar: ' + error.message); return; }
+  showToast('Insumo actualizado');
+  document.getElementById('editInsumoModal').classList.remove('open');
+  await loadGroupCatalogActive();
+  buildInsumosCatalog();
+  loadGroupIngredientsAdmin();
+});
 
 /* ---------- ADMIN: catálogo fijo de inventario ---------- */
 let INVENTORY_CATALOG_ITEMS = [];
@@ -2731,10 +2842,7 @@ function buildOrderRow(rowId, existing){
     </div>
     <div class="field f-unidad">
       <label class="field-label">Unidad</label>
-      <select class="row-unidad">
-        <option value="UND" ${existing && existing.unidad==='UND' ? 'selected':''}>Unidades</option>
-        <option value="KG" ${!existing || existing.unidad==='KG' ? 'selected':''}>Kg</option>
-      </select>
+      <select class="row-unidad"></select>
     </div>
     <div class="field f-nota">
       <label class="field-label">Nota (opc.)</label>
@@ -2747,6 +2855,15 @@ function buildOrderRow(rowId, existing){
   const searchInput = wrap.querySelector('.row-insumo-search');
   const suggBox = wrap.querySelector('.insumo-suggestions');
   const codeInput = wrap.querySelector('.row-insumo-code');
+  const unidadSelect = wrap.querySelector('.row-unidad');
+
+  function populateUnidadSelect(unidades, selectedValue){
+    let list = unidades && unidades.length ? unidades : DEFAULT_UNIDADES_COMPRA;
+    if(selectedValue && !list.includes(selectedValue)) list = [selectedValue, ...list];
+    unidadSelect.innerHTML = list.map(u =>
+      `<option value="${u}" ${selectedValue===u ? 'selected':''}>${UNIDADES_COMPRA_LABELS[u] || u}</option>`
+    ).join('');
+  }
 
   function refreshSearchState(){
     const cat = catSelect.value;
@@ -2755,6 +2872,7 @@ function buildOrderRow(rowId, existing){
       searchInput.placeholder = 'Elige categoría primero...';
       searchInput.value = '';
       codeInput.value = '';
+      populateUnidadSelect(DEFAULT_UNIDADES_COMPRA, null);
     } else {
       searchInput.disabled = false;
       searchInput.placeholder = 'Buscar insumo en ' + categoryLabel(cat) + '...';
@@ -2764,7 +2882,13 @@ function buildOrderRow(rowId, existing){
     if(!existing || catSelect.value !== existing.categoria){ searchInput.value=''; codeInput.value=''; }
     refreshSearchState();
   });
-  if(!existing) refreshSearchState(); else { searchInput.disabled = false; }
+  if(!existing){
+    refreshSearchState();
+  } else {
+    searchInput.disabled = false;
+    const catalogItem = (INSUMOS_CATALOG[existing.categoria] || []).find(it => it.code === existing.ingredient_code);
+    populateUnidadSelect(catalogItem ? catalogItem.unidades : DEFAULT_UNIDADES_COMPRA, existing.unidad);
+  }
 
   searchInput.addEventListener('input', ()=>{
     const cat = catSelect.value;
@@ -2787,6 +2911,8 @@ function buildOrderRow(rowId, existing){
         e.preventDefault();
         searchInput.value = el.dataset.name;
         codeInput.value = el.dataset.code;
+        const chosen = list.find(it => it.code === el.dataset.code);
+        populateUnidadSelect(chosen ? chosen.unidades : DEFAULT_UNIDADES_COMPRA, null);
         suggBox.style.display = 'none';
       });
     });
