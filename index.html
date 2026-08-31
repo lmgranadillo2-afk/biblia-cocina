@@ -1616,18 +1616,40 @@ async function initApp(){
   populateRecetaDatalist();
   loadMyProductions();
   await loadProveedores();
+  await loadProveedorInsumosMap();
   const iso = new Date().toISOString().slice(0,10);
   document.getElementById('prodFecha').value = iso;
 }
 
 /* ---------- PROVEEDORES ---------- */
 let PROVEEDORES = [];
+let PROVEEDOR_INSUMOS_MAP = {};
+
+async function loadProveedorInsumosMap(){
+  const { data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, group_ingredients(code)');
+  PROVEEDOR_INSUMOS_MAP = {};
+  if(error) return;
+  (data || []).forEach(r=>{
+    if(!r.group_ingredients) return;
+    if(!PROVEEDOR_INSUMOS_MAP[r.proveedor_id]) PROVEEDOR_INSUMOS_MAP[r.proveedor_id] = new Set();
+    PROVEEDOR_INSUMOS_MAP[r.proveedor_id].add(r.group_ingredients.code);
+  });
+}
 
 async function loadProveedores(){
   const { data, error } = await supa.from('area_proveedores').select('proveedor_id, proveedores(*)').eq('area_id', currentArea.id);
   PROVEEDORES = error ? [] : (data || []).map(r => r.proveedores).filter(Boolean).sort((a,b)=>a.nombre.localeCompare(b.nombre));
   populateProveedorSelect();
 }
+
+document.getElementById('orderProveedor').addEventListener('change', ()=>{
+  const rowsBox = document.getElementById('orderItemsRows');
+  if(rowsBox && rowsBox.querySelector('.order-row')){
+    showToast('Se reiniciaron los insumos según el proveedor elegido');
+    rowsBox.innerHTML = '';
+    rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, document.getElementById('orderProveedor').value));
+  }
+});
 
 function populateProveedorSelect(selectedId){
   const sel = document.getElementById('orderProveedor');
@@ -2816,12 +2838,26 @@ document.getElementById('icSubmit').addEventListener('click', async ()=>{
 document.getElementById('giSearch').addEventListener('input', renderGiList);
 document.getElementById('giFilterCategoria').addEventListener('change', renderGiList);
 
-function buildOrderRow(rowId, existing){
+function getFilteredInsumosCatalog(proveedorId){
+  if(!proveedorId || !PROVEEDOR_INSUMOS_MAP[proveedorId] || PROVEEDOR_INSUMOS_MAP[proveedorId].size === 0){
+    return INSUMOS_CATALOG;
+  }
+  const allowedCodes = PROVEEDOR_INSUMOS_MAP[proveedorId];
+  const filtered = {};
+  Object.keys(INSUMOS_CATALOG).forEach(cat=>{
+    const items = INSUMOS_CATALOG[cat].filter(it => allowedCodes.has(it.code));
+    if(items.length > 0) filtered[cat] = items;
+  });
+  return filtered;
+}
+
+function buildOrderRow(rowId, existing, proveedorIdForFilter){
   const wrap = document.createElement('div');
   wrap.className = 'order-row';
   wrap.dataset.rowId = rowId;
 
-  const catOptions = Object.keys(INSUMOS_CATALOG).map(p =>
+  const catalog = getFilteredInsumosCatalog(proveedorIdForFilter);
+  const catOptions = Object.keys(catalog).map(p =>
     `<option value="${p}" ${existing && existing.categoria===p ? 'selected':''}>${categoryLabel(p)}</option>`
   ).join('');
 
@@ -2886,7 +2922,7 @@ function buildOrderRow(rowId, existing){
     refreshSearchState();
   } else {
     searchInput.disabled = false;
-    const catalogItem = (INSUMOS_CATALOG[existing.categoria] || []).find(it => it.code === existing.ingredient_code);
+    const catalogItem = (catalog[existing.categoria] || []).find(it => it.code === existing.ingredient_code);
     populateUnidadSelect(catalogItem ? catalogItem.unidades : DEFAULT_UNIDADES_COMPRA, existing.unidad);
   }
 
@@ -2895,7 +2931,7 @@ function buildOrderRow(rowId, existing){
     const q = searchInput.value.trim().toUpperCase();
     codeInput.value = '';
     if(!cat || !q){ suggBox.style.display='none'; suggBox.innerHTML=''; return; }
-    const list = INSUMOS_CATALOG[cat] || [];
+    const list = catalog[cat] || [];
     const matches = list.filter(it => it.name.toUpperCase().includes(q) || it.code.toUpperCase().includes(q)).slice(0,8);
     if(matches.length === 0){
       suggBox.innerHTML = '<div class="insumo-sugg-empty">Sin resultados en esta categoría</div>';
@@ -2956,7 +2992,7 @@ document.getElementById('orderOpenNew').addEventListener('click', ()=>{
   document.getElementById('orderModal').classList.add('open');
 });
 document.getElementById('orderAddRow').addEventListener('click', ()=>{
-  document.getElementById('orderItemsRows').appendChild(buildOrderRow(orderRowCounter++));
+  document.getElementById('orderItemsRows').appendChild(buildOrderRow(orderRowCounter++, null, document.getElementById('orderProveedor').value));
 });
 document.getElementById('orderCancel').addEventListener('click', ()=>{
   document.getElementById('orderModal').classList.remove('open');
@@ -3204,8 +3240,8 @@ function openOrderEdit(orderId, list){
   document.getElementById('orderUrgenteBox').style.display = 'none';
   const rowsBox = document.getElementById('orderItemsRows');
   rowsBox.innerHTML = '';
-  sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it)));
-  if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++)); }
+  sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it, order.proveedor_id)));
+  if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, order.proveedor_id)); }
   document.getElementById('orderModal').classList.add('open');
 }
 
@@ -3222,20 +3258,23 @@ async function loadAdminOrders(){
   renderOrderKanban(list, document.getElementById('adminOrderKanban'), 'admin');
 }
 
+let currentReviewOrderProveedorId = null;
+
 function openOrderReview(orderId, list){
   const order = list.find(o => o.id === orderId);
   if(!order) return;
   currentReviewOrderId = orderId;
+  currentReviewOrderProveedorId = order.proveedor_id;
   const semanaTxt = order.semana_inicio ? ' · Semana del ' + new Date(order.semana_inicio+'T00:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'}) : '';
   document.getElementById('orderReviewMeta').textContent =
     `${order.codigo || ''} · ${order.proveedor || 'Sin proveedor'} · Fecha ${order.fecha}${semanaTxt} · Pedido por ${order.creado_por_nombre || ''}`;
   const rowsBox = document.getElementById('orderReviewRows');
   rowsBox.innerHTML = '';
   sortByCategoria(order.order_items || []).forEach(it=>{
-    rowsBox.appendChild(buildOrderRow(orderRowCounter++, it));
+    rowsBox.appendChild(buildOrderRow(orderRowCounter++, it, order.proveedor_id));
   });
   if((order.order_items || []).length === 0){
-    rowsBox.appendChild(buildOrderRow(orderRowCounter++));
+    rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, order.proveedor_id));
   }
   document.getElementById('orderRejectBox').style.display = 'none';
   document.getElementById('orderRejectMotivo').value = '';
@@ -3350,7 +3389,7 @@ document.getElementById('orderReviewCancel').addEventListener('click', ()=>{
   currentReviewOrderId = null;
 });
 document.getElementById('orderReviewAddRow').addEventListener('click', ()=>{
-  document.getElementById('orderReviewRows').appendChild(buildOrderRow(orderRowCounter++));
+  document.getElementById('orderReviewRows').appendChild(buildOrderRow(orderRowCounter++, null, currentReviewOrderProveedorId));
 });
 
 async function saveReviewedItems(orderId){
