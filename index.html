@@ -2043,9 +2043,18 @@ function prodEntryHtml(p, isAdmin){
   if(anulado){
     voidBlock = `<div class="p-obs anulado"><span class="p-obs-label">Anulado por ${escapeHtml(p.anulado_por||'')}</span>${escapeHtml(p.anulado_motivo||'')}</div>`;
   }
+  let ingresadoBlock = '';
+  if(p.ingresado){
+    const ingresadaHora = p.ingresado_at ? new Date(p.ingresado_at).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+    ingresadoBlock = `<div class="p-obs" style="background:rgba(156,178,51,0.12); border-color:var(--accent-2);"><span class="p-obs-label" style="color:var(--accent-2);">✓ Ingresado al inventario</span>${escapeHtml(p.ingresado_por||'')} · ${ingresadaHora}</div>`;
+  }
   let actions = '';
   if(isAdmin && !anulado){
-    actions = `<div class="p-actions"><button class="btn btn-danger btn-small" data-void="${p.id}">Anular registro</button></div>`;
+    actions = `<div class="p-actions" style="display:flex; gap:8px;">`;
+    if(!p.ingresado){
+      actions += `<button class="btn btn-accent btn-small" data-ingresado="${p.id}">Marcar como ingresado</button>`;
+    }
+    actions += `<button class="btn btn-danger btn-small" data-void="${p.id}">Anular registro</button></div>`;
   }
   return `<div class="prod-entry ${hasVariance?'variance':''} ${anulado?'anulado':''}">
       <span class="locked ${anulado?'anulado-tag':''}">${anulado?'&#9888; anulado':'&#128274; bloqueado'}</span>
@@ -2055,7 +2064,7 @@ function prodEntryHtml(p, isAdmin){
         Rinde esperado: <b>${p.rendimiento_esperado || 'sin dato'}</b><br>
         Responsable: <b>${escapeHtml(p.responsable)}</b> &nbsp;·&nbsp; Registrado a las <b>${hora}</b>
       </div>
-      ${obsBlock}${voidBlock}${actions}
+      ${obsBlock}${voidBlock}${ingresadoBlock}${actions}
     </div>`;
 }
 
@@ -2066,6 +2075,16 @@ function renderProdHistory(list, wrapEl, countEl, isAdmin){
   if(isAdmin){
     wrapEl.querySelectorAll('[data-void]').forEach(btn=>{
       btn.addEventListener('click', ()=>openVoidModal(btn.dataset.void));
+    });
+    wrapEl.querySelectorAll('[data-ingresado]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const { error } = await supa.from('productions').update({
+          ingresado: true, ingresado_por: profile.name || session.user.email, ingresado_at: new Date().toISOString()
+        }).eq('id', btn.dataset.ingresado);
+        if(error){ showToast('Error: ' + error.message); return; }
+        showToast('Marcado como ingresado al inventario');
+        loadAdminHistory();
+      });
     });
   }
 }
@@ -3099,9 +3118,9 @@ function orderKanbanCardHtml(o, mode){
     if(o.enviado){
       const enviadoHora = o.enviado_at ? new Date(o.enviado_at).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
       actions += `<div class="kc-actions"><span class="oe-status-badge aprobado">✓ Enviado ${enviadoHora}</span></div>`;
-    } else if(o.proveedor_telefono || o.proveedor_correo){
+    } else {
       let sendBtns = '<div class="kc-actions" style="display:flex; gap:6px;">';
-      if(o.proveedor_telefono) sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
+      sendBtns += `<button class="btn btn-ghost btn-small" data-wa-id="${o.id}" style="flex:1;">WhatsApp</button>`;
       if(o.proveedor_correo) sendBtns += `<button class="btn btn-ghost btn-small" data-mail-id="${o.id}" style="flex:1;">Correo</button>`;
       sendBtns += '</div>';
       actions += sendBtns;
@@ -3154,10 +3173,8 @@ async function markOrderAsSent(orderId){
 
 function sendPedidoWhatsApp(o){
   if(o.enviado){ showToast('Este pedido ya fue enviado'); return; }
-  if(!o.proveedor_telefono){ showToast('Este proveedor no tiene teléfono registrado'); return; }
-  const phone = o.proveedor_telefono.replace(/\D/g,'');
   const msg = encodeURIComponent(buildPedidoMessage(o));
-  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
   markOrderAsSent(o.id);
 }
 
@@ -4120,7 +4137,7 @@ async function loadConsolidadoOrders(){
 }
 
 document.getElementById('consSendBtn').addEventListener('click', async ()=>{
-  if(!currentConsolidadoProveedor || !currentConsolidadoProveedor.telefono){ showToast('Chemestry no tiene teléfono registrado'); return; }
+  if(!currentConsolidadoProveedor){ showToast('No se encontró el proveedor'); return; }
 
   const selectedIds = Array.from(document.querySelectorAll('.cons-order-cb:checked')).map(cb => cb.value);
   if(selectedIds.length === 0){ showToast('Marca al menos un pedido'); return; }
@@ -4147,9 +4164,8 @@ document.getElementById('consSendBtn').addEventListener('click', async ()=>{
     });
   });
 
-  const phone = currentConsolidadoProveedor.telefono.replace(/\D/g,'');
   const msg = encodeURIComponent(lines.join('\n'));
-  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
 
   for(const id of selectedIds){
     await supa.from('orders').update({
