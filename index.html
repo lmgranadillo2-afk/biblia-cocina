@@ -147,7 +147,7 @@ main{flex:1; display:flex; min-height:0; position:relative;}
 .view.active{display:flex; flex-direction:column; width:100%;}
 
 /* ===== RECETARIO ===== */
-#view-recetario{flex-direction:row;}
+#view-recetario, #view-costeo{flex-direction:row;}
 .rec-list-pane{width:100%; border-right:1px solid var(--border); display:flex; flex-direction:column;}
 .rec-search{padding:14px 16px 10px; position:sticky; top:0; background:var(--bg); z-index:5;}
 .rec-search input{
@@ -452,7 +452,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
 
 @media(min-width:800px){
-  #view-recetario.active{flex-direction:row;}
+  #view-recetario.active, #view-costeo.active{flex-direction:row;}
   .rec-list-pane{width:340px; flex-shrink:0; border-right:1px solid var(--border);}
   .rec-detail-pane{display:flex !important; flex:1; border-left:1px solid var(--border);}
   .detail-back{display:none;}
@@ -529,6 +529,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button id="tab-pedidos">Pedidos</button>
       <button id="tab-bajas">Bajas</button>
       <button id="tab-inventario">Inventario</button>
+      <button id="tab-costeo">Costeo</button>
       <button id="tab-admin" style="display:none">Admin</button>
     </nav>
   </header>
@@ -543,6 +544,18 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div class="rec-detail-pane" id="recDetailPane">
         <div class="detail-back" id="detailBack">&larr; Volver al recetario</div>
         <div class="detail-body" id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="view-costeo" class="view">
+      <div class="rec-list-pane">
+        <div class="rec-search"><input type="text" id="costeoSearchInput" placeholder="Buscar receta o código..."></div>
+        <div class="rec-count" id="costeoCount"></div>
+        <div class="rec-items" id="costeoItems"></div>
+      </div>
+      <div class="rec-detail-pane" id="costeoDetailPane">
+        <div class="detail-back" id="costeoDetailBack">&larr; Volver a costeo</div>
+        <div class="detail-body" id="costeoDetailBody"></div>
       </div>
     </div>
 
@@ -940,6 +953,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
               <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="pedidos" checked style="width:auto;"> Pedidos</label>
               <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="bajas" checked style="width:auto;"> Bajas</label>
               <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="inventario" checked style="width:auto;"> Inventario</label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer;"><input type="checkbox" class="area-module-cb" value="costeo" style="width:auto;"> Costeo</label>
             </div>
           </div>
           <button class="btn btn-accent btn-block" id="areaSubmit" style="margin-top:12px;">Crear área</button>
@@ -1324,6 +1338,10 @@ function fmtQty(q){
   if(isNaN(n)) return q;
   return n.toLocaleString('es-CO', {maximumFractionDigits:3});
 }
+function fmtMoney(n){
+  if(n === '' || n === undefined || n === null || isNaN(n)) return '';
+  return Math.round(n).toLocaleString('es-CO', {style:'currency', currency:'COP', maximumFractionDigits:0});
+}
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1513,7 +1531,7 @@ async function pickAreaForLocation(loc){
   });
 }
 
-const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario'];
+const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo'];
 
 function applyAreaModuleVisibility(modules){
   MODULE_TABS.forEach(m=>{
@@ -1592,9 +1610,10 @@ document.getElementById('tab-cronograma').addEventListener('click', ()=>switchTa
 document.getElementById('tab-pedidos').addEventListener('click', ()=>switchTab('pedidos'));
 document.getElementById('tab-bajas').addEventListener('click', ()=>switchTab('bajas'));
 document.getElementById('tab-inventario').addEventListener('click', ()=>switchTab('inventario'));
+document.getElementById('tab-costeo').addEventListener('click', ()=>switchTab('costeo'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','admin'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -1603,12 +1622,14 @@ function switchTab(name){
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
   if(name==='inventario') loadInventarioMonth();
+  if(name==='costeo') renderCosteoList();
 }
 
 /* ---------- INIT ---------- */
 async function initApp(){
   document.getElementById('recItems').innerHTML = '<div class="empty-note">Cargando recetario...</div>';
   await loadRecipes();
+  await loadIngredientCosts();
   await loadExtraCatalogItems();
   await loadGroupCatalogActive();
   buildInsumosCatalog();
@@ -1773,6 +1794,163 @@ async function loadRecipes(){
     yield_unit: r.yield_unit || '',
     activo_inventario: r.activo_inventario !== false
   }));
+}
+
+/* ---------- COSTEO ---------- */
+let INGREDIENT_COST_MAP = {};
+async function loadIngredientCosts(){
+  const { data, error } = await supa.from('group_ingredients').select('code, costo, unidad');
+  INGREDIENT_COST_MAP = {};
+  if(error) return;
+  (data || []).forEach(g => { INGREDIENT_COST_MAP[g.code] = { costo: g.costo, unidad: g.unidad }; });
+}
+function unitGroup(u){
+  u = (u || '').toUpperCase();
+  if(u==='GR' || u==='KG') return 'MASA';
+  if(u==='ML' || u==='L') return 'VOLUMEN';
+  if(u==='UND' || u==='UNIDAD' || u==='UN') return 'CONTEO';
+  return null;
+}
+function toBaseQty(qty, unit){
+  const g = unitGroup(unit);
+  const u = (unit || '').toUpperCase();
+  if(g==='MASA') return u==='GR' ? qty/1000 : qty;
+  if(g==='VOLUMEN') return u==='ML' ? qty/1000 : qty;
+  if(g==='CONTEO') return qty;
+  return null;
+}
+function calcCostFromIngredients(ingredients, visited){
+  visited = visited || new Set();
+  let total = 0, incomplete = false, missing = [];
+  (ingredients || []).forEach(ing => {
+    const qty = parseFloat(String(ing.qty).replace(',', '.')) || 0;
+    if(ing.code === 'AGUA') return;
+    if(ing.code && ing.code.indexOf('SUBC') === 0){
+      const sub = RECIPES.find(x => x.code === ing.code);
+      if(!sub || !sub.yield_qty){ incomplete = true; missing.push(ing.name + ' (sin rendimiento)'); return; }
+      if(unitGroup(ing.unit) !== unitGroup(sub.yield_unit)){ incomplete = true; missing.push(ing.name + ' (unidad incompatible)'); return; }
+      const subCalc = calcRecipeCost(ing.code, visited);
+      if(subCalc.incomplete){ incomplete = true; missing.push(...subCalc.missing); }
+      const costPerBase = subCalc.total / toBaseQty(parseFloat(sub.yield_qty), sub.yield_unit);
+      total += toBaseQty(qty, ing.unit) * costPerBase;
+    } else {
+      const info = INGREDIENT_COST_MAP[ing.code];
+      if(!info || info.costo === null || info.costo === undefined){ incomplete = true; missing.push(ing.name); return; }
+      if(unitGroup(ing.unit) !== unitGroup(info.unidad)){ incomplete = true; missing.push(ing.name + ' (unidad incompatible)'); return; }
+      total += toBaseQty(qty, ing.unit) * parseFloat(info.costo);
+    }
+  });
+  return { total, incomplete, missing };
+}
+function calcRecipeCost(code, visited){
+  visited = visited || new Set();
+  if(visited.has(code)) return { total: 0, incomplete: true, missing: ['Referencia circular en ' + code] };
+  visited.add(code);
+  const r = RECIPES.find(x => x.code === code);
+  if(!r) return { total: 0, incomplete: true, missing: [code + ' (no encontrada)'] };
+  return calcCostFromIngredients(r.ingredients, visited);
+}
+
+let currentCosteoCode = null;
+
+function renderCosteoList(){
+  const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
+  const list = RECIPES.filter(r => !q || r.name.toUpperCase().includes(q) || r.code.toUpperCase().includes(q));
+  const wrap = document.getElementById('costeoItems');
+  document.getElementById('costeoCount').textContent = list.length + ' receta' + (list.length===1?'':'s');
+  if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">No se encontraron recetas.</div>'; return; }
+  wrap.innerHTML = list.map(r => {
+    const calc = calcRecipeCost(r.code);
+    const y = fmtMoney(calc.total);
+    return `<div class="rec-card ${r.code===currentCosteoCode?'selected':''}" data-code="${r.code}">
+      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-code">${r.code}</div></div>
+      <div class="rec-card-yield">${calc.incomplete ? 'incompleto' : y}</div>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoDetail(el.dataset.code)));
+}
+document.getElementById('costeoSearchInput').addEventListener('input', renderCosteoList);
+document.getElementById('costeoDetailBack').addEventListener('click', ()=>{
+  document.getElementById('costeoDetailPane').classList.remove('open');
+});
+
+function openCosteoDetail(code){
+  currentCosteoCode = code;
+  const r = RECIPES.find(x=>x.code===code);
+  if(!r) return;
+  renderCosteoList();
+  document.getElementById('costeoDetailPane').classList.add('open');
+  renderCosteoDetail(r);
+}
+
+function renderCosteoDetail(r){
+  const hasYield = !!r.yield_qty;
+  const yieldHtml = hasYield
+    ? `<div class="yield-stamp small"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${r.yield_unit}</span></div>`
+    : '';
+
+  let lines = [];
+  let total = 0, incomplete = false, missing = [];
+  (r.ingredients || []).forEach(ing => {
+    const qty = parseFloat(String(ing.qty).replace(',', '.')) || 0;
+    if(ing.code === 'AGUA'){
+      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: 0, tag: 'agua' });
+      return;
+    }
+    if(ing.code && ing.code.indexOf('SUBC') === 0){
+      const sub = RECIPES.find(x => x.code === ing.code);
+      if(!sub || !sub.yield_qty || unitGroup(ing.unit) !== unitGroup(sub ? sub.yield_unit : null)){
+        incomplete = true; missing.push(ing.name);
+        lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: null, tag: 'subreceta' });
+        return;
+      }
+      const subCalc = calcRecipeCost(ing.code);
+      if(subCalc.incomplete){ incomplete = true; missing.push(...subCalc.missing); }
+      const costPerBase = subCalc.total / toBaseQty(parseFloat(sub.yield_qty), sub.yield_unit);
+      const lineCost = toBaseQty(qty, ing.unit) * costPerBase;
+      total += lineCost;
+      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost, tag: 'subreceta' });
+    } else {
+      const info = INGREDIENT_COST_MAP[ing.code];
+      if(!info || info.costo === null || info.costo === undefined || unitGroup(ing.unit) !== unitGroup(info.unidad)){
+        incomplete = true; missing.push(ing.name);
+        lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: null, tag: 'insumo' });
+        return;
+      }
+      const lineCost = toBaseQty(qty, ing.unit) * parseFloat(info.costo);
+      total += lineCost;
+      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost, tag: 'insumo' });
+    }
+  });
+
+  let linesHtml;
+  if(lines.length === 0){
+    linesHtml = `<div class="empty-note">Esta receta aún no tiene insumos cargados.</div>`;
+  } else {
+    linesHtml = `<div class="ingredient-ticket">` + lines.map(l => {
+      const costLabel = l.lineCost === null ? 'sin costo' : fmtMoney(l.lineCost);
+      return `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(l.code)}</span>${escapeHtml(l.name)} — ${fmtQty(l.qty)} ${escapeHtml(l.unit)}</div><div class="ing-qty">${costLabel}</div></div>`;
+    }).join('') + `</div>`;
+  }
+
+  const costPerYield = (hasYield && !incomplete) ? total / parseFloat(r.yield_qty) : null;
+  let totalHtml = `<div class="yield-stamp small"><span class="label">Costo total</span><span class="value">${fmtMoney(total)}</span></div>`;
+  if(costPerYield !== null){
+    totalHtml += `<div class="yield-stamp small"><span class="label">Costo por ${escapeHtml(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
+  }
+  if(incomplete){
+    totalHtml += `<div class="empty-note">Costo incompleto — falta costo de: ${missing.map(escapeHtml).join(', ')}</div>`;
+  }
+
+  document.getElementById('costeoDetailBody').innerHTML = `
+    <div class="detail-title">${escapeHtml(r.name)}</div>
+    <div class="detail-code">${r.code}</div>
+    ${yieldHtml}
+    <div class="section-label">Insumos y subrecetas</div>
+    ${linesHtml}
+    <div class="section-label">Costo</div>
+    ${totalHtml}
+  `;
 }
 
 /* ---------- RECETARIO ---------- */
@@ -3999,7 +4177,7 @@ async function loadAreasAdmin(){
 }
 
 function renderAreasAdminList(){
-  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario'};
+  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario', costeo:'Costeo'};
   const box = document.getElementById('areasAdminList');
   if(AREAS_THIS_LOCATION.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay áreas creadas en este punto.</div>'; return; }
   box.innerHTML = AREAS_THIS_LOCATION.map(a => `
