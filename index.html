@@ -549,7 +549,8 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 
     <div id="view-costeo" class="view">
       <div class="rec-list-pane">
-        <div class="rec-search"><input type="text" id="costeoSearchInput" placeholder="Buscar receta o código..."></div>
+        <div class="rec-search"><input type="text" id="costeoSearchInput" placeholder="Buscar plato..."></div>
+        <button class="btn btn-accent btn-block" id="costeoNewBtn" style="margin:0 14px 10px; width:calc(100% - 28px);">+ Nuevo plato</button>
         <div class="rec-count" id="costeoCount"></div>
         <div class="rec-items" id="costeoItems"></div>
       </div>
@@ -1622,7 +1623,7 @@ function switchTab(name){
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
   if(name==='inventario') loadInventarioMonth();
-  if(name==='costeo') renderCosteoList();
+  if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoPlatos().then(renderCosteoList); }
 }
 
 /* ---------- INIT ---------- */
@@ -1854,106 +1855,272 @@ function calcRecipeCost(code, visited){
   return calcCostFromIngredients(r.ingredients, visited);
 }
 
-let currentCosteoCode = null;
+let currentCosteoPlatoId = null;
+let costeoPlatoDraft = null;
+let COSTEO_PLATOS = [];
+
+async function loadCosteoPlatos(){
+  const { data, error } = await supa.from('costeo_platos').select('*').eq('area_id', currentArea.id).order('nombre', {ascending:true});
+  COSTEO_PLATOS = error ? [] : (data || []);
+  if(error) showToast('No se pudo cargar Costeo: ' + error.message);
+}
+
+function costeoCalcTotals(plato){
+  const calc = calcCostFromIngredients(plato.items);
+  const impuestoMonto = calc.total * ((plato.impuesto_pct || 0) / 100);
+  const otrosTotal = impuestoMonto + (plato.empaque_fijo || 0) + (plato.mano_obra_fijo || 0);
+  const costoTotal = calc.total + otrosTotal;
+  const porciones = plato.porciones || 1;
+  return { costoInsumos: calc.total, incomplete: calc.incomplete, missing: calc.missing, otrosTotal, costoTotal, costoPorcion: costoTotal / porciones };
+}
+
+function costeoIngredientCandidates(){
+  const list = [];
+  GROUP_ACTIVE_ITEMS.forEach(g => list.push({ code: g.code, name: g.name, tipo: 'insumo', unidad: g.unidad, costo: g.costo }));
+  RECIPES.forEach(r => list.push({ code: r.code, name: r.name, tipo: 'subreceta', unidad: r.yield_unit, costo: null }));
+  list.push({ code: 'AGUA', name: 'AGUA', tipo: 'agua', unidad: null, costo: 0 });
+  return list;
+}
+function costeoDefaultUnitFor(c){
+  if(c.code === 'AGUA') return 'GR';
+  const g = unitGroup(c.unidad);
+  if(g === 'MASA') return 'GR';
+  if(g === 'VOLUMEN') return 'ML';
+  if(g === 'CONTEO') return 'UND';
+  return 'GR';
+}
 
 function renderCosteoList(){
   const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
-  const list = RECIPES.filter(r => !q || r.name.toUpperCase().includes(q) || r.code.toUpperCase().includes(q));
+  const list = COSTEO_PLATOS.filter(p => !q || p.nombre.toUpperCase().includes(q));
   const wrap = document.getElementById('costeoItems');
-  document.getElementById('costeoCount').textContent = list.length + ' receta' + (list.length===1?'':'s');
-  if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">No se encontraron recetas.</div>'; return; }
-  wrap.innerHTML = list.map(r => {
-    const calc = calcRecipeCost(r.code);
-    const y = fmtMoney(calc.total);
-    return `<div class="rec-card ${r.code===currentCosteoCode?'selected':''}" data-code="${r.code}">
-      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-code">${r.code}</div></div>
-      <div class="rec-card-yield">${calc.incomplete ? 'incompleto' : y}</div>
+  document.getElementById('costeoCount').textContent = list.length + ' plato' + (list.length===1?'':'s');
+  if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">Todavía no hay platos costeados. Tocá "+ Nuevo plato".</div>'; return; }
+  wrap.innerHTML = list.map(p => {
+    const t = costeoCalcTotals(p);
+    return `<div class="rec-card ${p.id===currentCosteoPlatoId?'selected':''}" data-id="${p.id}">
+      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(p.nombre)}</div><div class="rec-card-code">${(p.items||[]).length} ítems</div></div>
+      <div class="rec-card-yield">${t.incomplete ? 'incompleto' : fmtMoney(t.costoPorcion) + '/porción'}</div>
     </div>`;
   }).join('');
-  wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoDetail(el.dataset.code)));
+  wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoPlato(el.dataset.id)));
 }
 document.getElementById('costeoSearchInput').addEventListener('input', renderCosteoList);
 document.getElementById('costeoDetailBack').addEventListener('click', ()=>{
+  costeoPlatoDraft = null;
   document.getElementById('costeoDetailPane').classList.remove('open');
 });
+document.getElementById('costeoNewBtn').addEventListener('click', ()=>openCosteoPlato(null));
 
-function openCosteoDetail(code){
-  currentCosteoCode = code;
-  const r = RECIPES.find(x=>x.code===code);
-  if(!r) return;
+function openCosteoPlato(id){
+  currentCosteoPlatoId = id;
+  const existing = id ? COSTEO_PLATOS.find(p=>p.id===id) : null;
+  costeoPlatoDraft = existing ? {
+    id: existing.id, nombre: existing.nombre,
+    items: (existing.items||[]).map(i=>({...i})),
+    impuesto_pct: existing.impuesto_pct || 0, empaque_fijo: existing.empaque_fijo || 0, mano_obra_fijo: existing.mano_obra_fijo || 0,
+    porciones: existing.porciones || 1, precio_venta: existing.precio_venta === null ? '' : String(existing.precio_venta),
+    margenObjetivo: 70
+  } : {
+    id: null, nombre: '', items: [], impuesto_pct: 0, empaque_fijo: 0, mano_obra_fijo: 0, porciones: 1, precio_venta: '', margenObjetivo: 70
+  };
   renderCosteoList();
   document.getElementById('costeoDetailPane').classList.add('open');
-  renderCosteoDetail(r);
+  renderCosteoPlatoForm();
 }
 
-function renderCosteoDetail(r){
-  const hasYield = !!r.yield_qty;
-  const yieldHtml = hasYield
-    ? `<div class="yield-stamp small"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${normalizeUnitLabel(r.yield_unit)}</span></div>`
-    : '';
-
-  let lines = [];
-  let total = 0, incomplete = false, missing = [];
-  (r.ingredients || []).forEach(ing => {
-    const qty = parseFloat(String(ing.qty).replace(',', '.')) || 0;
-    if(ing.code === 'AGUA'){
-      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: 0, tag: 'agua' });
-      return;
-    }
-    if(ing.code && ing.code.indexOf('SUBC') === 0){
-      const sub = RECIPES.find(x => x.code === ing.code);
-      if(!sub || !sub.yield_qty || unitGroup(ing.unit) !== unitGroup(sub ? sub.yield_unit : null)){
-        incomplete = true; missing.push(ing.name);
-        lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: null, tag: 'subreceta' });
-        return;
-      }
-      const subCalc = calcRecipeCost(ing.code);
-      if(subCalc.incomplete){ incomplete = true; missing.push(...subCalc.missing); }
-      const costPerBase = subCalc.total / toBaseQty(parseFloat(sub.yield_qty), sub.yield_unit);
-      const lineCost = toBaseQty(qty, ing.unit) * costPerBase;
-      total += lineCost;
-      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost, tag: 'subreceta' });
-    } else {
-      const info = INGREDIENT_COST_MAP[ing.code];
-      if(!info || info.costo === null || info.costo === undefined || unitGroup(ing.unit) !== unitGroup(info.unidad)){
-        incomplete = true; missing.push(ing.name);
-        lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost: null, tag: 'insumo' });
-        return;
-      }
-      const lineCost = toBaseQty(qty, ing.unit) * parseFloat(info.costo);
-      total += lineCost;
-      lines.push({ code: ing.code, name: ing.name, qty, unit: ing.unit, lineCost, tag: 'insumo' });
-    }
-  });
-
-  let linesHtml;
-  if(lines.length === 0){
-    linesHtml = `<div class="empty-note">Esta receta aún no tiene insumos cargados.</div>`;
-  } else {
-    linesHtml = `<div class="ingredient-ticket">` + lines.map(l => {
-      const costLabel = l.lineCost === null ? 'sin costo' : fmtMoney(l.lineCost);
-      return `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(l.code)}</span>${escapeHtml(l.name)} — ${fmtQty(l.qty)} ${normalizeUnitLabel(l.unit)}</div><div class="ing-qty">${costLabel}</div></div>`;
-    }).join('') + `</div>`;
+function updateCosteoPreview(){
+  const box = document.getElementById('costeoDraftPreview');
+  if(!box) return;
+  const d = costeoPlatoDraft;
+  const t = costeoCalcTotals(d);
+  let html = `<div class="yield-stamp small"><span class="label">Costo insumos</span><span class="value">${fmtMoney(t.costoInsumos)}</span></div>`;
+  html += `<div class="yield-stamp small"><span class="label">Otros costos</span><span class="value">${fmtMoney(t.otrosTotal)}</span></div>`;
+  html += `<div class="yield-stamp small"><span class="label">Costo total</span><span class="value">${fmtMoney(t.costoTotal)}</span></div>`;
+  html += `<div class="yield-stamp small"><span class="label">Costo por porción</span><span class="value">${fmtMoney(t.costoPorcion)}</span></div>`;
+  if(t.incomplete){
+    html += `<div class="empty-note">Costo incompleto — falta costo de: ${t.missing.map(escapeHtml).join(', ')}</div>`;
   }
+  const precio = parseFloat(d.precio_venta);
+  if(!isNaN(precio) && precio > 0){
+    const margenPct = ((precio - t.costoPorcion) / precio) * 100;
+    const color = margenPct >= 60 ? '#2F7A4D' : (margenPct >= 30 ? '#C1440E' : '#B0281C');
+    html += `<div class="yield-stamp small"><span class="label">Margen</span><span class="value" style="color:${color};">${margenPct.toLocaleString('es-CO',{maximumFractionDigits:1})}%</span></div>`;
+    html += `<div class="yield-stamp small"><span class="label">Ganancia por porción</span><span class="value">${fmtMoney(precio - t.costoPorcion)}</span></div>`;
+  }
+  box.innerHTML = html;
+}
 
-  const costPerYield = (hasYield && !incomplete) ? total / parseFloat(r.yield_qty) : null;
-  let totalHtml = `<div class="yield-stamp small"><span class="label">Costo total</span><span class="value">${fmtMoney(total)}</span></div>`;
-  if(costPerYield !== null){
-    totalHtml += `<div class="yield-stamp small"><span class="label">Costo por ${normalizeUnitLabel(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
-  }
-  if(incomplete){
-    totalHtml += `<div class="empty-note">Costo incompleto — falta costo de: ${missing.map(escapeHtml).join(', ')}</div>`;
-  }
+function costeoAddItem(c){
+  costeoPlatoDraft.items.push({ code: c.code, name: c.name, qty: '', unit: costeoDefaultUnitFor(c) });
+  renderCosteoPlatoForm();
+}
+
+function renderCosteoPlatoForm(){
+  const d = costeoPlatoDraft;
+  const editing = !!d.id;
+  const ingRows = d.items.map((it, idx) => `
+    <div class="ing-row">
+      <div class="ing-name"><span class="ing-code">${escapeHtml(it.code)}</span>${escapeHtml(it.name)}</div>
+      <input type="number" class="cf-ing-qty" data-idx="${idx}" value="${it.qty}" style="width:70px;">
+      <select class="cf-ing-unit" data-idx="${idx}">
+        ${['GR','KG','ML','L','UND'].map(u=>`<option value="${u}" ${it.unit===u?'selected':''}>${u}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-small cf-ing-remove" data-idx="${idx}">✕</button>
+    </div>`).join('');
 
   document.getElementById('costeoDetailBody').innerHTML = `
-    <div class="detail-title">${escapeHtml(r.name)}</div>
-    <div class="detail-code">${r.code}</div>
-    ${yieldHtml}
+    <div class="detail-title">${editing ? 'Editar plato' : 'Nuevo plato'}</div>
+    <div class="obs-form">
+      <div class="field" style="margin-bottom:0;"><label class="field-label">Nombre del plato</label><input type="text" id="cfNombre" value="${escapeHtml(d.nombre)}" placeholder="Ej: Ceviche de leche de tigre"></div>
+    </div>
+
     <div class="section-label">Insumos y subrecetas</div>
-    ${linesHtml}
+    <div class="ingredient-ticket" id="cfIngList">${ingRows || '<div class="empty-note">Sin insumos agregados.</div>'}</div>
+
+    <div class="obs-form">
+      <div class="field" style="margin-bottom:0;"><label class="field-label">Buscar insumo o subreceta</label><input type="text" id="cfIngSearch" placeholder="Escribe para buscar..."></div>
+      <div id="cfIngResults"></div>
+    </div>
+
+    <div class="section-label">Otros costos</div>
+    <div class="obs-form">
+      <div class="field" style="display:flex; align-items:center; justify-content:space-between;">
+        <label class="field-label" style="margin:0;">Impuestos (% sobre costo de insumos)</label>
+        <input type="number" id="cfImpuesto" value="${d.impuesto_pct}" style="width:80px;">
+      </div>
+      <div class="field" style="display:flex; align-items:center; justify-content:space-between;">
+        <label class="field-label" style="margin:0;">Empaque ($ por porción)</label>
+        <input type="number" id="cfEmpaque" value="${d.empaque_fijo}" style="width:100px;">
+      </div>
+      <div class="field" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
+        <label class="field-label" style="margin:0;">Mano de obra ($ por porción)</label>
+        <input type="number" id="cfManoObra" value="${d.mano_obra_fijo}" style="width:100px;">
+      </div>
+    </div>
+
     <div class="section-label">Costo</div>
-    ${totalHtml}
+    <div id="costeoDraftPreview"></div>
+
+    <div class="obs-form">
+      <div class="field" style="display:flex; align-items:center; justify-content:space-between;">
+        <label class="field-label" style="margin:0;">Porciones</label>
+        <input type="number" id="cfPorciones" value="${d.porciones}" style="width:80px;">
+      </div>
+      <div class="field" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
+        <label class="field-label" style="margin:0;">Precio de venta (por porción)</label>
+        <input type="number" id="cfPrecio" value="${d.precio_venta}" style="width:100px;">
+      </div>
+    </div>
+
+    <div class="obs-form">
+      <div class="field" style="display:flex; align-items:center; gap:8px; margin-bottom:0;">
+        <label class="field-label" style="margin:0; flex:1;">Margen objetivo</label>
+        <input type="number" id="cfMargenObjetivo" value="${d.margenObjetivo}" style="width:70px;">
+        <span>%</span>
+        <button class="btn btn-ghost btn-small" id="cfAplicarMargen">Aplicar al precio</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button class="btn btn-accent btn-block" id="cfSave">${editing ? 'Guardar cambios' : 'Crear plato'}</button>
+      <button class="btn btn-ghost btn-block" id="cfCancel">Cancelar</button>
+    </div>
+    ${editing ? '<button class="btn btn-ghost btn-block" id="cfDelete" style="margin-top:10px;">Eliminar plato</button>' : ''}
   `;
+
+  document.getElementById('cfNombre').addEventListener('input', e=>{ d.nombre = e.target.value; });
+  document.getElementById('cfImpuesto').addEventListener('input', e=>{ d.impuesto_pct = parseFloat(e.target.value) || 0; updateCosteoPreview(); });
+  document.getElementById('cfEmpaque').addEventListener('input', e=>{ d.empaque_fijo = parseFloat(e.target.value) || 0; updateCosteoPreview(); });
+  document.getElementById('cfManoObra').addEventListener('input', e=>{ d.mano_obra_fijo = parseFloat(e.target.value) || 0; updateCosteoPreview(); });
+  document.getElementById('cfPorciones').addEventListener('input', e=>{ d.porciones = parseFloat(e.target.value) || 1; updateCosteoPreview(); });
+  document.getElementById('cfPrecio').addEventListener('input', e=>{ d.precio_venta = e.target.value; updateCosteoPreview(); });
+  document.getElementById('cfMargenObjetivo').addEventListener('input', e=>{ d.margenObjetivo = parseFloat(e.target.value) || 0; });
+  document.getElementById('cfAplicarMargen').addEventListener('click', ()=>{
+    const t = costeoCalcTotals(d);
+    const m = Math.min(95, Math.max(0, d.margenObjetivo || 0));
+    d.precio_venta = String(Math.round(t.costoPorcion / (1 - m/100)));
+    renderCosteoPlatoForm();
+  });
+
+  document.querySelectorAll('.cf-ing-qty').forEach(el=>{
+    el.addEventListener('input', ()=>{ d.items[parseInt(el.dataset.idx,10)].qty = el.value; updateCosteoPreview(); });
+  });
+  document.querySelectorAll('.cf-ing-unit').forEach(el=>{
+    el.addEventListener('change', ()=>{ d.items[parseInt(el.dataset.idx,10)].unit = el.value; updateCosteoPreview(); });
+  });
+  document.querySelectorAll('.cf-ing-remove').forEach(el=>{
+    el.addEventListener('click', ()=>{ d.items.splice(parseInt(el.dataset.idx,10),1); renderCosteoPlatoForm(); });
+  });
+
+  document.getElementById('cfIngSearch').addEventListener('input', e=>{
+    const q = e.target.value.trim().toUpperCase();
+    const results = document.getElementById('cfIngResults');
+    if(!q){ results.innerHTML=''; return; }
+    const candidates = costeoIngredientCandidates().filter(c => c.name.toUpperCase().includes(q) || c.code.toUpperCase().includes(q)).slice(0,20);
+    if(candidates.length===0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
+    results.innerHTML = `<div class="ingredient-ticket">` + candidates.map(c=>{
+      const tag = c.tipo === 'subreceta' ? 'subreceta' : (c.costo != null ? fmtMoney(c.costo) + '/' + escapeHtml(c.unidad||'') : 'sin costo');
+      return `<div class="ing-row cf-ing-pick" data-code="${escapeHtml(c.code)}"><div class="ing-name"><span class="ing-code">${escapeHtml(c.code)}</span>${escapeHtml(c.name)}</div><div class="ing-qty">${tag}</div></div>`;
+    }).join('') + `</div>`;
+    results.querySelectorAll('.cf-ing-pick').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const c = candidates.find(x=>x.code===el.dataset.code);
+        costeoAddItem(c);
+      });
+    });
+  });
+
+  document.getElementById('cfCancel').addEventListener('click', ()=>{
+    costeoPlatoDraft = null;
+    currentCosteoPlatoId = null;
+    document.getElementById('costeoDetailPane').classList.remove('open');
+    renderCosteoList();
+  });
+
+  document.getElementById('cfSave').addEventListener('click', async ()=>{
+    const nombre = d.nombre.trim();
+    if(!nombre){ showToast('Ponele un nombre al plato'); return; }
+    const payload = {
+      nombre,
+      items: d.items.map(i=>({ code:i.code, name:i.name, qty:String(i.qty||0), unit:i.unit })),
+      impuesto_pct: d.impuesto_pct || 0,
+      empaque_fijo: d.empaque_fijo || 0,
+      mano_obra_fijo: d.mano_obra_fijo || 0,
+      porciones: d.porciones || 1,
+      precio_venta: d.precio_venta === '' ? null : parseFloat(d.precio_venta),
+      location_id: currentLocation.id, area_id: currentArea.id
+    };
+    let error;
+    if(d.id){
+      ({ error } = await supa.from('costeo_platos').update(payload).eq('id', d.id));
+    } else {
+      ({ error } = await supa.from('costeo_platos').insert({ ...payload, created_by: session.user.id }));
+    }
+    if(error){ showToast('Error al guardar: ' + error.message); return; }
+    showToast('Plato guardado');
+    costeoPlatoDraft = null;
+    currentCosteoPlatoId = null;
+    await loadCosteoPlatos();
+    renderCosteoList();
+    document.getElementById('costeoDetailPane').classList.remove('open');
+  });
+
+  const delBtn = document.getElementById('cfDelete');
+  if(delBtn){
+    delBtn.addEventListener('click', async ()=>{
+      const { error } = await supa.from('costeo_platos').delete().eq('id', d.id);
+      if(error){ showToast('Error al eliminar: ' + error.message); return; }
+      showToast('Plato eliminado');
+      costeoPlatoDraft = null;
+      currentCosteoPlatoId = null;
+      await loadCosteoPlatos();
+      renderCosteoList();
+      document.getElementById('costeoDetailPane').classList.remove('open');
+    });
+  }
+
+  updateCosteoPreview();
 }
 
 /* ---------- RECETARIO ---------- */
