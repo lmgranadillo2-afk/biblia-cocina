@@ -537,7 +537,6 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     <div id="view-recetario" class="view active">
       <div class="rec-list-pane">
         <div class="rec-search"><input type="text" id="searchInput" placeholder="Buscar receta o código..."></div>
-        <button class="btn btn-accent btn-block" id="newRecipeBtn" style="display:none; margin:0 14px 10px; width:calc(100% - 28px);">+ Nueva receta</button>
         <div class="rec-count" id="recCount"></div>
         <div class="rec-items" id="recItems"></div>
       </div>
@@ -1325,10 +1324,6 @@ function fmtQty(q){
   if(isNaN(n)) return q;
   return n.toLocaleString('es-CO', {maximumFractionDigits:3});
 }
-function fmtMoney(n){
-  if(n === '' || n === undefined || n === null || isNaN(n)) return '';
-  return Math.round(n).toLocaleString('es-CO', {style:'currency', currency:'COP', maximumFractionDigits:0});
-}
 function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1540,7 +1535,6 @@ function enterArea(loc, area){
   roleBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? 'block' : 'none';
-  document.getElementById('newRecipeBtn').style.display = profile.role === 'admin' ? 'block' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   applyAreaModuleVisibility(area.modules || MODULE_TABS);
@@ -1615,7 +1609,6 @@ function switchTab(name){
 async function initApp(){
   document.getElementById('recItems').innerHTML = '<div class="empty-note">Cargando recetario...</div>';
   await loadRecipes();
-  await loadIngredientCosts();
   await loadExtraCatalogItems();
   await loadGroupCatalogActive();
   buildInsumosCatalog();
@@ -1778,71 +1771,8 @@ async function loadRecipes(){
     ingredients: r.ingredients || [],
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
     yield_unit: r.yield_unit || '',
-    activo_inventario: r.activo_inventario !== false,
-    precio_venta: r.precio_venta === null ? '' : String(r.precio_venta),
-    otros_costos: r.otros_costos || []
+    activo_inventario: r.activo_inventario !== false
   }));
-}
-
-/* ---------- COSTOS ---------- */
-let INGREDIENT_COST_MAP = {};
-async function loadIngredientCosts(){
-  const { data, error } = await supa.from('group_ingredients').select('code, costo, unidad');
-  INGREDIENT_COST_MAP = {};
-  if(error) return;
-  (data || []).forEach(g => { INGREDIENT_COST_MAP[g.code] = { costo: g.costo, unidad: g.unidad }; });
-}
-function unitGroup(u){
-  u = (u || '').toUpperCase();
-  if(u==='GR' || u==='KG') return 'MASA';
-  if(u==='ML' || u==='L') return 'VOLUMEN';
-  if(u==='UND' || u==='UNIDAD' || u==='UN') return 'CONTEO';
-  return null;
-}
-function toBaseQty(qty, unit){
-  const g = unitGroup(unit);
-  const u = (unit || '').toUpperCase();
-  if(g==='MASA') return u==='GR' ? qty/1000 : qty;
-  if(g==='VOLUMEN') return u==='ML' ? qty/1000 : qty;
-  if(g==='CONTEO') return qty;
-  return null;
-}
-function calcCostFromIngredients(ingredients, visited){
-  visited = visited || new Set();
-  let total = 0, incomplete = false, missing = [];
-  (ingredients || []).forEach(ing => {
-    const qty = parseFloat(String(ing.qty).replace(',', '.')) || 0;
-    if(ing.code === 'AGUA') return;
-    if(ing.code && ing.code.indexOf('SUBC') === 0){
-      const sub = RECIPES.find(x => x.code === ing.code);
-      if(!sub || !sub.yield_qty){ incomplete = true; missing.push(ing.name + ' (sin rendimiento)'); return; }
-      if(unitGroup(ing.unit) !== unitGroup(sub.yield_unit)){ incomplete = true; missing.push(ing.name + ' (unidad incompatible)'); return; }
-      const subCalc = calcRecipeCost(ing.code, visited);
-      if(subCalc.incomplete){ incomplete = true; missing.push(...subCalc.missing); }
-      const costPerBase = subCalc.total / toBaseQty(parseFloat(sub.yield_qty), sub.yield_unit);
-      total += toBaseQty(qty, ing.unit) * costPerBase;
-    } else {
-      const info = INGREDIENT_COST_MAP[ing.code];
-      if(!info || info.costo === null || info.costo === undefined){ incomplete = true; missing.push(ing.name); return; }
-      if(unitGroup(ing.unit) !== unitGroup(info.unidad)){ incomplete = true; missing.push(ing.name + ' (unidad incompatible)'); return; }
-      total += toBaseQty(qty, ing.unit) * parseFloat(info.costo);
-    }
-  });
-  return { total, incomplete, missing };
-}
-function calcRecipeCost(code, visited){
-  visited = visited || new Set();
-  if(visited.has(code)) return { total: 0, incomplete: true, missing: ['Referencia circular en ' + code] };
-  visited.add(code);
-  const r = RECIPES.find(x => x.code === code);
-  if(!r) return { total: 0, incomplete: true, missing: [code + ' (no encontrada)'] };
-  return calcCostFromIngredients(r.ingredients, visited);
-}
-function sumOtrosCostos(otrosCostos, base){
-  return (otrosCostos || []).reduce((sum, o) => {
-    const v = parseFloat(o.value) || 0;
-    return sum + (o.type === 'pct' ? base * (v / 100) : v);
-  }, 0);
 }
 
 /* ---------- RECETARIO ---------- */
@@ -1864,7 +1794,6 @@ function renderRecipeList(){
 document.getElementById('searchInput').addEventListener('input', renderRecipeList);
 
 function openRecipe(code){
-  recipeDraft = null;
   currentCode = code;
   const r = RECIPES.find(x=>x.code===code);
   if(!r) return;
@@ -1872,7 +1801,6 @@ function openRecipe(code){
   document.getElementById('recDetailPane').classList.add('open');
   renderDetail(r);
 }
-document.getElementById('newRecipeBtn').addEventListener('click', ()=>openRecipeForm(null));
 document.getElementById('detailBack').addEventListener('click', ()=>{
   document.getElementById('recDetailPane').classList.remove('open');
 });
@@ -1892,61 +1820,12 @@ async function renderDetail(r){
     ).join('') + `</div>`;
   }
 
-  const costCalc = calcRecipeCost(r.code);
-  const costPerYield = (hasYield && !costCalc.incomplete) ? costCalc.total / parseFloat(r.yield_qty) : null;
-  const baseForExtras = costPerYield !== null ? costPerYield : costCalc.total;
-  const otrosCostosTotal = sumOtrosCostos(r.otros_costos, baseForExtras);
-  const totalCostPerUnit = baseForExtras + otrosCostosTotal;
-
-  let costHtml = `<div class="yield-stamp small"><span class="label">Costo insumos</span><span class="value">${fmtMoney(costCalc.total)}</span></div>`;
-  if(costPerYield !== null){
-    costHtml += `<div class="yield-stamp small"><span class="label">Costo insumos por ${escapeHtml(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
-  }
-  if(costCalc.incomplete){
-    costHtml += `<div class="empty-note">Costo incompleto — falta costo de: ${costCalc.missing.map(escapeHtml).join(', ')}</div>`;
-  }
-  if((r.otros_costos || []).length > 0){
-    costHtml += `<div class="ingredient-ticket">` + r.otros_costos.map(o => {
-      const v = parseFloat(o.value) || 0;
-      const computed = o.type === 'pct' ? baseForExtras * (v / 100) : v;
-      const label = o.type === 'pct' ? `${escapeHtml(o.name || 'Sin nombre')} (${v}%)` : escapeHtml(o.name || 'Sin nombre');
-      return `<div class="ing-row"><div class="ing-name">${label}</div><div class="ing-qty">${fmtMoney(computed)}</div></div>`;
-    }).join('') + `</div>`;
-    costHtml += `<div class="yield-stamp small"><span class="label">Costo total (con otros costos)</span><span class="value">${fmtMoney(totalCostPerUnit)}</span></div>`;
-  }
-
-  let priceHtml = '';
-  if(isAdminRole()){
-    priceHtml = `<button class="btn btn-ghost btn-block" id="editRecipeBtn" style="margin-bottom:12px;">Editar receta</button>`;
-    priceHtml += `<div class="obs-form">
-      <div class="field"><label class="field-label">Precio de venta</label><input type="number" id="priceInput" value="${r.precio_venta || ''}" placeholder="Ej: 35000"></div>
-      <button class="btn btn-accent btn-block" id="priceSubmit">Guardar precio de venta</button>
-    </div>`;
-    priceHtml += `<div class="obs-form">
-      <div class="field"><label class="field-label">Margen objetivo (%)</label><input type="number" id="marginTarget" value="30" min="0" max="95"></div>
-      <div id="suggestedPriceBox"></div>
-      <button class="btn btn-ghost btn-block" id="useSuggestedPrice">Usar precio sugerido</button>
-    </div>`;
-  }
-  if(r.precio_venta){
-    const precio = parseFloat(r.precio_venta);
-    priceHtml += `<div class="yield-stamp small"><span class="label">Precio de venta</span><span class="value">${fmtMoney(precio)}</span></div>`;
-    if(costPerYield !== null){
-      const foodCostPct = (totalCostPerUnit / precio) * 100;
-      priceHtml += `<div class="yield-stamp small"><span class="label">Food cost</span><span class="value">${foodCostPct.toLocaleString('es-CO',{maximumFractionDigits:1})}%</span></div>`;
-      priceHtml += `<div class="yield-stamp small"><span class="label">Margen</span><span class="value">${fmtMoney(precio - totalCostPerUnit)}</span></div>`;
-    }
-  }
-
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-title">${escapeHtml(r.name)}</div>
     <div class="detail-code">${r.code}</div>
     ${yieldHtml}
     <div class="section-label">Insumos</div>
     ${ingHtml}
-    <div class="section-label">Costo</div>
-    ${costHtml}
-    ${priceHtml}
     <div class="section-label">Observaciones de rendimiento</div>
     <div id="obsListBox"><div class="empty-note">Cargando...</div></div>
     <div class="obs-form">
@@ -1954,39 +1833,6 @@ async function renderDetail(r){
       <button class="btn btn-accent btn-block" id="obsSubmit">Guardar observación</button>
     </div>
   `;
-
-  if(isAdminRole()){
-    document.getElementById('editRecipeBtn').addEventListener('click', ()=>openRecipeForm(r));
-
-    const updateSuggestedPrice = () => {
-      const box = document.getElementById('suggestedPriceBox');
-      const margin = Math.min(95, Math.max(0, parseFloat(document.getElementById('marginTarget').value) || 0));
-      if(costPerYield === null){
-        box.innerHTML = `<div class="empty-note">Necesita rendimiento y costo completo para sugerir precio.</div>`;
-        return;
-      }
-      const suggested = totalCostPerUnit / (1 - margin / 100);
-      box.innerHTML = `<div class="yield-stamp small"><span class="label">Precio sugerido</span><span class="value">${fmtMoney(suggested)}</span></div>`;
-    };
-    document.getElementById('marginTarget').addEventListener('input', updateSuggestedPrice);
-    document.getElementById('useSuggestedPrice').addEventListener('click', () => {
-      const margin = Math.min(95, Math.max(0, parseFloat(document.getElementById('marginTarget').value) || 0));
-      if(costPerYield === null){ showToast('Necesita rendimiento y costo completo para sugerir precio'); return; }
-      document.getElementById('priceInput').value = Math.round(totalCostPerUnit / (1 - margin / 100));
-    });
-    updateSuggestedPrice();
-
-    document.getElementById('priceSubmit').addEventListener('click', async ()=>{
-      const val = document.getElementById('priceInput').value;
-      const precio_venta = val === '' ? null : parseFloat(val);
-      const { error } = await supa.from('recipes').update({ precio_venta }).eq('id', r.id);
-      if(error){ showToast('Error al guardar: ' + error.message); return; }
-      showToast('Precio de venta guardado');
-      await loadRecipes();
-      const updated = RECIPES.find(x=>x.code===r.code);
-      if(updated) renderDetail(updated);
-    });
-  }
 
   const { data: obsList, error } = await supa.from('observations').select('*').eq('recipe_code', r.code).eq('area_id', currentArea.id).order('created_at', {ascending:false});
   const box = document.getElementById('obsListBox');
@@ -2010,239 +1856,6 @@ async function renderDetail(r){
     showToast('Observación guardada');
     renderDetail(r);
   });
-}
-
-/* ---------- EDITOR DE RECETAS ---------- */
-let recipeDraft = null;
-const RF_UNITS = ['GR','KG','ML','L','UND','UNIDAD'];
-
-function nextSubcCode(){
-  let max = 0;
-  RECIPES.forEach(r=>{
-    const m = r.code.match(/^SUBC(\d+)$/);
-    if(m) max = Math.max(max, parseInt(m[1], 10));
-  });
-  return 'SUBC' + String(max + 1).padStart(3, '0');
-}
-
-function ingredientCandidates(){
-  const list = [];
-  GROUP_ACTIVE_ITEMS.forEach(g => list.push({ code: g.code, name: g.name, kind: 'insumo', unidad: g.unidad, costo: g.costo }));
-  RECIPES.forEach(r => {
-    if(recipeDraft && r.code === recipeDraft.code) return;
-    list.push({ code: r.code, name: r.name, kind: 'subreceta', unidad: r.yield_unit, costo: null });
-  });
-  list.push({ code: 'AGUA', name: 'AGUA', kind: 'agua', unidad: null, costo: 0 });
-  return list;
-}
-
-function defaultUnitFor(c){
-  if(c.code === 'AGUA') return 'GR';
-  const g = unitGroup(c.unidad);
-  if(g === 'MASA') return 'GR';
-  if(g === 'VOLUMEN') return 'ML';
-  if(g === 'CONTEO') return 'UNIDAD';
-  return 'GR';
-}
-
-function openRecipeForm(existing){
-  recipeDraft = existing ? {
-    id: existing.id, code: existing.code, name: existing.name,
-    yield_qty: existing.yield_qty || '', yield_unit: existing.yield_unit || 'KG',
-    precio_venta: existing.precio_venta || '',
-    ingredients: existing.ingredients.map(i => ({ ...i })),
-    otros_costos: (existing.otros_costos || []).map(o => ({ ...o }))
-  } : {
-    id: null, code: nextSubcCode(), name: '', yield_qty: '', yield_unit: 'KG', precio_venta: '', ingredients: [], otros_costos: []
-  };
-  document.getElementById('recDetailPane').classList.add('open');
-  renderRecipeForm();
-}
-
-function updateCostPreview(){
-  const box = document.getElementById('draftCostPreview');
-  if(!box) return;
-  const calc = calcCostFromIngredients(recipeDraft.ingredients);
-  const yq = parseFloat(recipeDraft.yield_qty);
-  const perUnit = yq ? calc.total / yq : null;
-  const baseForExtras = perUnit !== null ? perUnit : calc.total;
-  const extrasTotal = sumOtrosCostos(recipeDraft.otros_costos, baseForExtras);
-  let html = `<div class="yield-stamp small"><span class="label">Costo insumos</span><span class="value">${fmtMoney(calc.total)}</span></div>`;
-  if(perUnit !== null){
-    html += `<div class="yield-stamp small"><span class="label">Costo insumos por ${escapeHtml(recipeDraft.yield_unit || '')}</span><span class="value">${fmtMoney(perUnit)}</span></div>`;
-  }
-  if(calc.incomplete){
-    html += `<div class="empty-note">Costo incompleto — falta costo de: ${calc.missing.map(escapeHtml).join(', ')}</div>`;
-  }
-  if((recipeDraft.otros_costos || []).length > 0){
-    html += `<div class="yield-stamp small"><span class="label">Costo total (con otros costos)</span><span class="value">${fmtMoney(baseForExtras + extrasTotal)}</span></div>`;
-  }
-  box.innerHTML = html;
-}
-
-function addIngredientRow(c){
-  recipeDraft.ingredients.push({ code: c.code, name: c.name, qty: '', unit: defaultUnitFor(c) });
-  renderRecipeForm();
-}
-
-function addOtroCosto(){
-  recipeDraft.otros_costos.push({ name: '', type: 'fixed', value: '' });
-  renderRecipeForm();
-}
-
-function renderRecipeForm(){
-  const d = recipeDraft;
-  const editing = !!d.id;
-
-  const ingRows = d.ingredients.map((ing, idx) => `
-    <div class="ing-row">
-      <div class="ing-name"><span class="ing-code">${escapeHtml(ing.code)}</span>${escapeHtml(ing.name)}</div>
-      <input type="number" class="rf-ing-qty" data-idx="${idx}" value="${ing.qty}" style="width:70px;">
-      <select class="rf-ing-unit" data-idx="${idx}">
-        ${RF_UNITS.map(u => `<option value="${u}" ${ing.unit===u?'selected':''}>${u}</option>`).join('')}
-      </select>
-      <button class="btn btn-ghost btn-small rf-ing-remove" data-idx="${idx}">✕</button>
-    </div>`).join('');
-
-  document.getElementById('detailBody').innerHTML = `
-    <div class="detail-title">${editing ? 'Editar receta' : 'Nueva receta'}</div>
-    <div class="obs-form">
-      <div class="field"><label class="field-label">Nombre</label><input type="text" id="rfName" value="${escapeHtml(d.name)}"></div>
-      <div class="field"><label class="field-label">Código</label><input type="text" id="rfCode" value="${escapeHtml(d.code)}" ${editing ? 'disabled' : ''}></div>
-      <div class="field" style="display:flex; gap:10px;">
-        <div style="flex:1;"><label class="field-label">Rendimiento (cantidad)</label><input type="number" id="rfYieldQty" value="${d.yield_qty}"></div>
-        <div style="flex:1;"><label class="field-label">Unidad</label>
-          <select id="rfYieldUnit">${RF_UNITS.map(u => `<option value="${u}" ${d.yield_unit===u?'selected':''}>${u}</option>`).join('')}</select>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-label">Insumos</div>
-    <div class="ingredient-ticket" id="rfIngList">${ingRows || '<div class="empty-note">Sin insumos agregados.</div>'}</div>
-
-    <div class="obs-form">
-      <div class="field"><label class="field-label">Buscar insumo o subreceta</label><input type="text" id="rfIngSearch" placeholder="Escribe para buscar..."></div>
-      <div id="rfIngResults"></div>
-    </div>
-
-    <div class="section-label">Otros costos (ICO, empaque, servicio...)</div>
-    <div class="ingredient-ticket" id="rfExtrasList">${
-      d.otros_costos.map((o, idx) => `
-        <div class="ing-row">
-          <input type="text" class="rf-extra-name" data-idx="${idx}" placeholder="Nombre (ej. ICO)" value="${escapeHtml(o.name)}" style="flex:1;">
-          <input type="number" class="rf-extra-value" data-idx="${idx}" value="${o.value}" style="width:80px;">
-          <select class="rf-extra-type" data-idx="${idx}">
-            <option value="fixed" ${o.type==='fixed'?'selected':''}>$</option>
-            <option value="pct" ${o.type==='pct'?'selected':''}>%</option>
-          </select>
-          <button class="btn btn-ghost btn-small rf-extra-remove" data-idx="${idx}">✕</button>
-        </div>`).join('') || '<div class="empty-note">Sin otros costos agregados.</div>'
-    }</div>
-    <button class="btn btn-ghost btn-block" id="rfAddExtra" style="margin:10px 0;">+ Agregar otro costo</button>
-
-    <div class="section-label">Costo</div>
-    <div id="draftCostPreview"></div>
-
-    <div class="obs-form">
-      <div class="field"><label class="field-label">Precio de venta</label><input type="number" id="rfPrecio" value="${d.precio_venta}"></div>
-    </div>
-
-    <div style="display:flex; gap:10px; margin-top:14px;">
-      <button class="btn btn-accent btn-block" id="rfSave">${editing ? 'Guardar cambios' : 'Crear receta'}</button>
-      <button class="btn btn-ghost btn-block" id="rfCancel">Cancelar</button>
-    </div>
-  `;
-
-  document.getElementById('rfName').addEventListener('input', e => { d.name = e.target.value; });
-  document.getElementById('rfCode').addEventListener('input', e => { d.code = e.target.value.toUpperCase(); });
-  document.getElementById('rfYieldQty').addEventListener('input', e => { d.yield_qty = e.target.value; updateCostPreview(); });
-  document.getElementById('rfYieldUnit').addEventListener('change', e => { d.yield_unit = e.target.value; updateCostPreview(); });
-  document.getElementById('rfPrecio').addEventListener('input', e => { d.precio_venta = e.target.value; });
-
-  document.querySelectorAll('.rf-ing-qty').forEach(el => {
-    el.addEventListener('input', () => { d.ingredients[parseInt(el.dataset.idx,10)].qty = el.value; updateCostPreview(); });
-  });
-  document.querySelectorAll('.rf-ing-unit').forEach(el => {
-    el.addEventListener('change', () => { d.ingredients[parseInt(el.dataset.idx,10)].unit = el.value; updateCostPreview(); });
-  });
-  document.querySelectorAll('.rf-ing-remove').forEach(el => {
-    el.addEventListener('click', () => { d.ingredients.splice(parseInt(el.dataset.idx,10), 1); renderRecipeForm(); });
-  });
-
-  document.getElementById('rfAddExtra').addEventListener('click', addOtroCosto);
-  document.querySelectorAll('.rf-extra-name').forEach(el => {
-    el.addEventListener('input', () => { d.otros_costos[parseInt(el.dataset.idx,10)].name = el.value; });
-  });
-  document.querySelectorAll('.rf-extra-value').forEach(el => {
-    el.addEventListener('input', () => { d.otros_costos[parseInt(el.dataset.idx,10)].value = el.value; updateCostPreview(); });
-  });
-  document.querySelectorAll('.rf-extra-type').forEach(el => {
-    el.addEventListener('change', () => { d.otros_costos[parseInt(el.dataset.idx,10)].type = el.value; updateCostPreview(); });
-  });
-  document.querySelectorAll('.rf-extra-remove').forEach(el => {
-    el.addEventListener('click', () => { d.otros_costos.splice(parseInt(el.dataset.idx,10), 1); renderRecipeForm(); });
-  });
-
-  document.getElementById('rfIngSearch').addEventListener('input', e => {
-    const q = e.target.value.trim().toUpperCase();
-    const results = document.getElementById('rfIngResults');
-    if(!q){ results.innerHTML = ''; return; }
-    const candidates = ingredientCandidates().filter(c => c.name.toUpperCase().includes(q) || c.code.toUpperCase().includes(q)).slice(0, 20);
-    if(candidates.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
-    results.innerHTML = `<div class="ingredient-ticket">` + candidates.map(c => {
-      const tag = c.kind === 'subreceta' ? 'subreceta' : (c.costo != null ? fmtMoney(c.costo) + '/' + escapeHtml(c.unidad || '') : 'sin costo');
-      return `<div class="ing-row rf-ing-pick" data-code="${escapeHtml(c.code)}"><div class="ing-name"><span class="ing-code">${escapeHtml(c.code)}</span>${escapeHtml(c.name)}</div><div class="ing-qty">${tag}</div></div>`;
-    }).join('') + `</div>`;
-    results.querySelectorAll('.rf-ing-pick').forEach(el => {
-      el.addEventListener('click', () => {
-        const c = candidates.find(x => x.code === el.dataset.code);
-        addIngredientRow(c);
-      });
-    });
-  });
-
-  document.getElementById('rfCancel').addEventListener('click', () => {
-    const wasEditing = d.id;
-    const code = d.code;
-    recipeDraft = null;
-    if(wasEditing) openRecipe(code); else document.getElementById('recDetailPane').classList.remove('open');
-  });
-
-  document.getElementById('rfSave').addEventListener('click', async () => {
-    const name = d.name.trim();
-    const code = d.code.trim().toUpperCase();
-    if(!name || !code){ showToast('Completa nombre y código'); return; }
-    const dup = RECIPES.find(r => r.code === code && r.id !== d.id);
-    if(dup){ showToast('Ese código ya existe en esta área: ' + dup.name); return; }
-    if(d.ingredients.some(i => i.code === code)){ showToast('Una receta no puede usarse a sí misma como ingrediente'); return; }
-
-    const payload = {
-      code, name,
-      yield_qty: d.yield_qty === '' ? null : parseFloat(d.yield_qty),
-      yield_unit: d.yield_unit || null,
-      precio_venta: d.precio_venta === '' ? null : parseFloat(d.precio_venta),
-      ingredients: d.ingredients.map(i => ({ code: i.code, name: i.name, qty: String(i.qty || 0), unit: i.unit })),
-      otros_costos: d.otros_costos.map(o => ({ name: o.name, type: o.type, value: String(o.value || 0) })),
-      location_id: currentLocation.id, area_id: currentArea.id
-    };
-
-    const { error } = d.id
-      ? await supa.from('recipes').update(payload).eq('id', d.id)
-      : await supa.from('recipes').insert(payload);
-    if(error){ showToast('Error al guardar: ' + error.message); return; }
-
-    showToast('Receta guardada');
-    recipeDraft = null;
-    await loadRecipes();
-    await loadIngredientCosts();
-    buildInsumosCatalog();
-    populateRecetaDatalist();
-    renderRecipeList();
-    const saved = RECIPES.find(r => r.code === code);
-    if(saved) openRecipe(saved.code); else document.getElementById('recDetailPane').classList.remove('open');
-  });
-
-  updateCostPreview();
 }
 
 /* ---------- PRODUCCION ---------- */
