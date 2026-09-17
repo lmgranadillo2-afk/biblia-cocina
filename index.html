@@ -1779,7 +1779,8 @@ async function loadRecipes(){
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
     yield_unit: r.yield_unit || '',
     activo_inventario: r.activo_inventario !== false,
-    precio_venta: r.precio_venta === null ? '' : String(r.precio_venta)
+    precio_venta: r.precio_venta === null ? '' : String(r.precio_venta),
+    otros_costos: r.otros_costos || []
   }));
 }
 
@@ -1837,6 +1838,12 @@ function calcRecipeCost(code, visited){
   if(!r) return { total: 0, incomplete: true, missing: [code + ' (no encontrada)'] };
   return calcCostFromIngredients(r.ingredients, visited);
 }
+function sumOtrosCostos(otrosCostos, base){
+  return (otrosCostos || []).reduce((sum, o) => {
+    const v = parseFloat(o.value) || 0;
+    return sum + (o.type === 'pct' ? base * (v / 100) : v);
+  }, 0);
+}
 
 /* ---------- RECETARIO ---------- */
 function renderRecipeList(){
@@ -1887,12 +1894,25 @@ async function renderDetail(r){
 
   const costCalc = calcRecipeCost(r.code);
   const costPerYield = (hasYield && !costCalc.incomplete) ? costCalc.total / parseFloat(r.yield_qty) : null;
-  let costHtml = `<div class="yield-stamp small"><span class="label">Costo receta</span><span class="value">${fmtMoney(costCalc.total)}</span></div>`;
+  const baseForExtras = costPerYield !== null ? costPerYield : costCalc.total;
+  const otrosCostosTotal = sumOtrosCostos(r.otros_costos, baseForExtras);
+  const totalCostPerUnit = baseForExtras + otrosCostosTotal;
+
+  let costHtml = `<div class="yield-stamp small"><span class="label">Costo insumos</span><span class="value">${fmtMoney(costCalc.total)}</span></div>`;
   if(costPerYield !== null){
-    costHtml += `<div class="yield-stamp small"><span class="label">Costo por ${escapeHtml(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
+    costHtml += `<div class="yield-stamp small"><span class="label">Costo insumos por ${escapeHtml(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
   }
   if(costCalc.incomplete){
     costHtml += `<div class="empty-note">Costo incompleto — falta costo de: ${costCalc.missing.map(escapeHtml).join(', ')}</div>`;
+  }
+  if((r.otros_costos || []).length > 0){
+    costHtml += `<div class="ingredient-ticket">` + r.otros_costos.map(o => {
+      const v = parseFloat(o.value) || 0;
+      const computed = o.type === 'pct' ? baseForExtras * (v / 100) : v;
+      const label = o.type === 'pct' ? `${escapeHtml(o.name || 'Sin nombre')} (${v}%)` : escapeHtml(o.name || 'Sin nombre');
+      return `<div class="ing-row"><div class="ing-name">${label}</div><div class="ing-qty">${fmtMoney(computed)}</div></div>`;
+    }).join('') + `</div>`;
+    costHtml += `<div class="yield-stamp small"><span class="label">Costo total (con otros costos)</span><span class="value">${fmtMoney(totalCostPerUnit)}</span></div>`;
   }
 
   let priceHtml = '';
@@ -1902,14 +1922,19 @@ async function renderDetail(r){
       <div class="field"><label class="field-label">Precio de venta</label><input type="number" id="priceInput" value="${r.precio_venta || ''}" placeholder="Ej: 35000"></div>
       <button class="btn btn-accent btn-block" id="priceSubmit">Guardar precio de venta</button>
     </div>`;
+    priceHtml += `<div class="obs-form">
+      <div class="field"><label class="field-label">Margen objetivo (%)</label><input type="number" id="marginTarget" value="30" min="0" max="95"></div>
+      <div id="suggestedPriceBox"></div>
+      <button class="btn btn-ghost btn-block" id="useSuggestedPrice">Usar precio sugerido</button>
+    </div>`;
   }
   if(r.precio_venta){
     const precio = parseFloat(r.precio_venta);
     priceHtml += `<div class="yield-stamp small"><span class="label">Precio de venta</span><span class="value">${fmtMoney(precio)}</span></div>`;
     if(costPerYield !== null){
-      const foodCostPct = (costPerYield / precio) * 100;
+      const foodCostPct = (totalCostPerUnit / precio) * 100;
       priceHtml += `<div class="yield-stamp small"><span class="label">Food cost</span><span class="value">${foodCostPct.toLocaleString('es-CO',{maximumFractionDigits:1})}%</span></div>`;
-      priceHtml += `<div class="yield-stamp small"><span class="label">Margen</span><span class="value">${fmtMoney(precio - costPerYield)}</span></div>`;
+      priceHtml += `<div class="yield-stamp small"><span class="label">Margen</span><span class="value">${fmtMoney(precio - totalCostPerUnit)}</span></div>`;
     }
   }
 
@@ -1932,6 +1957,25 @@ async function renderDetail(r){
 
   if(isAdminRole()){
     document.getElementById('editRecipeBtn').addEventListener('click', ()=>openRecipeForm(r));
+
+    const updateSuggestedPrice = () => {
+      const box = document.getElementById('suggestedPriceBox');
+      const margin = Math.min(95, Math.max(0, parseFloat(document.getElementById('marginTarget').value) || 0));
+      if(costPerYield === null){
+        box.innerHTML = `<div class="empty-note">Necesita rendimiento y costo completo para sugerir precio.</div>`;
+        return;
+      }
+      const suggested = totalCostPerUnit / (1 - margin / 100);
+      box.innerHTML = `<div class="yield-stamp small"><span class="label">Precio sugerido</span><span class="value">${fmtMoney(suggested)}</span></div>`;
+    };
+    document.getElementById('marginTarget').addEventListener('input', updateSuggestedPrice);
+    document.getElementById('useSuggestedPrice').addEventListener('click', () => {
+      const margin = Math.min(95, Math.max(0, parseFloat(document.getElementById('marginTarget').value) || 0));
+      if(costPerYield === null){ showToast('Necesita rendimiento y costo completo para sugerir precio'); return; }
+      document.getElementById('priceInput').value = Math.round(totalCostPerUnit / (1 - margin / 100));
+    });
+    updateSuggestedPrice();
+
     document.getElementById('priceSubmit').addEventListener('click', async ()=>{
       const val = document.getElementById('priceInput').value;
       const precio_venta = val === '' ? null : parseFloat(val);
@@ -2006,9 +2050,10 @@ function openRecipeForm(existing){
     id: existing.id, code: existing.code, name: existing.name,
     yield_qty: existing.yield_qty || '', yield_unit: existing.yield_unit || 'KG',
     precio_venta: existing.precio_venta || '',
-    ingredients: existing.ingredients.map(i => ({ ...i }))
+    ingredients: existing.ingredients.map(i => ({ ...i })),
+    otros_costos: (existing.otros_costos || []).map(o => ({ ...o }))
   } : {
-    id: null, code: nextSubcCode(), name: '', yield_qty: '', yield_unit: 'KG', precio_venta: '', ingredients: []
+    id: null, code: nextSubcCode(), name: '', yield_qty: '', yield_unit: 'KG', precio_venta: '', ingredients: [], otros_costos: []
   };
   document.getElementById('recDetailPane').classList.add('open');
   renderRecipeForm();
@@ -2019,18 +2064,29 @@ function updateCostPreview(){
   if(!box) return;
   const calc = calcCostFromIngredients(recipeDraft.ingredients);
   const yq = parseFloat(recipeDraft.yield_qty);
-  let html = `<div class="yield-stamp small"><span class="label">Costo receta</span><span class="value">${fmtMoney(calc.total)}</span></div>`;
-  if(yq){
-    html += `<div class="yield-stamp small"><span class="label">Costo por ${escapeHtml(recipeDraft.yield_unit || '')}</span><span class="value">${fmtMoney(calc.total / yq)}</span></div>`;
+  const perUnit = yq ? calc.total / yq : null;
+  const baseForExtras = perUnit !== null ? perUnit : calc.total;
+  const extrasTotal = sumOtrosCostos(recipeDraft.otros_costos, baseForExtras);
+  let html = `<div class="yield-stamp small"><span class="label">Costo insumos</span><span class="value">${fmtMoney(calc.total)}</span></div>`;
+  if(perUnit !== null){
+    html += `<div class="yield-stamp small"><span class="label">Costo insumos por ${escapeHtml(recipeDraft.yield_unit || '')}</span><span class="value">${fmtMoney(perUnit)}</span></div>`;
   }
   if(calc.incomplete){
     html += `<div class="empty-note">Costo incompleto — falta costo de: ${calc.missing.map(escapeHtml).join(', ')}</div>`;
+  }
+  if((recipeDraft.otros_costos || []).length > 0){
+    html += `<div class="yield-stamp small"><span class="label">Costo total (con otros costos)</span><span class="value">${fmtMoney(baseForExtras + extrasTotal)}</span></div>`;
   }
   box.innerHTML = html;
 }
 
 function addIngredientRow(c){
   recipeDraft.ingredients.push({ code: c.code, name: c.name, qty: '', unit: defaultUnitFor(c) });
+  renderRecipeForm();
+}
+
+function addOtroCosto(){
+  recipeDraft.otros_costos.push({ name: '', type: 'fixed', value: '' });
   renderRecipeForm();
 }
 
@@ -2069,6 +2125,21 @@ function renderRecipeForm(){
       <div id="rfIngResults"></div>
     </div>
 
+    <div class="section-label">Otros costos (ICO, empaque, servicio...)</div>
+    <div class="ingredient-ticket" id="rfExtrasList">${
+      d.otros_costos.map((o, idx) => `
+        <div class="ing-row">
+          <input type="text" class="rf-extra-name" data-idx="${idx}" placeholder="Nombre (ej. ICO)" value="${escapeHtml(o.name)}" style="flex:1;">
+          <input type="number" class="rf-extra-value" data-idx="${idx}" value="${o.value}" style="width:80px;">
+          <select class="rf-extra-type" data-idx="${idx}">
+            <option value="fixed" ${o.type==='fixed'?'selected':''}>$</option>
+            <option value="pct" ${o.type==='pct'?'selected':''}>%</option>
+          </select>
+          <button class="btn btn-ghost btn-small rf-extra-remove" data-idx="${idx}">✕</button>
+        </div>`).join('') || '<div class="empty-note">Sin otros costos agregados.</div>'
+    }</div>
+    <button class="btn btn-ghost btn-block" id="rfAddExtra" style="margin:10px 0;">+ Agregar otro costo</button>
+
     <div class="section-label">Costo</div>
     <div id="draftCostPreview"></div>
 
@@ -2096,6 +2167,20 @@ function renderRecipeForm(){
   });
   document.querySelectorAll('.rf-ing-remove').forEach(el => {
     el.addEventListener('click', () => { d.ingredients.splice(parseInt(el.dataset.idx,10), 1); renderRecipeForm(); });
+  });
+
+  document.getElementById('rfAddExtra').addEventListener('click', addOtroCosto);
+  document.querySelectorAll('.rf-extra-name').forEach(el => {
+    el.addEventListener('input', () => { d.otros_costos[parseInt(el.dataset.idx,10)].name = el.value; });
+  });
+  document.querySelectorAll('.rf-extra-value').forEach(el => {
+    el.addEventListener('input', () => { d.otros_costos[parseInt(el.dataset.idx,10)].value = el.value; updateCostPreview(); });
+  });
+  document.querySelectorAll('.rf-extra-type').forEach(el => {
+    el.addEventListener('change', () => { d.otros_costos[parseInt(el.dataset.idx,10)].type = el.value; updateCostPreview(); });
+  });
+  document.querySelectorAll('.rf-extra-remove').forEach(el => {
+    el.addEventListener('click', () => { d.otros_costos.splice(parseInt(el.dataset.idx,10), 1); renderRecipeForm(); });
   });
 
   document.getElementById('rfIngSearch').addEventListener('input', e => {
@@ -2137,6 +2222,7 @@ function renderRecipeForm(){
       yield_unit: d.yield_unit || null,
       precio_venta: d.precio_venta === '' ? null : parseFloat(d.precio_venta),
       ingredients: d.ingredients.map(i => ({ code: i.code, name: i.name, qty: String(i.qty || 0), unit: i.unit })),
+      otros_costos: d.otros_costos.map(o => ({ name: o.name, type: o.type, value: String(o.value || 0) })),
       location_id: currentLocation.id, area_id: currentArea.id
     };
 
