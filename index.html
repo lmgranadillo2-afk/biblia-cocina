@@ -1819,6 +1819,9 @@ function toBaseQty(qty, unit){
   if(g==='CONTEO') return qty;
   return null;
 }
+function normalizeUnitLabel(u){
+  return unitGroup(u) === 'CONTEO' ? 'UND' : (u || '').toUpperCase();
+}
 function calcCostFromIngredients(ingredients, visited){
   visited = visited || new Set();
   let total = 0, incomplete = false, missing = [];
@@ -1886,7 +1889,7 @@ function openCosteoDetail(code){
 function renderCosteoDetail(r){
   const hasYield = !!r.yield_qty;
   const yieldHtml = hasYield
-    ? `<div class="yield-stamp small"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${r.yield_unit}</span></div>`
+    ? `<div class="yield-stamp small"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${normalizeUnitLabel(r.yield_unit)}</span></div>`
     : '';
 
   let lines = [];
@@ -1929,14 +1932,14 @@ function renderCosteoDetail(r){
   } else {
     linesHtml = `<div class="ingredient-ticket">` + lines.map(l => {
       const costLabel = l.lineCost === null ? 'sin costo' : fmtMoney(l.lineCost);
-      return `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(l.code)}</span>${escapeHtml(l.name)} — ${fmtQty(l.qty)} ${escapeHtml(l.unit)}</div><div class="ing-qty">${costLabel}</div></div>`;
+      return `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(l.code)}</span>${escapeHtml(l.name)} — ${fmtQty(l.qty)} ${normalizeUnitLabel(l.unit)}</div><div class="ing-qty">${costLabel}</div></div>`;
     }).join('') + `</div>`;
   }
 
   const costPerYield = (hasYield && !incomplete) ? total / parseFloat(r.yield_qty) : null;
   let totalHtml = `<div class="yield-stamp small"><span class="label">Costo total</span><span class="value">${fmtMoney(total)}</span></div>`;
   if(costPerYield !== null){
-    totalHtml += `<div class="yield-stamp small"><span class="label">Costo por ${escapeHtml(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
+    totalHtml += `<div class="yield-stamp small"><span class="label">Costo por ${normalizeUnitLabel(r.yield_unit)}</span><span class="value">${fmtMoney(costPerYield)}</span></div>`;
   }
   if(incomplete){
     totalHtml += `<div class="empty-note">Costo incompleto — falta costo de: ${missing.map(escapeHtml).join(', ')}</div>`;
@@ -1986,7 +1989,7 @@ document.getElementById('detailBack').addEventListener('click', ()=>{
 async function renderDetail(r){
   const hasYield = !!r.yield_qty;
   const yieldHtml = hasYield
-    ? `<div class="yield-stamp"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${r.yield_unit}</span></div>`
+    ? `<div class="yield-stamp"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${normalizeUnitLabel(r.yield_unit)}</span></div>`
     : `<div class="yield-stamp empty"><span class="label">Rinde</span><span class="value">Sin dato</span></div>`;
 
   let ingHtml;
@@ -1994,7 +1997,7 @@ async function renderDetail(r){
     ingHtml = `<div class="empty-note">Esta subreceta aún no tiene insumos cargados.</div>`;
   } else {
     ingHtml = `<div class="ingredient-ticket">` + r.ingredients.map(i=>
-      `<div class="ing-row"><div class="ing-name"><span class="ing-code">${i.code}</span>${escapeHtml(i.name)}</div><div class="ing-qty">${fmtQty(i.qty)} ${i.unit}</div></div>`
+      `<div class="ing-row"><div class="ing-name"><span class="ing-code">${i.code}</span>${escapeHtml(i.name)}</div><div class="ing-qty">${fmtQty(i.qty)} ${normalizeUnitLabel(i.unit)}</div></div>`
     ).join('') + `</div>`;
   }
 
@@ -2050,7 +2053,7 @@ function updateExpectedYield(){
   const match = findRecetaByName(name);
   if(!match || !match.yield_qty){ box.innerHTML=''; return; }
   const expected = parseFloat(match.yield_qty) * mult;
-  box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${match.yield_unit}</span></div>`;
+  box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${normalizeUnitLabel(match.yield_unit)}</span></div>`;
 }
 document.getElementById('prodReceta').addEventListener('input', updateExpectedYield);
 document.getElementById('prodCantidad').addEventListener('change', updateExpectedYield);
@@ -2070,7 +2073,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
 
   const expectedYield = match.yield_qty ? (parseFloat(match.yield_qty) * parseFloat(cantidadMult)) : null;
-  const expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + match.yield_unit) : '';
+  const expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + normalizeUnitLabel(match.yield_unit)) : '';
 
   pendingEntry = {
     fecha, recipe_code: match.code, recipe_name: match.name,
