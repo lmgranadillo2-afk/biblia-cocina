@@ -2566,7 +2566,7 @@ async function loadCosteoEventos(){
   if(error) showToast('No se pudieron cargar los eventos: ' + error.message);
 }
 
-// Cotización: carta + personal (costo + margen) + otros − descuento + servicio (solo sobre la carta).
+// Cotización: carta + personal (costo + margen) + otros − descuento + servicio (sobre todo) + impoconsumo (solo sobre la carta).
 // Costo interno de un ítem de carta: el costo ACTUAL de la carta (si se actualizan costos, los
 // eventos ya guardados lo reflejan); si el ítem ya no existe, el que se guardó en el evento.
 // El precio al cliente, en cambio, queda fijo al de la cotización.
@@ -2617,9 +2617,10 @@ function eventoCalcTotals(e){
   const descuentoBruto = e.descuento_tipo === 'valor' ? toNum(e.descuento_valor) : subtotal * toNum(e.descuento_valor) / 100;
   const descuento = Math.min(subtotal, Math.max(0, descuentoBruto));
   const base = subtotal - descuento;
-  // El descuento se reparte proporcionalmente, así servicio e impoconsumo se calculan sobre la carta ya descontada.
+  // Servicio: sobre todo el subtotal ya descontado (carta, personal, otros).
+  // Impoconsumo: solo sobre la carta; el descuento se reparte proporcionalmente.
   const cartaNeta = carta * (subtotal ? base / subtotal : 1);
-  const servicio = cartaNeta * toNum(e.servicio_pct) / 100;
+  const servicio = base * toNum(e.servicio_pct) / 100;
   const impoconsumo = cartaNeta * toNum(e.impoconsumo_pct) / 100;
   const total = base + servicio + impoconsumo;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
