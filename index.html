@@ -2798,6 +2798,225 @@ async function eventoCopiarTexto(d){
   }
 }
 
+/* ---------- Cotización completa con la plantilla del punto ----------
+   Páginas exportadas de Canva (1414 × 2000 px, A4) guardadas en /plantillas/<slug>/.
+   Las coordenadas de abajo están en píxeles de esa imagen. */
+const PLANTILLAS_COTIZACION = {
+  'dos-santos': {
+    carpeta: 'plantillas/dos-santos/',
+    portada: 'portada.jpg', tabla: 'tabla.jpg', fijas: ['politicas-1.jpg', 'politicas-2.jpg'],
+    // Zona libre de la página de tabla: debajo del jaguar y encima del logo inferior.
+    tablaTop: 520, tablaBottom: 1540, tablaLeft: 50, tablaWidth: 1320
+  }
+};
+function plantillaCotizacion(){
+  return currentLocation && PLANTILLAS_COTIZACION[currentLocation.slug] || null;
+}
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function fechaLarga(f){
+  if(!f) return '';
+  const [y, m, d] = f.split('-').map(Number);
+  return `${d} ${MESES_ES[m - 1]} ${y}`;
+}
+// "FLAUTAS DE TINGA DE POLLO" -> "Flautas de tinga de pollo"; "BT.ANTIOQUEÑO AZUL" -> "Botella antioqueño azul".
+const PREFIJOS_CARTA = { 'BT.': 'Botella ', 'VT.': 'Botella ', 'VB.': 'Botella ', 'VR.': 'Botella ', 'MD.': 'Media ', 'TG.': 'Trago ', 'TG ': 'Trago ', 'CP.': 'Copa ', 'AD.': 'Adición de ' };
+function nombrePlato(s){
+  let t = (s || '').trim().replace(/\s+/g, ' ');
+  if(!t || t !== t.toUpperCase()) return t;
+  let prefijo = '';
+  const p = Object.keys(PREFIJOS_CARTA).find(k => t.startsWith(k));
+  if(p){ prefijo = PREFIJOS_CARTA[p]; t = t.slice(p.length).trim(); }
+  const lower = t.toLowerCase().replace(/\bdos santos\b/g, 'Dos Santos');
+  const texto = prefijo + lower;
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+function categoriaTitulo(s){ return nombrePlato(s); }
+function descripcionCarta(item){
+  const c = CARTA_ITEMS.find(x => x.id === item.carta_item_id);
+  return c && c.descripcion ? c.descripcion : '';
+}
+
+// Bloques de la tabla del documento: cada bloque es un <tbody> que no se corta entre páginas.
+function cotizacionBloquesHtml(d, t){
+  const bloques = [];
+  const desc = it => {
+    const dsc = descripcionCarta(it);
+    return `<div class="pl-nombre">${escapeHtml(nombrePlato(it.nombre))}</div>${dsc ? `<div class="pl-desc">${escapeHtml(dsc)}</div>` : ''}`;
+  };
+  const num = v => `<td class="pl-num">${cotizQty(v)}</td>`;
+  const money = v => `<td class="pl-money"><span>$</span><span>${v === null || v === undefined ? '' : Math.round(v).toLocaleString('es-CO')}</span></td>`;
+
+  (d.tiempos || []).forEach((tp, idx) => {
+    const ops = tp.opciones || [];
+    if(!ops.length) return;
+    const c = t.tiemposCalc[idx], n = ops.length, individual = tp.modo === 'individual';
+    let rows = '';
+    ops.forEach((o, i) => {
+      rows += '<tr>';
+      if(i === 0) rows += `<td class="pl-cat" rowspan="${n}">${escapeHtml(tp.nombre || 'Tiempo')}</td>`;
+      rows += `<td class="pl-desc-cell">${desc(o)}</td>`;
+      if(individual) rows += num(toNum(o.cantidad)) + money(toNum(o.precio)) + money(toNum(o.precio) * toNum(o.cantidad));
+      else if(i === 0) rows += num(c.cant).replace('<td', `<td rowspan="${n}"`) + money(c.precio).replace('<td', `<td rowspan="${n}"`) + money(c.venta).replace('<td', `<td rowspan="${n}"`);
+      rows += '</tr>';
+    });
+    bloques.push(`<tbody>${rows}</tbody>`);
+  });
+
+  // Ítems sueltos de carta, agrupados por su categoría de la carta.
+  const grupos = [];
+  (d.items || []).forEach(i => {
+    const cat = categoriaTitulo(i.categoria || 'Carta');
+    let g = grupos.find(x => x.cat === cat);
+    if(!g) grupos.push(g = { cat, items: [] });
+    g.items.push(i);
+  });
+  const bloqueSimple = (cat, filas) => {
+    let rows = '';
+    filas.forEach((f, i) => {
+      rows += '<tr>' + (i === 0 ? `<td class="pl-cat" rowspan="${filas.length}">${escapeHtml(cat)}</td>` : '')
+        + `<td class="pl-desc-cell">${f.desc}</td>` + num(f.cant) + money(f.unit) + money(f.sub) + '</tr>';
+    });
+    bloques.push(`<tbody>${rows}</tbody>`);
+  };
+  grupos.forEach(g => bloqueSimple(g.cat, g.items.map(i => ({ desc: desc(i), cant: toNum(i.cantidad), unit: toNum(i.precio), sub: toNum(i.precio) * toNum(i.cantidad) }))));
+
+  const factorPersonal = 1 + toNum(d.margen_personal_pct) / 100;
+  if((d.personal || []).length) bloqueSimple('Personal', d.personal.map(p => {
+    const unit = toNum(p.horas) * toNum(p.valor_hora) * factorPersonal;
+    return { desc: `<div class="pl-nombre">${escapeHtml(p.nombre)} · ${fmtQty(toNum(p.horas))} horas</div>`, cant: toNum(p.personas), unit, sub: unit * toNum(p.personas) };
+  }));
+  if((d.otros || []).length) bloqueSimple('Extras', d.otros.map(o => ({
+    desc: `<div class="pl-nombre">${escapeHtml(o.descripcion || 'Ítem')}</div>`, cant: toNum(o.cantidad), unit: toNum(o.precio), sub: toNum(o.cantidad) * toNum(o.precio)
+  })));
+  return bloques;
+}
+
+function cotizacionTotalesHtml(d, t){
+  const fila = (label, v, cls) => `<tr class="${cls || ''}"><td class="pl-tot-label">${label}</td><td class="pl-money"><span>$</span><span>${Math.round(v).toLocaleString('es-CO')}</span></td></tr>`;
+  let tot = fila('TOTAL', t.subtotal);
+  if(t.descuento) tot += fila('DESCUENTO' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), -t.descuento);
+  if(t.servicio) tot += fila(`SERVICIO ${toNum(d.servicio_pct)}%`, t.servicio);
+  if(t.impoconsumo) tot += fila(`ICO ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
+  tot += fila('TOTAL A PAGAR', t.total, 'pl-pagar');
+  return `<table class="pl-totales-wrap"><tr>
+    <td class="pl-detalles"><div class="pl-detalles-bar">DETALLES DEL EVENTO</div><div class="pl-notas">${escapeHtml(d.notas || '').replace(/\n/g, '<br>')}</div></td>
+    <td class="pl-tot-cell"><table class="pl-totales">${tot}</table></td>
+  </tr></table>`;
+}
+
+const COTIZ_DOC_CSS = `
+@page{size:A4; margin:0;}
+*{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+html,body{margin:0; padding:0; background:#777;}
+.pl-page{width:210mm; height:297mm; position:relative; overflow:hidden; background:#fff; margin:0 auto; page-break-after:always; break-after:page;}
+.pl-page:last-child{page-break-after:auto; break-after:auto;}
+.pl-scale{position:absolute; left:0; top:0; width:1414px; height:2000px; transform-origin:0 0; transform:scale(0.56133);}
+.pl-bg{position:absolute; inset:0; width:1414px; height:2000px;}
+.pl-portada-txt{position:absolute; left:100px; right:100px; text-align:center; font-family:'Bitter',serif;}
+.pl-cliente{top:672px; color:#8B4A2B; font-size:62px; font-weight:500; letter-spacing:6px; line-height:1.15; text-transform:uppercase;}
+.pl-linea{color:#F4EDE4; font-size:44px; font-weight:500; letter-spacing:4px; text-transform:uppercase; line-height:66px;}
+.pl-horario{color:#F4EDE4; font-family:Arial,'Arial MT Pro',sans-serif; font-size:34px; letter-spacing:3px; text-transform:uppercase; margin-top:6px;}
+.pl-tabla-zona{position:absolute; font-family:Arial,'Arial MT Pro',sans-serif; color:#111;}
+table.pl-tabla{width:100%; border-collapse:collapse; font-size:19px; line-height:1.2;}
+table.pl-tabla th{background:#7A3E0C; color:#fff; font-weight:700; font-size:18px; text-transform:uppercase; padding:5px 8px; border:1.5px solid #3a2a1c;}
+table.pl-tabla td{border:1.5px solid #3a2a1c; padding:3px 8px; vertical-align:middle;}
+table.pl-tabla tbody{break-inside:avoid;}
+.pl-cat{width:158px; text-align:center; font-weight:700;}
+.pl-desc-cell{vertical-align:top !important;}
+.pl-nombre{font-weight:400;}
+.pl-desc{font-size:17px; color:#222;}
+.pl-num{width:126px; text-align:center;}
+.pl-money{width:170px; white-space:nowrap;}
+.pl-money span:first-child{float:left;}
+.pl-money span:last-child{float:right;}
+table.pl-totales-wrap{width:100%; border-collapse:collapse; margin-top:-1.5px;}
+table.pl-totales-wrap > tbody > tr > td, table.pl-totales-wrap > tr > td{padding:0; vertical-align:top;}
+.pl-detalles{border-bottom:1.5px solid #3a2a1c;}
+.pl-detalles-bar{background:#7A3E0C; color:#fff; font-weight:700; font-size:18px; padding:4px 4px;}
+.pl-notas{font-size:17px; padding:6px 4px; white-space:normal;}
+.pl-tot-cell{width:368px;}
+table.pl-totales{width:100%; border-collapse:collapse; font-size:18px;}
+table.pl-totales td{border:1.5px solid #3a2a1c; padding:3px 8px;}
+.pl-tot-label{font-weight:700; width:170px;}
+.pl-pagar td{font-weight:700; font-size:20px; padding:8px;}
+.pl-pagar td.pl-money{background:#FAD9BD;}
+@media print{ html,body{background:#fff;} .pl-page{margin:0;} }
+@media screen{ .pl-page{margin:16px auto; box-shadow:0 4px 20px rgba(0,0,0,.3);} }
+`;
+
+function eventoDocumentoCompleto(d){
+  const pl = plantillaCotizacion();
+  if(!pl){ showToast('Este punto todavía no tiene plantilla de cotización'); return; }
+  const w = window.open('', '_blank');
+  if(!w){ showToast('El navegador bloqueó la ventana: permití ventanas emergentes para esta página'); return; }
+  w.document.write(eventoDocumentoHtml(d, pl, true));
+  w.document.close();
+}
+
+// HTML completo del documento (portada + tabla paginada + páginas fijas). Con imprimir=true abre el diálogo de impresión al terminar.
+function eventoDocumentoHtml(d, pl, imprimir){
+  const t = eventoCalcTotals(d);
+  const url = f => new URL(pl.carpeta + f, location.href).href;
+  const pagina = (bg, contenido) => `<div class="pl-page"><div class="pl-scale"><img class="pl-bg" src="${url(bg)}">${contenido || ''}</div></div>`;
+
+  const portada = pagina(pl.portada, `
+    <div class="pl-portada-txt pl-cliente" style="top:672px;">${escapeHtml(d.cliente || d.nombre || '')}</div>
+    <div class="pl-portada-txt" style="top:772px;">
+      ${d.fecha ? `<div class="pl-linea">${escapeHtml(fechaLarga(d.fecha))}</div>` : ''}
+      ${toNum(d.invitados) ? `<div class="pl-linea">${toNum(d.invitados)} personas</div>` : ''}
+      ${(d.horario || '').trim() ? `<div class="pl-horario">${escapeHtml(d.horario.trim())}</div>` : ''}
+    </div>`);
+
+  const zona = `left:${pl.tablaLeft}px; top:${pl.tablaTop}px; width:${pl.tablaWidth}px;`;
+  const thead = '<thead><tr><th>Categoría</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>';
+  const bloques = cotizacionBloquesHtml(d, t);
+  const totales = cotizacionTotalesHtml(d, t);
+  const maxAlto = pl.tablaBottom - pl.tablaTop;
+
+  return `<!doctype html><html><head><meta charset="utf-8">
+    <title>${escapeHtml(cotizNombreArchivo(d, 'pdf').replace(/\.pdf$/, ''))}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>${COTIZ_DOC_CSS}</style></head><body>
+    ${portada}
+    <div id="tablas"></div>
+    ${pl.fijas.map(f => pagina(f)).join('')}
+    <script>
+    (function(){
+      var bloques = ${JSON.stringify(bloques)}, totales = ${JSON.stringify(totales)};
+      var cont = document.getElementById('tablas');
+      function nuevaPagina(){
+        var p = document.createElement('div'); p.className = 'pl-page';
+        p.innerHTML = '<div class="pl-scale"><img class="pl-bg" src="${url(pl.tabla)}"><div class="pl-tabla-zona" style="${zona}"><table class="pl-tabla">${thead}</table></div></div>';
+        cont.appendChild(p);
+        return p.querySelector('.pl-tabla-zona');
+      }
+      function armar(){
+        var zona = nuevaPagina(), tabla = zona.querySelector('table');
+        bloques.forEach(function(b){
+          tabla.insertAdjacentHTML('beforeend', b);
+          if(zona.offsetHeight > ${maxAlto} && tabla.tBodies.length > 1){
+            tabla.removeChild(tabla.tBodies[tabla.tBodies.length - 1]);
+            zona = nuevaPagina(); tabla = zona.querySelector('table');
+            tabla.insertAdjacentHTML('beforeend', b);
+          }
+        });
+        zona.insertAdjacentHTML('beforeend', totales);
+        if(zona.offsetHeight > ${maxAlto}){
+          zona.removeChild(zona.lastElementChild);
+          zona = nuevaPagina(); zona.innerHTML = totales;
+        }
+      }
+      Promise.all([document.fonts ? document.fonts.ready : Promise.resolve()]).then(function(){
+        armar();
+        var todas = [].slice.call(document.images);
+        return Promise.all(todas.map(function(i){ return i.complete ? 0 : new Promise(function(r){ i.onload = i.onerror = r; }); }));
+      }).then(function(){ ${imprimir ? 'setTimeout(function(){ window.print(); }, 300);' : 'document.body.setAttribute("data-listo", "1");'} });
+    })();
+    <\/script>
+    </body></html>`;
+}
+
 function fmtFecha(f){
   if(!f) return '';
   const [y, m, d] = f.split('-');
@@ -2825,14 +3044,14 @@ function openCosteoEvento(id){
   currentCosteoEventoId = id;
   const e = id ? COSTEO_EVENTOS.find(x=>x.id===id) : null;
   costeoEventoDraft = e ? {
-    id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '',
+    id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '', horario: e.horario || '',
     tiempos: (e.tiempos||[]).map(t=>({ ...t, opciones: (t.opciones||[]).map(o=>({...o})) })),
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
     servicio_pct: e.servicio_pct ?? 10, impoconsumo_pct: e.impoconsumo_pct ?? 8, anticipo_pct: e.anticipo_pct ?? 50,
     encargado: e.encargado || '', comision_pct: e.comision_pct || 0
   } : {
-    id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '',
+    id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '', horario: '',
     tiempos: EVENTO_TIEMPOS_BASE.map(n => ({ nombre: n, cantidad: null, opciones: [] })),
     items: [], personal: [], otros: [],
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
@@ -2987,6 +3206,7 @@ function renderCosteoEventoForm(){
         <div class="field" style="flex:1;"><label class="field-label">Fecha</label><input type="date" id="evFecha" value="${d.fecha}"></div>
         <div class="field" style="width:110px;"><label class="field-label">Invitados</label><input type="number" id="evInvitados" value="${d.invitados}"></div>
       </div>
+      <div class="field"><label class="field-label">Horario</label><input type="text" id="evHorario" value="${escapeHtml(d.horario)}" placeholder="Ej: 12:30 pm a 6:00 pm"></div>
       <div class="field" style="margin-bottom:0;"><label class="field-label">Notas</label><textarea id="evNotas" placeholder="Horario, montaje, restricciones...">${escapeHtml(d.notas)}</textarea></div>
     </div>
 
@@ -3048,6 +3268,7 @@ function renderCosteoEventoForm(){
     </div>` : ''}
 
     <div class="section-label">Cotización</div>
+    ${plantillaCotizacion() ? `<button class="btn btn-accent btn-block" id="evDocCompleto" style="margin-bottom:10px;">Cotización completa con plantilla (PDF)</button>` : ''}
     <div class="ev-quick" style="align-items:center; margin-top:0;">
       <span class="ev-dim" style="font-size:12px;">Exportar para Canva (solo lo que ve el cliente):</span>
       <button class="btn btn-ghost btn-small" id="evExpPng">Imagen PNG (letra clara)</button>
@@ -3065,7 +3286,7 @@ function renderCosteoEventoForm(){
 
   const bindText = (id, key) => document.getElementById(id).addEventListener('input', e=>{ d[key] = e.target.value; });
   const bindNum = (id, key) => document.getElementById(id).addEventListener('input', e=>{ d[key] = toNum(e.target.value); updateEventoPreview(); });
-  bindText('evNombre', 'nombre'); bindText('evCliente', 'cliente'); bindText('evFecha', 'fecha'); bindText('evNotas', 'notas');
+  bindText('evNombre', 'nombre'); bindText('evCliente', 'cliente'); bindText('evFecha', 'fecha'); bindText('evNotas', 'notas'); bindText('evHorario', 'horario');
   bindNum('evInvitados', 'invitados'); bindNum('evMargenPersonal', 'margen_personal_pct');
   bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evAnticipo', 'anticipo_pct');
   document.getElementById('evDescTipo').addEventListener('change', e=>{ d.descuento_tipo = e.target.value; updateEventoPreview(); });
@@ -3076,6 +3297,8 @@ function renderCosteoEventoForm(){
     finally{ btn.disabled = false; btn.textContent = 'Imagen PNG (letra clara)'; }
   });
   document.getElementById('evExpPdf').addEventListener('click', ()=>eventoExportarPdf(d));
+  const docBtn = document.getElementById('evDocCompleto');
+  if(docBtn) docBtn.addEventListener('click', ()=>eventoDocumentoCompleto(d));
   document.getElementById('evExpTxt').addEventListener('click', async ()=>{ await eventoCopiarTexto(d); showToast('Cotización copiada: pegala en Canva'); });
   if(isAdminRole()){
     document.getElementById('evEncargado').addEventListener('input', e=>{ d.encargado = e.target.value; updateEventoPreview(); });
@@ -3188,6 +3411,7 @@ function renderCosteoEventoForm(){
       fecha: d.fecha || null,
       invitados: Math.round(toNum(d.invitados)),
       notas: d.notas.trim() || null,
+      horario: (d.horario || '').trim() || null,
       tiempos: d.tiempos.map(tp=>({
         nombre: (tp.nombre || '').trim() || 'Tiempo',
         modo: tp.modo === 'individual' ? 'individual' : 'max',
