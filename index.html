@@ -299,6 +299,21 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 .ev-sum-row.total{font-weight:700; font-size:16px; border-top:1px solid var(--border); margin-top:4px; padding-top:9px;}
 .ev-sum-row.dim{color:var(--text-dim); font-size:13px;}
 .ev-quick{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+.ev-dim{color:var(--text-dim); font-weight:400;}
+.ev-table-wrap{border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow-x:auto; margin-top:10px;}
+.ev-table{width:100%; border-collapse:collapse; font-size:13px;}
+.ev-table th{text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-muted); padding:9px 8px; border-bottom:1px solid var(--border);}
+.ev-table td{padding:6px 8px; border-bottom:1px dashed var(--border); vertical-align:top; color:var(--text);}
+.ev-table .num{text-align:right; white-space:nowrap; font-family:'IBM Plex Mono',monospace;}
+.ev-table tr.ev-sec td{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--accent); padding-top:12px; border-bottom:1px solid var(--border);}
+.ev-table tr.ev-t-head td{font-weight:700; border-bottom:none; padding-top:9px;}
+.ev-table tr.ev-op td{border-bottom:none; padding-top:2px; padding-bottom:2px;}
+.ev-table tr.ev-op td:first-child{padding-left:20px; color:var(--text-muted);}
+.ev-table tr.ev-op td:first-child::before{content:'· ';}
+.ev-table tfoot td{border-bottom:none; padding:5px 8px;}
+.ev-table tfoot tr:first-child td{border-top:1px solid var(--border); padding-top:9px;}
+.ev-table tr.ev-strong td{font-weight:700;}
+.ev-table tr.ev-total td{font-size:15px; border-top:1px solid var(--border);}
 .adminpanel{display:none;}
 .adminpanel.active{display:block;}
 .user-row{
@@ -2543,6 +2558,7 @@ let COSTEO_EVENTOS = [];
 let currentCosteoEventoId = null;
 let costeoEventoDraft = null;
 const EVENTO_OTROS_RAPIDOS = ['Menaje', 'Experiencia', 'DJ'];
+const EVENTO_TIEMPOS_BASE = ['Entrada', 'Fuerte', 'Postre'];
 
 async function loadCosteoEventos(){
   const { data, error } = await supa.from('costeo_eventos').select('*').eq('location_id', currentLocation.id).order('fecha', {ascending:false, nullsFirst:false});
@@ -2560,11 +2576,39 @@ function eventoItemCosto(i){
   return hasValue(i.costo) ? toNum(i.costo) : null;
 }
 
+// Un tiempo (Entrada, Fuerte...) tiene dos modos:
+// - 'max' (por defecto, el cliente todavía no define): varias opciones que se cobran una sola vez,
+//   precio de la opción más cara × porciones (vacío = invitados). Costo = el más alto (peor caso).
+// - 'individual' (el cliente ya definió): cada opción con su precio y su cantidad.
+function eventoTiempoCalc(t, invitados){
+  const ops = t.opciones || [];
+  if(t.modo === 'individual'){
+    const costos = ops.map(eventoItemCosto);
+    return {
+      cant: ops.reduce((s, o) => s + toNum(o.cantidad), 0),
+      precio: null, costo: null,
+      venta: ops.reduce((s, o) => s + toNum(o.precio) * toNum(o.cantidad), 0),
+      costoTotal: ops.reduce((s, o, i) => s + (costos[i] || 0) * toNum(o.cantidad), 0),
+      sinCosto: ops.filter((o, i) => costos[i] === null && toNum(o.cantidad) > 0).length
+    };
+  }
+  const cant = hasValue(t.cantidad) ? toNum(t.cantidad) : invitados;
+  const precio = ops.reduce((m, o) => Math.max(m, toNum(o.precio)), 0);
+  const costos = ops.map(eventoItemCosto);
+  const costo = costos.reduce((m, c) => Math.max(m, c || 0), 0);
+  return { cant, precio, costo, venta: precio * cant, costoTotal: costo * cant, sinCosto: costos.filter(c => c === null).length };
+}
+
 function eventoCalcTotals(e){
   const items = e.items || [], personal = e.personal || [], otros = e.otros || [];
-  const carta = items.reduce((s, i) => s + toNum(i.precio) * toNum(i.cantidad), 0);
-  const costoCarta = items.reduce((s, i) => s + (eventoItemCosto(i) || 0) * toNum(i.cantidad), 0);
-  const cartaSinCosto = items.filter(i => eventoItemCosto(i) === null && toNum(i.cantidad) > 0).length;
+  const invitados = toNum(e.invitados);
+  const tiemposCalc = (e.tiempos || []).map(t => eventoTiempoCalc(t, invitados));
+  const carta = tiemposCalc.reduce((s, t) => s + t.venta, 0)
+    + items.reduce((s, i) => s + toNum(i.precio) * toNum(i.cantidad), 0);
+  const costoCarta = tiemposCalc.reduce((s, t) => s + t.costoTotal, 0)
+    + items.reduce((s, i) => s + (eventoItemCosto(i) || 0) * toNum(i.cantidad), 0);
+  const cartaSinCosto = tiemposCalc.reduce((s, t) => s + t.sinCosto, 0)
+    + items.filter(i => eventoItemCosto(i) === null && toNum(i.cantidad) > 0).length;
   const costoPersonal = personal.reduce((s, p) => s + toNum(p.personas) * toNum(p.horas) * toNum(p.valor_hora), 0);
   const cobroPersonal = costoPersonal * (1 + toNum(e.margen_personal_pct) / 100);
   const otrosTotal = otros.reduce((s, o) => s + toNum(o.cantidad) * toNum(o.precio), 0);
@@ -2579,17 +2623,178 @@ function eventoCalcTotals(e){
   const impoconsumo = cartaNeta * toNum(e.impoconsumo_pct) / 100;
   const total = base + servicio + impoconsumo;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
-  const invitados = toNum(e.invitados);
   // Comisión del encargado: % sobre el COSTO de la carta (no sobre el precio de venta). Interno.
   const comision = costoCarta * toNum(e.comision_pct) / 100;
   const costoTotal = costoCarta + costoPersonal + costoOtros + comision;
   const ganancia = base - costoTotal;
   return {
-    carta, costoCarta, cartaSinCosto, comision, costoPersonal, cobroPersonal, otrosTotal, costoOtros,
+    tiemposCalc, carta, costoCarta, cartaSinCosto, comision, costoPersonal, cobroPersonal, otrosTotal, costoOtros,
     subtotal, descuento, base, servicio, impoconsumo, total, anticipo, saldo: total - anticipo,
     porInvitado: invitados ? total / invitados : null,
     costoTotal, ganancia, margenPct: base ? ganancia / base * 100 : null
   };
+}
+
+// Filas de la cotización que ve el cliente (nunca incluye costos, comisión ni ganancia).
+// La misma lista alimenta la tabla en pantalla y las exportaciones para Canva (PNG, PDF, texto).
+function eventoCotizacionFilas(d, t){
+  const filas = [];
+  const factorPersonal = 1 + toNum(d.margen_personal_pct) / 100;
+  const tiempos = (d.tiempos || []).map((tp, idx) => ({ tp, c: t.tiemposCalc[idx] })).filter(x => (x.tp.opciones || []).length);
+  if(tiempos.length){
+    filas.push({ tipo: 'sec', concepto: 'Menú' });
+    tiempos.forEach(({ tp, c }) => {
+      const individual = tp.modo === 'individual', n = tp.opciones.length;
+      filas.push({ tipo: 'tiempo', concepto: tp.nombre || 'Tiempo', nota: !individual && n > 1 ? `${n} opciones, se elige una` : '', cant: c.cant, sub: c.venta });
+      tp.opciones.forEach(o => filas.push(individual
+        ? { tipo: 'opcion', concepto: o.nombre, cant: toNum(o.cantidad), unit: toNum(o.precio), sub: toNum(o.precio) * toNum(o.cantidad) }
+        : { tipo: 'opcion', concepto: o.nombre, unit: c.precio }));
+    });
+  }
+  if((d.items || []).length){
+    filas.push({ tipo: 'sec', concepto: tiempos.length ? 'Bebidas y otros de carta' : 'Carta' });
+    d.items.forEach(i => filas.push({ tipo: 'fila', concepto: i.nombre, cant: toNum(i.cantidad), unit: toNum(i.precio), sub: toNum(i.precio) * toNum(i.cantidad) }));
+  }
+  if((d.personal || []).length){
+    filas.push({ tipo: 'sec', concepto: 'Personal' });
+    d.personal.forEach(p => {
+      const unit = toNum(p.horas) * toNum(p.valor_hora) * factorPersonal;
+      filas.push({ tipo: 'fila', concepto: p.nombre, nota: fmtQty(toNum(p.horas)) + ' h', cant: toNum(p.personas), unit, sub: unit * toNum(p.personas) });
+    });
+  }
+  if((d.otros || []).length){
+    filas.push({ tipo: 'sec', concepto: 'Otros' });
+    d.otros.forEach(o => filas.push({ tipo: 'fila', concepto: o.descripcion || 'Ítem', cant: toNum(o.cantidad), unit: toNum(o.precio), sub: toNum(o.cantidad) * toNum(o.precio) }));
+  }
+  const total = (concepto, sub, estilo, menos) => filas.push({ tipo: 'total', concepto, sub, estilo, menos });
+  total('Subtotal', t.subtotal, 'ev-strong');
+  if(t.descuento) total('Descuento' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), t.descuento, '', true);
+  if(t.servicio) total(`Servicio ${toNum(d.servicio_pct)}%`, t.servicio);
+  if(t.impoconsumo) total(`Impoconsumo ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
+  total('Total', t.total, 'ev-strong ev-total');
+  if(t.porInvitado !== null) total('Por invitado', t.porInvitado, 'ev-dim');
+  if(toNum(d.anticipo_pct)){
+    total(`Anticipo ${toNum(d.anticipo_pct)}%`, t.anticipo);
+    total('Saldo', t.saldo);
+  }
+  return filas;
+}
+const cotizMoney = v => v === undefined || v === null ? '' : fmtMoney(v);
+const cotizQty = v => v === undefined || v === null ? '' : fmtQty(v);
+
+function eventoCotizacionTabla(filas){
+  let body = '', pie = '';
+  filas.forEach(f => {
+    if(f.tipo === 'sec') body += `<tr class="ev-sec"><td colspan="4">${escapeHtml(f.concepto)}</td></tr>`;
+    else if(f.tipo === 'total') pie += `<tr class="${f.estilo || ''}"><td colspan="3">${escapeHtml(f.concepto)}</td><td class="num">${f.menos ? '− ' : ''}${cotizMoney(f.sub)}</td></tr>`;
+    else body += `<tr class="${f.tipo === 'tiempo' ? 'ev-t-head' : f.tipo === 'opcion' ? 'ev-op' : ''}"><td>${escapeHtml(f.concepto)}${f.nota ? ` <span class="ev-dim">· ${escapeHtml(f.nota)}</span>` : ''}</td><td class="num">${cotizQty(f.cant)}</td><td class="num">${cotizMoney(f.unit)}</td><td class="num">${cotizMoney(f.sub)}</td></tr>`;
+  });
+  return `<table class="ev-table">
+    <thead><tr><th>Concepto</th><th class="num">Cant.</th><th class="num">Valor unit.</th><th class="num">Subtotal</th></tr></thead>
+    <tbody>${body || '<tr><td colspan="4" class="ev-dim">Todavía no hay nada en la cotización.</td></tr>'}</tbody>
+    <tfoot>${pie}</tfoot>
+  </table>`;
+}
+
+// Texto separado por tabulaciones: se pega en una tabla de Canva, Excel o Sheets.
+function eventoCotizacionTexto(filas){
+  const lineas = ['Concepto\tCant.\tValor unit.\tSubtotal'];
+  filas.forEach(f => {
+    if(f.tipo === 'sec') lineas.push(f.concepto.toUpperCase());
+    else if(f.tipo === 'total') lineas.push(`${f.concepto}\t\t\t${f.menos ? '− ' : ''}${cotizMoney(f.sub)}`);
+    else lineas.push(`${f.tipo === 'opcion' ? '   · ' : ''}${f.concepto}${f.nota ? ' (' + f.nota + ')' : ''}\t${cotizQty(f.cant)}\t${cotizMoney(f.unit)}\t${cotizMoney(f.sub)}`);
+  });
+  return lineas.join('\n');
+}
+
+// Estilo propio de la exportación (colores fijos, fondo transparente) para que funcione
+// igual dentro de la app (PNG) y en la ventana de impresión (PDF), donde no existen las variables del tema.
+const COTIZ_EXPORT_CSS = `
+.cz-export{font-family:'Inter',Arial,sans-serif; color:#1F1A17; width:820px; padding:8px; box-sizing:border-box;}
+.cz-export .ev-table{width:100%; border-collapse:collapse; font-size:15px; font-variant-numeric:tabular-nums;}
+.cz-export .ev-table th{text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#6B5F57; padding:10px 10px; border-bottom:1.5px solid #1F1A17;}
+.cz-export .ev-table td{padding:7px 10px; border-bottom:1px solid rgba(31,26,23,.12); vertical-align:top; color:#1F1A17;}
+.cz-export .ev-table .num{text-align:right; white-space:nowrap; font-family:'Inter',Arial,sans-serif;}
+.cz-export .ev-table tr.ev-sec td{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:#1F1A17; padding-top:16px; border-bottom:1.5px solid #1F1A17;}
+.cz-export .ev-table tr.ev-t-head td{font-weight:700; border-bottom:none; padding-top:11px;}
+.cz-export .ev-table tr.ev-op td{border-bottom:none; padding-top:2px; padding-bottom:2px;}
+.cz-export .ev-table tr.ev-op td:first-child{padding-left:24px; color:#4A403A;}
+.cz-export .ev-table tr.ev-op td:first-child::before{content:'· ';}
+.cz-export .ev-dim{color:#8A7E76; font-weight:400;}
+.cz-export .ev-table tfoot td{border-bottom:none; padding:6px 10px;}
+.cz-export .ev-table tfoot tr:first-child td{border-top:1.5px solid #1F1A17; padding-top:12px;}
+.cz-export .ev-table tr.ev-strong td{font-weight:700;}
+.cz-export .ev-table tr.ev-total td{font-size:18px; border-top:1px solid rgba(31,26,23,.25);}
+/* Versión en letra clara para plantillas de fondo oscuro (la usa la imagen PNG). */
+.cz-export.cz-claro, .cz-export.cz-claro .ev-table td, .cz-export.cz-claro .ev-table tr.ev-sec td{color:#FFFFFF;}
+.cz-export.cz-claro .ev-table th{color:rgba(255,255,255,.75); border-bottom-color:#FFFFFF;}
+.cz-export.cz-claro .ev-table td{border-bottom-color:rgba(255,255,255,.18);}
+.cz-export.cz-claro .ev-table tr.ev-sec td, .cz-export.cz-claro .ev-table tfoot tr:first-child td{border-color:#FFFFFF;}
+.cz-export.cz-claro .ev-table tr.ev-op td:first-child{color:rgba(255,255,255,.85);}
+.cz-export.cz-claro .ev-dim{color:rgba(255,255,255,.6);}
+.cz-export.cz-claro .ev-table tr.ev-total td{border-top-color:rgba(255,255,255,.35);}
+`;
+function cotizNombreArchivo(d, ext){
+  const slug = (d.nombre || 'evento').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `cotizacion-${slug || 'evento'}.${ext}`;
+}
+
+let html2canvasPromise = null;
+function cargarHtml2Canvas(){
+  if(window.html2canvas) return Promise.resolve();
+  if(!html2canvasPromise) html2canvasPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = resolve;
+    s.onerror = () => { html2canvasPromise = null; reject(new Error('No se pudo cargar el generador de imágenes')); };
+    document.head.appendChild(s);
+  });
+  return html2canvasPromise;
+}
+
+async function eventoExportarPng(d){
+  await cargarHtml2Canvas();
+  if(!document.getElementById('cotizExportCss')){
+    const st = document.createElement('style'); st.id = 'cotizExportCss'; st.textContent = COTIZ_EXPORT_CSS; document.head.appendChild(st);
+  }
+  const box = document.createElement('div');
+  box.className = 'cz-export cz-claro';
+  box.style.cssText = 'position:fixed; left:-10000px; top:0;';
+  box.innerHTML = eventoCotizacionTabla(eventoCotizacionFilas(d, eventoCalcTotals(d)));
+  document.body.appendChild(box);
+  try{
+    const canvas = await window.html2canvas(box, { backgroundColor: null, scale: 3 });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = cotizNombreArchivo(d, 'png');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } finally {
+    box.remove();
+  }
+}
+
+function eventoExportarPdf(d){
+  const w = window.open('', '_blank');
+  if(!w){ showToast('El navegador bloqueó la ventana: permití ventanas emergentes para esta página'); return; }
+  const tabla = eventoCotizacionTabla(eventoCotizacionFilas(d, eventoCalcTotals(d)));
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(cotizNombreArchivo(d, 'pdf').replace(/\.pdf$/, ''))}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>${COTIZ_EXPORT_CSS} @page{size:A4; margin:14mm;} body{margin:0; background:#fff;} .cz-export{width:100%;}</style>
+    </head><body><div class="cz-export">${tabla}</div>
+    <script>(document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){ setTimeout(function(){ window.print(); }, 200); });<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
+async function eventoCopiarTexto(d){
+  const texto = eventoCotizacionTexto(eventoCotizacionFilas(d, eventoCalcTotals(d)));
+  try{
+    await navigator.clipboard.writeText(texto);
+  } catch(e){
+    const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
 }
 
 function fmtFecha(f){
@@ -2620,12 +2825,15 @@ function openCosteoEvento(id){
   const e = id ? COSTEO_EVENTOS.find(x=>x.id===id) : null;
   costeoEventoDraft = e ? {
     id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '',
+    tiempos: (e.tiempos||[]).map(t=>({ ...t, opciones: (t.opciones||[]).map(o=>({...o})) })),
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
     servicio_pct: e.servicio_pct ?? 10, impoconsumo_pct: e.impoconsumo_pct ?? 8, anticipo_pct: e.anticipo_pct ?? 50,
     encargado: e.encargado || '', comision_pct: e.comision_pct || 0
   } : {
-    id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '', items: [], personal: [], otros: [],
+    id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '',
+    tiempos: EVENTO_TIEMPOS_BASE.map(n => ({ nombre: n, cantidad: null, opciones: [] })),
+    items: [], personal: [], otros: [],
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
     encargado: '', comision_pct: 0
   };
@@ -2642,26 +2850,23 @@ function updateEventoPreview(){
   d.otros.forEach((o, idx) => { const el = document.getElementById('evOtroSub' + idx); if(el) el.textContent = fmtMoney(toNum(o.cantidad) * toNum(o.precio)); });
 
   const t = eventoCalcTotals(d);
+  d.tiempos.forEach((tp, idx) => {
+    const c = t.tiemposCalc[idx];
+    const p = document.getElementById('evTPrecio' + idx); if(p) p.textContent = fmtMoney(c.precio);
+    const s = document.getElementById('evTSub' + idx); if(s) s.textContent = fmtMoney(c.venta);
+    const n = document.getElementById('evTCantTotal' + idx); if(n) n.textContent = fmtQty(c.cant);
+    const q = document.querySelector(`.ev-t-cant[data-t="${idx}"]`); if(q) q.placeholder = String(toNum(d.invitados));
+    if(tp.modo === 'individual') (tp.opciones||[]).forEach((o, oi) => {
+      const el = document.getElementById(`evTOpSub${idx}_${oi}`); if(el) el.textContent = fmtMoney(toNum(o.precio) * toNum(o.cantidad));
+    });
+  });
+
+  let html = `<div class="ev-table-wrap">${eventoCotizacionTabla(eventoCotizacionFilas(d, t))}</div>`;
   const row = (label, value, cls) => `<div class="ev-sum-row ${cls||''}"><span>${label}</span><span>${value}</span></div>`;
-  let html = '<div class="ev-sum">';
-  html += row('Carta', fmtMoney(t.carta));
-  html += row(`Personal (costo ${fmtMoney(t.costoPersonal)} + ${toNum(d.margen_personal_pct)}%)`, fmtMoney(t.cobroPersonal));
-  html += row('Otros ítems', fmtMoney(t.otrosTotal));
-  html += row('Subtotal', fmtMoney(t.subtotal), 'total');
-  if(t.descuento) html += row('Descuento' + (d.descuento_tipo === 'pct' ? ` (${toNum(d.descuento_valor)}%)` : ''), '− ' + fmtMoney(t.descuento));
-  if(t.servicio) html += row(`Servicio ${toNum(d.servicio_pct)}% (sobre carta)`, fmtMoney(t.servicio));
-  if(t.impoconsumo) html += row(`Impoconsumo ${toNum(d.impoconsumo_pct)}% (sobre carta)`, fmtMoney(t.impoconsumo));
-  html += row('Total', fmtMoney(t.total), 'total');
-  if(t.porInvitado !== null) html += row('Por invitado', fmtMoney(t.porInvitado), 'dim');
-  if(toNum(d.anticipo_pct)) {
-    html += row(`Anticipo ${toNum(d.anticipo_pct)}%`, fmtMoney(t.anticipo));
-    html += row('Saldo', fmtMoney(t.saldo));
-  }
-  html += '</div>';
 
   if(isAdminRole()){
     html += '<div class="section-label">Interno — costos y ganancia</div><div class="ev-sum">';
-    html += row('Costo carta', fmtMoney(t.costoCarta));
+    html += row('Costo carta' + (d.tiempos.some(tp => (tp.opciones||[]).length > 1) ? ' (tiempos a la opción más costosa)' : ''), fmtMoney(t.costoCarta));
     html += row('Costo personal', fmtMoney(t.costoPersonal));
     html += row('Costo otros ítems', fmtMoney(t.costoOtros));
     html += row(`Comisión ${escapeHtml(d.encargado.trim() || 'encargado')} (${toNum(d.comision_pct)}% del costo carta)`, fmtMoney(t.comision));
@@ -2692,6 +2897,52 @@ function renderCosteoEventoForm(){
         <label style="margin-left:auto; align-items:flex-end;">Subtotal<span class="ev-sub" id="evItemSub${idx}" style="padding:9px 0;"></span></label>
       </div>
     </div>`).join('');
+
+  const tiemposHtml = d.tiempos.map((tp, ti) => {
+    const individual = tp.modo === 'individual';
+    return `
+    <div class="ingredient-ticket" style="margin-bottom:10px;">
+      <div class="ev-line">
+        <div class="ev-line-head">
+          <input type="text" class="ev-t-nombre" data-t="${ti}" value="${escapeHtml(tp.nombre)}" placeholder="Nombre del tiempo" style="flex:1; font-weight:700;">
+          <button class="btn btn-ghost btn-small ev-t-del" data-t="${ti}" title="Quitar tiempo">✕</button>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" class="ev-t-modo" data-t="${ti}" ${individual ? '' : 'checked'} style="width:auto;">
+          Cobrar todas al precio más alto <span class="ev-dim">(el cliente aún no define)</span>
+        </label>
+      </div>
+      ${(tp.opciones||[]).map((o, oi) => individual ? `
+        <div class="ev-line">
+          <div class="ev-line-head">
+            <div class="ing-name"><span class="ing-code">${escapeHtml(o.categoria || '')}</span>${escapeHtml(o.nombre)}</div>
+            <button class="btn btn-ghost btn-small ev-t-op-del" data-t="${ti}" data-o="${oi}">✕</button>
+          </div>
+          <div class="ev-line-fields">
+            <label>Cantidad<input type="number" class="ev-t-op-cant" data-t="${ti}" data-o="${oi}" value="${hasValue(o.cantidad) ? o.cantidad : ''}" placeholder="0"></label>
+            <label>Precio unit.<span class="ev-sub" style="padding:9px 0;">${fmtMoney(o.precio)}</span></label>
+            <label style="margin-left:auto; align-items:flex-end;">Subtotal<span class="ev-sub" id="evTOpSub${ti}_${oi}" style="padding:9px 0;"></span></label>
+          </div>
+        </div>` : `
+        <div class="ing-row">
+          <div class="ing-name"><span class="ing-code">${escapeHtml(o.categoria || '')}</span>${escapeHtml(o.nombre)}</div>
+          <div class="ing-code" style="margin:0;">${fmtMoney(o.precio)}</div>
+          <button class="btn btn-ghost btn-small ev-t-op-del" data-t="${ti}" data-o="${oi}">✕</button>
+        </div>`).join('') || '<div class="ing-row"><div class="ing-name ev-dim">Sin opciones todavía.</div></div>'}
+      <div class="ev-line">
+        <div class="ev-line-fields" style="margin-top:0;">
+          ${individual
+            ? `<label>Porciones (total)<span class="ev-sub" id="evTCantTotal${ti}" style="padding:9px 0;"></span></label>`
+            : `<label>Porciones<input type="number" class="ev-t-cant" data-t="${ti}" value="${hasValue(tp.cantidad) ? tp.cantidad : ''}" placeholder="${toNum(d.invitados)}"></label>
+               <label>Precio (más alto)<span class="ev-sub" id="evTPrecio${ti}" style="padding:9px 0;"></span></label>`}
+          <label style="margin-left:auto; align-items:flex-end;">Subtotal<span class="ev-sub" id="evTSub${ti}" style="padding:9px 0;"></span></label>
+        </div>
+        <input type="text" id="evTSearch${ti}" placeholder="Agregar opción de la carta..." style="margin-top:10px;">
+        <div id="evTRes${ti}"></div>
+      </div>
+    </div>`;
+  }).join('');
+  const tiemposFaltantes = EVENTO_TIEMPOS_BASE.filter(n => !d.tiempos.some(tp => (tp.nombre || '').trim().toLowerCase() === n.toLowerCase()));
 
   const personalRows = d.personal.map((p, idx) => `
     <div class="ev-line">
@@ -2738,10 +2989,18 @@ function renderCosteoEventoForm(){
       <div class="field" style="margin-bottom:0;"><label class="field-label">Notas</label><textarea id="evNotas" placeholder="Horario, montaje, restricciones...">${escapeHtml(d.notas)}</textarea></div>
     </div>
 
-    <div class="section-label">Carta</div>
-    <div class="ingredient-ticket">${itemRows || '<div class="empty-note" style="border:none;">Sin ítems de carta.</div>'}</div>
+    <div class="section-label">Menú por tiempos</div>
+    <div class="ev-dim" style="margin:-4px 0 10px; font-size:13px;">Cada tiempo se cobra una vez: la opción más cara × porciones. El cliente ve todas las opciones con ese precio. Porciones vacío = invitados.</div>
+    ${tiemposHtml || '<div class="empty-note" style="margin-bottom:10px;">Sin tiempos.</div>'}
+    <div class="ev-quick" style="margin-top:0;">
+      ${tiemposFaltantes.map(n=>`<button class="btn btn-ghost btn-small ev-t-add" data-nombre="${n}">+ ${n}</button>`).join('')}
+      <button class="btn btn-ghost btn-small ev-t-add" data-nombre="">+ Otro tiempo</button>
+    </div>
+
+    <div class="section-label">Bebidas y otros de carta</div>
+    <div class="ingredient-ticket">${itemRows || '<div class="empty-note" style="border:none;">Sin ítems (cada uno con su propio precio).</div>'}</div>
     <div class="obs-form">
-      <div class="field" style="margin-bottom:0;"><label class="field-label">Agregar de la carta</label><input type="text" id="evCartaSearch" placeholder="Buscar plato, bebida o categoría..."></div>
+      <div class="field" style="margin-bottom:0;"><label class="field-label">Agregar de la carta</label><input type="text" id="evCartaSearch" placeholder="Buscar bebida, botella, plato..."></div>
       <div id="evCartaResults"></div>
     </div>
 
@@ -2788,6 +3047,12 @@ function renderCosteoEventoForm(){
     </div>` : ''}
 
     <div class="section-label">Cotización</div>
+    <div class="ev-quick" style="align-items:center; margin-top:0;">
+      <span class="ev-dim" style="font-size:12px;">Exportar para Canva (solo lo que ve el cliente):</span>
+      <button class="btn btn-ghost btn-small" id="evExpPng">Imagen PNG (letra clara)</button>
+      <button class="btn btn-ghost btn-small" id="evExpPdf">PDF</button>
+      <button class="btn btn-ghost btn-small" id="evExpTxt">Copiar texto</button>
+    </div>
     <div id="evPreview"></div>
 
     <div style="display:flex; gap:10px; margin-top:14px;">
@@ -2803,6 +3068,14 @@ function renderCosteoEventoForm(){
   bindNum('evInvitados', 'invitados'); bindNum('evMargenPersonal', 'margen_personal_pct');
   bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evAnticipo', 'anticipo_pct');
   document.getElementById('evDescTipo').addEventListener('change', e=>{ d.descuento_tipo = e.target.value; updateEventoPreview(); });
+  document.getElementById('evExpPng').addEventListener('click', async e=>{
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Generando...';
+    try{ await eventoExportarPng(d); showToast('Imagen descargada'); }
+    catch(err){ showToast('No se pudo generar la imagen: ' + err.message); }
+    finally{ btn.disabled = false; btn.textContent = 'Imagen PNG (letra clara)'; }
+  });
+  document.getElementById('evExpPdf').addEventListener('click', ()=>eventoExportarPdf(d));
+  document.getElementById('evExpTxt').addEventListener('click', async ()=>{ await eventoCopiarTexto(d); showToast('Cotización copiada: pegala en Canva'); });
   if(isAdminRole()){
     document.getElementById('evEncargado').addEventListener('input', e=>{ d.encargado = e.target.value; updateEventoPreview(); });
     bindNum('evComision', 'comision_pct');
@@ -2838,25 +3111,61 @@ function renderCosteoEventoForm(){
     });
   });
 
-  document.getElementById('evCartaSearch').addEventListener('input', e=>{
-    const q = e.target.value.trim().toUpperCase();
-    const results = document.getElementById('evCartaResults');
-    if(!q){ results.innerHTML = ''; return; }
-    const candidates = CARTA_ITEMS.filter(c => c.activo && (c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q))).slice(0, 25);
-    if(candidates.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
-    results.innerHTML = `<div class="ingredient-ticket" style="margin-top:10px;">` + candidates.map(c=>
-      `<div class="ing-row ev-carta-pick" data-id="${c.id}" style="cursor:pointer;"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}</div><div class="ing-qty">${fmtMoney(c.precio)}</div></div>`
-    ).join('') + `</div>`;
-    results.querySelectorAll('.ev-carta-pick').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const c = CARTA_ITEMS.find(x=>x.id===el.dataset.id);
-        const existente = d.items.find(i => i.carta_item_id === c.id);
-        if(existente) existente.cantidad = toNum(existente.cantidad) + 1;
-        else d.items.push({ carta_item_id: c.id, categoria: c.categoria, nombre: c.nombre, precio: toNum(c.precio), costo: hasValue(c.costo) ? toNum(c.costo) : null, cantidad: 1 });
-        renderCosteoEventoForm();
-        const s = document.getElementById('evCartaSearch');
-        s.value = e.target.value; s.focus(); s.dispatchEvent(new Event('input'));
+  // Buscador de la carta; al elegir, redibuja y deja el mismo buscador abierto con la misma búsqueda.
+  const bindCartaSearch = (inputId, resultsId, onPick) => {
+    document.getElementById(inputId).addEventListener('input', e=>{
+      const q = e.target.value.trim().toUpperCase();
+      const results = document.getElementById(resultsId);
+      if(!q){ results.innerHTML = ''; return; }
+      const candidates = CARTA_ITEMS.filter(c => c.activo && (c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q))).slice(0, 25);
+      if(candidates.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
+      results.innerHTML = `<div class="ingredient-ticket" style="margin-top:10px;">` + candidates.map(c=>
+        `<div class="ing-row ev-carta-pick" data-id="${c.id}" style="cursor:pointer;"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}</div><div class="ing-qty">${fmtMoney(c.precio)}</div></div>`
+      ).join('') + `</div>`;
+      results.querySelectorAll('.ev-carta-pick').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          onPick(CARTA_ITEMS.find(x=>x.id===el.dataset.id));
+          renderCosteoEventoForm();
+          const s = document.getElementById(inputId);
+          s.value = e.target.value; s.focus(); s.dispatchEvent(new Event('input'));
+        });
       });
+    });
+  };
+  const cartaSnapshot = c => ({ carta_item_id: c.id, categoria: c.categoria, nombre: c.nombre, precio: toNum(c.precio), costo: hasValue(c.costo) ? toNum(c.costo) : null });
+
+  bindCartaSearch('evCartaSearch', 'evCartaResults', c => {
+    const existente = d.items.find(i => i.carta_item_id === c.id);
+    if(existente) existente.cantidad = toNum(existente.cantidad) + 1;
+    else d.items.push({ ...cartaSnapshot(c), cantidad: 1 });
+  });
+
+  d.tiempos.forEach((tp, ti) => bindCartaSearch('evTSearch' + ti, 'evTRes' + ti, c => {
+    if(!tp.opciones.some(o => o.carta_item_id === c.id)) tp.opciones.push(cartaSnapshot(c));
+  }));
+  document.querySelectorAll('.ev-t-nombre').forEach(el=>{
+    el.addEventListener('input', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].nombre = el.value; updateEventoPreview(); });
+  });
+  document.querySelectorAll('.ev-t-cant').forEach(el=>{
+    el.addEventListener('input', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].cantidad = el.value === '' ? null : el.value; updateEventoPreview(); });
+  });
+  document.querySelectorAll('.ev-t-modo').forEach(el=>{
+    el.addEventListener('change', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].modo = el.checked ? 'max' : 'individual'; renderCosteoEventoForm(); });
+  });
+  document.querySelectorAll('.ev-t-op-cant').forEach(el=>{
+    el.addEventListener('input', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].opciones[parseInt(el.dataset.o,10)].cantidad = el.value; updateEventoPreview(); });
+  });
+  document.querySelectorAll('.ev-t-del').forEach(el=>{
+    el.addEventListener('click', ()=>{ d.tiempos.splice(parseInt(el.dataset.t,10), 1); renderCosteoEventoForm(); });
+  });
+  document.querySelectorAll('.ev-t-op-del').forEach(el=>{
+    el.addEventListener('click', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].opciones.splice(parseInt(el.dataset.o,10), 1); renderCosteoEventoForm(); });
+  });
+  document.querySelectorAll('.ev-t-add').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      d.tiempos.push({ nombre: el.dataset.nombre, cantidad: null, opciones: [] });
+      renderCosteoEventoForm();
+      if(!el.dataset.nombre) document.querySelector(`.ev-t-nombre[data-t="${d.tiempos.length - 1}"]`).focus();
     });
   });
 
@@ -2878,6 +3187,12 @@ function renderCosteoEventoForm(){
       fecha: d.fecha || null,
       invitados: Math.round(toNum(d.invitados)),
       notas: d.notas.trim() || null,
+      tiempos: d.tiempos.map(tp=>({
+        nombre: (tp.nombre || '').trim() || 'Tiempo',
+        modo: tp.modo === 'individual' ? 'individual' : 'max',
+        cantidad: hasValue(tp.cantidad) ? toNum(tp.cantidad) : null,
+        opciones: (tp.opciones||[]).map(o=>({ carta_item_id: o.carta_item_id, categoria: o.categoria, nombre: o.nombre, precio: toNum(o.precio), costo: hasValue(o.costo) ? toNum(o.costo) : null, cantidad: toNum(o.cantidad) }))
+      })),
       items: d.items.map(i=>({ carta_item_id: i.carta_item_id, categoria: i.categoria, nombre: i.nombre, precio: toNum(i.precio), costo: hasValue(i.costo) ? toNum(i.costo) : null, cantidad: toNum(i.cantidad) })),
       personal: d.personal.map(p=>({ cargo_id: p.cargo_id, nombre: p.nombre, personas: toNum(p.personas), horas: toNum(p.horas), valor_hora: toNum(p.valor_hora) })),
       otros: d.otros.map(o=>({ descripcion: (o.descripcion || '').trim(), cantidad: toNum(o.cantidad), precio: toNum(o.precio), costo: toNum(o.costo) })),
