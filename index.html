@@ -2573,9 +2573,11 @@ function eventoCalcTotals(e){
   const descuentoBruto = e.descuento_tipo === 'valor' ? toNum(e.descuento_valor) : subtotal * toNum(e.descuento_valor) / 100;
   const descuento = Math.min(subtotal, Math.max(0, descuentoBruto));
   const base = subtotal - descuento;
-  // El descuento se reparte proporcionalmente, así el servicio se calcula sobre la carta ya descontada.
-  const servicio = carta * (subtotal ? base / subtotal : 1) * toNum(e.servicio_pct) / 100;
-  const total = base + servicio;
+  // El descuento se reparte proporcionalmente, así servicio e impoconsumo se calculan sobre la carta ya descontada.
+  const cartaNeta = carta * (subtotal ? base / subtotal : 1);
+  const servicio = cartaNeta * toNum(e.servicio_pct) / 100;
+  const impoconsumo = cartaNeta * toNum(e.impoconsumo_pct) / 100;
+  const total = base + servicio + impoconsumo;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
   const invitados = toNum(e.invitados);
   // Comisión del encargado: % sobre el COSTO de la carta (no sobre el precio de venta). Interno.
@@ -2584,7 +2586,7 @@ function eventoCalcTotals(e){
   const ganancia = base - costoTotal;
   return {
     carta, costoCarta, cartaSinCosto, comision, costoPersonal, cobroPersonal, otrosTotal, costoOtros,
-    subtotal, descuento, base, servicio, total, anticipo, saldo: total - anticipo,
+    subtotal, descuento, base, servicio, impoconsumo, total, anticipo, saldo: total - anticipo,
     porInvitado: invitados ? total / invitados : null,
     costoTotal, ganancia, margenPct: base ? ganancia / base * 100 : null
   };
@@ -2620,11 +2622,11 @@ function openCosteoEvento(id){
     id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '',
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
-    servicio_pct: e.servicio_pct ?? 10, anticipo_pct: e.anticipo_pct ?? 50,
+    servicio_pct: e.servicio_pct ?? 10, impoconsumo_pct: e.impoconsumo_pct ?? 8, anticipo_pct: e.anticipo_pct ?? 50,
     encargado: e.encargado || '', comision_pct: e.comision_pct || 0
   } : {
     id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '', items: [], personal: [], otros: [],
-    margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, anticipo_pct: 50,
+    margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
     encargado: '', comision_pct: 0
   };
   renderCosteoList();
@@ -2648,6 +2650,7 @@ function updateEventoPreview(){
   html += row('Subtotal', fmtMoney(t.subtotal), 'total');
   if(t.descuento) html += row('Descuento' + (d.descuento_tipo === 'pct' ? ` (${toNum(d.descuento_valor)}%)` : ''), '− ' + fmtMoney(t.descuento));
   if(t.servicio) html += row(`Servicio ${toNum(d.servicio_pct)}% (sobre carta)`, fmtMoney(t.servicio));
+  if(t.impoconsumo) html += row(`Impoconsumo ${toNum(d.impoconsumo_pct)}% (sobre carta)`, fmtMoney(t.impoconsumo));
   html += row('Total', fmtMoney(t.total), 'total');
   if(t.porInvitado !== null) html += row('Por invitado', fmtMoney(t.porInvitado), 'dim');
   if(toNum(d.anticipo_pct)) {
@@ -2773,6 +2776,7 @@ function renderCosteoEventoForm(){
         <input type="number" id="evDescValor" value="${d.descuento_valor}" style="width:110px;">
       </div>
       ${pctRow('Servicio (%, 0 para quitarlo)', 'evServicio', d.servicio_pct)}
+      ${pctRow('Impoconsumo (% sobre carta)', 'evImpoconsumo', d.impoconsumo_pct)}
       ${pctRow('Anticipo (%)', 'evAnticipo', d.anticipo_pct).replace('justify-content:space-between;', 'justify-content:space-between; margin-bottom:0;')}
     </div>
 
@@ -2797,7 +2801,7 @@ function renderCosteoEventoForm(){
   const bindNum = (id, key) => document.getElementById(id).addEventListener('input', e=>{ d[key] = toNum(e.target.value); updateEventoPreview(); });
   bindText('evNombre', 'nombre'); bindText('evCliente', 'cliente'); bindText('evFecha', 'fecha'); bindText('evNotas', 'notas');
   bindNum('evInvitados', 'invitados'); bindNum('evMargenPersonal', 'margen_personal_pct');
-  bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evAnticipo', 'anticipo_pct');
+  bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evAnticipo', 'anticipo_pct');
   document.getElementById('evDescTipo').addEventListener('change', e=>{ d.descuento_tipo = e.target.value; updateEventoPreview(); });
   if(isAdminRole()){
     document.getElementById('evEncargado').addEventListener('input', e=>{ d.encargado = e.target.value; updateEventoPreview(); });
@@ -2881,6 +2885,7 @@ function renderCosteoEventoForm(){
       descuento_tipo: d.descuento_tipo,
       descuento_valor: toNum(d.descuento_valor),
       servicio_pct: toNum(d.servicio_pct),
+      impoconsumo_pct: toNum(d.impoconsumo_pct),
       anticipo_pct: toNum(d.anticipo_pct),
       encargado: d.encargado.trim() || null,
       comision_pct: toNum(d.comision_pct),
