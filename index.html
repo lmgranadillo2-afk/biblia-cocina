@@ -2661,7 +2661,9 @@ async function generarFoodcost(){
     const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), accion: 'foodcost', ini: ini.replace(/-/g, ''), end: end.replace(/-/g, '') } });
     if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
     if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
-    body.innerHTML = renderFoodcostReporte(data);
+    const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', cartaVisibleId());
+    FC_ACTUAL = { r: data, locId: cartaVisibleId(), grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
+    pintarFoodcost();
   } catch(err){
     body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
   } finally {
@@ -2672,6 +2674,29 @@ async function generarFoodcost(){
 function fcColor(p){ return p === null || p === undefined ? '' : (p <= 30 ? '#2F7A4D' : (p <= 38 ? '#C1440E' : '#B0281C')); }
 function fcPct(p){ return p === null || p === undefined ? '—' : `<span style="color:${fcColor(p)}; font-weight:700;">${p.toLocaleString('es-CO', {maximumFractionDigits:1})}%</span>`; }
 const fcFecha = s => s ? `${s.slice(6,8)}/${s.slice(4,6)}` : '';
+
+/* Cocina / Barra / Excluir por categoría de Toteat. Si no está guardada, se sugiere por el nombre. */
+let FC_ACTUAL = null;
+const FC_GRUPOS = { cocina: 'Cocina', barra: 'Barra', excluir: 'Excluir' };
+function grupoSugerido(cat){
+  const c = (cat || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  if(/^(OTROS|MERCH|SIN CATEGORIA)$|^(COVER|EVENTO|BONO)/.test(c)) return 'excluir';
+  if(/COMPARTIR|ENTRADA|TACO|POSTRE|ASADOR|ENSALADA|BOWL|ESPECIAL|FUERTE|PLATO|COCINA|BOTANA|QUESADILLA|BIRRIA|NACHO|SOPA|ACOMPA/.test(c)) return 'cocina';
+  return 'barra';
+}
+function grupoDe(cat){ return (FC_ACTUAL && FC_ACTUAL.grupos[cat]) || grupoSugerido(cat); }
+
+function pintarFoodcost(){
+  const body = document.getElementById('costeoDetailBody');
+  body.innerHTML = renderFoodcostReporte(FC_ACTUAL.r);
+  body.querySelectorAll('.fc-grupo').forEach(sel => sel.addEventListener('change', async ()=>{
+    const categoria = sel.dataset.cat, grupo = sel.value;
+    FC_ACTUAL.grupos[categoria] = grupo;
+    pintarFoodcost();
+    const { error } = await supa.from('foodcost_grupos').upsert({ location_id: FC_ACTUAL.locId, categoria, grupo, updated_at: new Date().toISOString() });
+    if(error) showToast('No se guardó la asignación: ' + error.message);
+  }));
+}
 
 function renderFoodcostReporte(r){
   if(!r.pagos) return `<div class="detail-title">Food cost · ${escapeHtml(r.restaurante)}</div>
@@ -2697,8 +2722,24 @@ function renderFoodcostReporte(r){
     </div>
     ${avisoTomas}${avisoSinCosto}
 
+    <div class="section-label">Cocina vs Barra</div>
+    ${tabla(['Grupo','Ventas','Costo','Food cost'], ['cocina','barra','excluir'].map(g=>{
+      const cats = r.categorias.filter(c => grupoDe(c.categoria) === g);
+      const v = cats.reduce((s,c)=>s+c.ventas,0), co = cats.reduce((s,c)=>s+c.costo,0);
+      if(!cats.length) return '';
+      return `<tr class="${g==='excluir'?'ev-dim':''}"><td><b>${FC_GRUPOS[g]}</b>${g==='excluir'?' <span class="ev-dim">(no cuenta)</span>':''}</td><td class="num">${fmtMoney(v)}</td><td class="num">${fmtMoney(co)}</td><td class="num">${g==='excluir'?'—':fcPct(v ? Math.round(co/v*1000)/10 : null)}</td></tr>`;
+    }).concat((()=>{
+      const cats = r.categorias.filter(c => grupoDe(c.categoria) !== 'excluir');
+      const v = cats.reduce((s,c)=>s+c.ventas,0), co = cats.reduce((s,c)=>s+c.costo,0);
+      return [`<tr class="ev-strong"><td><b>Total cocina + barra</b></td><td class="num">${fmtMoney(v)}</td><td class="num">${fmtMoney(co)}</td><td class="num">${fcPct(v ? Math.round(co/v*1000)/10 : null)}</td></tr>`];
+    })()))}
+
     <div class="section-label">Por categoría</div>
-    ${tabla(['Categoría','Ventas','Costo','Food cost'], r.categorias.map(c=>`<tr><td>${escapeHtml(c.categoria)}</td><td class="num">${fmtMoney(c.ventas)}</td><td class="num">${fmtMoney(c.costo)}</td><td class="num">${fcPct(c.foodcost)}</td></tr>`))}
+    <div class="ev-dim" style="font-size:12px; margin:-4px 0 6px;">Elegí a qué grupo pertenece cada categoría de Toteat; queda guardado para los próximos reportes.</div>
+    ${tabla(['Categoría','Grupo','Ventas','Food cost'], r.categorias.map(c=>`<tr><td>${escapeHtml(c.categoria)}</td><td class="num">
+        <select class="fc-grupo" data-cat="${escapeHtml(c.categoria)}" style="width:auto; padding:4px 6px; font-size:12px;" ${isAdminRole()?'':'disabled'}>
+          ${Object.keys(FC_GRUPOS).map(g=>`<option value="${g}" ${grupoDe(c.categoria)===g?'selected':''}>${FC_GRUPOS[g]}</option>`).join('')}
+        </select></td><td class="num">${fmtMoney(c.ventas)}</td><td class="num">${fcPct(c.foodcost)}</td></tr>`))}
 
     ${t.ingredientes_con_tomas ? `<div class="section-label">Dónde se pierde más (merma por ingrediente)</div>
     ${tabla(['Ingrediente','Faltante','Valor'], r.top_mermas.filter(m=>m.valor>0).map(m=>`<tr><td>${escapeHtml(m.ingrediente)}</td><td class="num">${fmtQty(m.cantidad)} ${escapeHtml(m.unidad)}</td><td class="num" style="color:#B0281C;">${fmtMoney(m.valor)}</td></tr>`))}
