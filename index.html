@@ -3029,6 +3029,53 @@ function eventoDocumentoCompleto(d){
   w.document.close();
 }
 
+// Descarga directa del PDF (sin diálogo de impresión): arma el documento en un iframe oculto,
+// convierte cada página en imagen y las junta en un PDF A4. El texto queda como imagen.
+let jspdfPromise = null;
+function cargarJsPdf(){
+  if(window.jspdf) return Promise.resolve();
+  if(!jspdfPromise) jspdfPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = () => { jspdfPromise = null; reject(new Error('No se pudo cargar el generador de PDF')); };
+    document.head.appendChild(s);
+  });
+  return jspdfPromise;
+}
+async function eventoDescargarPdf(d){
+  const pl = plantillaCotizacion(d);
+  if(!pl) throw new Error('Este restaurante todavía no tiene plantilla de cotización');
+  await cargarJsPdf();
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed; left:-10000px; top:0; width:900px; height:1300px; border:0;';
+  document.body.appendChild(iframe);
+  try{
+    await new Promise(resolve => { iframe.onload = resolve; iframe.srcdoc = eventoDocumentoHtml(d, pl, false); });
+    const win = iframe.contentWindow, doc = iframe.contentDocument;
+    // Espera a que la página termine de armar la tabla (marca data-listo) y cargue html2canvas adentro.
+    for(let i = 0; i < 100 && doc.body.getAttribute('data-listo') !== '1'; i++) await new Promise(r => setTimeout(r, 100));
+    await new Promise((resolve, reject) => {
+      const s = doc.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar el generador de imágenes'));
+      doc.head.appendChild(s);
+    });
+    const paginas = [...doc.querySelectorAll('.pl-page')];
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    for(let i = 0; i < paginas.length; i++){
+      const p = paginas[i];
+      p.style.margin = '0'; p.style.boxShadow = 'none';
+      const canvas = await win.html2canvas(p, { scale: 1654 / p.offsetWidth, useCORS: true, backgroundColor: '#ffffff' });
+      if(i > 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
+    }
+    pdf.save(cotizNombreArchivo(d, 'pdf'));
+  } finally {
+    iframe.remove();
+  }
+}
+
 // HTML completo del documento (portada + tabla paginada + páginas fijas). Con imprimir=true abre el diálogo de impresión al terminar.
 function eventoDocumentoHtml(d, pl, imprimir){
   const t = eventoCalcTotals(d);
@@ -3354,7 +3401,9 @@ function renderCosteoEventoForm(){
     </div>` : ''}
 
     <div class="section-label">Cotización</div>
-    ${plantillaCotizacion(d) ? `<button class="btn btn-accent btn-block" id="evDocCompleto" style="margin-bottom:10px;">Cotización completa con plantilla (PDF)</button>` : ''}
+    ${plantillaCotizacion(d) ? `
+    <button class="btn btn-accent btn-block" id="evDocDescargar" style="margin-bottom:6px;">Descargar cotización completa (PDF)</button>
+    <button class="btn btn-ghost btn-small" id="evDocCompleto" style="margin-bottom:10px;">Abrir para imprimir (PDF con texto editable)</button>` : ''}
     <div class="ev-quick" style="align-items:center; margin-top:0;">
       <span class="ev-dim" style="font-size:12px;">Exportar para Canva (solo lo que ve el cliente):</span>
       <button class="btn btn-ghost btn-small" id="evExpPng">Imagen PNG (letra clara)</button>
@@ -3393,6 +3442,14 @@ function renderCosteoEventoForm(){
   document.getElementById('evExpPdf').addEventListener('click', ()=>eventoExportarPdf(d));
   const docBtn = document.getElementById('evDocCompleto');
   if(docBtn) docBtn.addEventListener('click', ()=>eventoDocumentoCompleto(d));
+  const descBtn = document.getElementById('evDocDescargar');
+  if(descBtn) descBtn.addEventListener('click', async e=>{
+    const btn = e.currentTarget, texto = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Generando PDF... (unos segundos)';
+    try{ await eventoDescargarPdf(d); showToast('PDF descargado'); }
+    catch(err){ showToast('No se pudo generar el PDF: ' + err.message); }
+    finally{ btn.disabled = false; btn.textContent = texto; }
+  });
   document.getElementById('evExpTxt').addEventListener('click', async ()=>{ await eventoCopiarTexto(d); showToast('Cotización copiada: pegala en Canva'); });
   if(isAdminRole()){
     document.getElementById('evEncargado').addEventListener('input', e=>{ d.encargado = e.target.value; updateEventoPreview(); });
