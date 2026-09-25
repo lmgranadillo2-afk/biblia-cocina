@@ -2484,8 +2484,10 @@ async function loadCosteoTodo(){
 }
 /* Sincronización de la carta con Toteat (Edge Function "toteat-sync"). Primero muestra
    qué cambiaría; solo guarda cuando el admin confirma. */
+// Nombre con que quedó desplegada la función en Supabase (código en supabase/functions/toteat-sync).
+const TOTEAT_FUNCION = 'dynamic-endpoint';
 async function toteatInvocar(aplicar){
-  const { data, error } = await supa.functions.invoke('toteat-sync', { body: { location_id: cartaVisibleId(), aplicar } });
+  const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), aplicar } });
   if(error){
     let msg = error.message;
     try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){}
