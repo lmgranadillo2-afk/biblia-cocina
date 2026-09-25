@@ -1663,10 +1663,19 @@ function switchTab(name){
   if(name==='bajas') loadMyBajas();
   if(name==='inventario') loadInventarioMonth();
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
-    // En el punto Eventos no hay recetas: arranca en la pestaña Eventos y oculta Platos.
-    document.getElementById('costeosub-platos').style.display = esHubEventos() ? 'none' : '';
-    document.getElementById('costeosub-foodcost').style.display = isAdminRole() ? '' : 'none';
-    if(esHubEventos() && costeoSub === 'platos') switchCosteoSub('eventos'); else renderCosteoList();
+    // Qué pestañas ve cada punto:
+    //  - Restaurante: Platos, Eventos (los suyos), Carta (la suya), Cargos (para Platos), Food cost (admin).
+    //  - Admin: todo de todos los restaurantes, menos Platos (no tiene recetas).
+    //  - Eventos: solo Eventos y Carta.
+    const visibles = {
+      platos: !esHub(),
+      eventos: true,
+      carta: true,
+      cargos: !esPuntoEventos(),
+      foodcost: !esPuntoEventos() && isAdminRole()
+    };
+    Object.keys(visibles).forEach(k => { document.getElementById('costeosub-' + k).style.display = visibles[k] ? '' : 'none'; });
+    if(!visibles[costeoSub]) switchCosteoSub(esHub() ? 'eventos' : 'platos'); else renderCosteoList();
   }); }
 }
 
@@ -1912,8 +1921,16 @@ async function loadCosteoPlatos(){
   COSTEO_PLATOS = error ? [] : (data || []);
   if(error) showToast('No se pudo cargar Costeo: ' + error.message);
 }
+// Dónde viven los cargos que se ven en la pestaña Cargos: en las centrales (Eventos y Admin),
+// los cargos de eventos, guardados en el punto Eventos; en un restaurante, los suyos (para Platos).
+let EVENTOS_HUB_ID = null;
+async function cargosLocationId(){
+  if(!esHub()) return currentLocation.id;
+  if(!EVENTOS_HUB_ID){ const { data } = await supa.rpc('eventos_location_id'); EVENTOS_HUB_ID = data || null; }
+  return EVENTOS_HUB_ID;
+}
 async function loadCosteoCargos(){
-  const { data, error } = await supa.from('costeo_cargos').select('*').eq('location_id', currentLocation.id).order('nombre', {ascending:true});
+  const { data, error } = await supa.from('costeo_cargos').select('*').eq('location_id', await cargosLocationId()).order('nombre', {ascending:true});
   COSTEO_CARGOS = error ? [] : (data || []);
   if(error) showToast('No se pudieron cargar los cargos: ' + error.message);
 }
@@ -2165,7 +2182,7 @@ function renderCosteoCargoForm(){
       incluye_auxilio_transporte: !!d.incluye_auxilio_transporte,
       horas_mes: d.horas_mes || 0,
       valor_hora: d.valor_hora || 0,
-      location_id: currentLocation.id
+      location_id: await cargosLocationId()
     };
     let error;
     if(d.id){
@@ -2441,8 +2458,10 @@ let costeoCartaDraft = null;
 let RESTAURANTES = [];       // restaurantes que se pueden elegir desde Eventos
 let EVENTO_CARGOS = [];      // cargos del punto Eventos (los usa la pestaña Eventos de cada restaurante)
 let cartaPuntoId = null;     // restaurante cuya carta se ve en Eventos → Carta
-function esHubEventos(){ return !!currentLocation && currentLocation.slug === 'eventos'; }
-function cartaVisibleId(){ return esHubEventos() ? cartaPuntoId : (currentLocation && currentLocation.id); }
+// Centrales: "Eventos" (comercial) y "Admin" (gerencia) ven los datos de todos los restaurantes.
+function esHub(){ return !!currentLocation && (currentLocation.slug === 'eventos' || currentLocation.slug === 'admin'); }
+function esPuntoEventos(){ return !!currentLocation && currentLocation.slug === 'eventos'; }
+function cartaVisibleId(){ return esHub() ? cartaPuntoId : (currentLocation && currentLocation.id); }
 function restauranteDe(id){
   if(currentLocation && currentLocation.id === id) return currentLocation;
   return RESTAURANTES.find(r => r.id === id) || null;
@@ -2454,7 +2473,7 @@ function cartaItemById(id){
   }
   return null;
 }
-function eventoCargos(){ return esHubEventos() ? COSTEO_CARGOS : EVENTO_CARGOS; }
+function eventoCargos(){ return esHub() ? COSTEO_CARGOS : EVENTO_CARGOS; }
 
 async function loadCartaItems(locId){
   locId = locId || cartaVisibleId();
@@ -2465,7 +2484,7 @@ async function loadCartaItems(locId){
   if(error) showToast('No se pudo cargar la carta: ' + error.message);
 }
 async function loadRestaurantes(){
-  const { data, error } = await supa.from('locations').select('id, name, slug').neq('slug', 'eventos').eq('activo', true).order('name', {ascending:true});
+  const { data, error } = await supa.from('locations').select('id, name, slug').not('slug', 'in', '(eventos,admin)').eq('activo', true).order('name', {ascending:true});
   RESTAURANTES = error ? [] : (data || []);
 }
 async function loadEventoCargos(){
@@ -2477,11 +2496,11 @@ async function loadEventoCargos(){
 // Carga todo lo que usa Costeo según el punto (restaurante o central de Eventos).
 async function loadCosteoTodo(){
   Object.keys(CARTA_POR_PUNTO).forEach(k => delete CARTA_POR_PUNTO[k]);
-  if(esHubEventos()){
+  if(esHub()){
     await loadRestaurantes();
     if(!RESTAURANTES.some(r => r.id === cartaPuntoId)) cartaPuntoId = RESTAURANTES[0] ? RESTAURANTES[0].id : null;
   }
-  await Promise.all([loadCosteoPlatos(), loadCosteoCargos(), loadCosteoEventos(), loadCartaItems(), esHubEventos() ? null : loadEventoCargos()]);
+  await Promise.all([loadCosteoPlatos(), loadCosteoCargos(), loadCosteoEventos(), loadCartaItems(), esHub() ? null : loadEventoCargos()]);
   // Cartas de los restaurantes de los eventos (para costos internos y descripciones).
   const ids = [...new Set(COSTEO_EVENTOS.map(e => e.restaurante_id).filter(id => id && !CARTA_POR_PUNTO[id]))];
   await Promise.all(ids.map(id => loadCartaItems(id)));
@@ -2695,7 +2714,7 @@ function renderFoodcostReporte(r){
 function renderCosteoPuntoSelect(){
   document.getElementById('costeoToteatBtn').style.display = (costeoSub === 'carta' && isAdminRole() && cartaVisibleId()) ? '' : 'none';
   const wrap = document.getElementById('costeoPuntoWrap');
-  const visible = esHubEventos() && (costeoSub === 'carta' || costeoSub === 'foodcost');
+  const visible = esHub() && (costeoSub === 'carta' || costeoSub === 'foodcost');
   wrap.style.display = visible ? '' : 'none';
   if(!visible) return;
   const prefijo = costeoSub === 'carta' ? 'Carta de ' : '';
@@ -2848,7 +2867,7 @@ const EVENTO_TIEMPOS_BASE = ['Entrada', 'Fuerte', 'Postre'];
 async function loadCosteoEventos(){
   // Eventos ve todos; cada restaurante ve los que se hacen en él.
   let q = supa.from('costeo_eventos').select('*');
-  if(!esHubEventos()) q = q.eq('restaurante_id', currentLocation.id);
+  if(!esHub()) q = q.eq('restaurante_id', currentLocation.id);
   const { data, error } = await q.order('fecha', {ascending:false, nullsFirst:false});
   COSTEO_EVENTOS = error ? [] : (data || []);
   if(error) showToast('No se pudieron cargar los eventos: ' + error.message);
@@ -3368,7 +3387,7 @@ function renderCosteoEventosList(){
   if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">Todavía no hay eventos. Tocá "+ Nuevo evento".</div>'; return; }
   wrap.innerHTML = list.map(e => {
     const t = eventoCalcTotals(e);
-    const rest = esHubEventos() ? restauranteDe(e.restaurante_id) : null;
+    const rest = esHub() ? restauranteDe(e.restaurante_id) : null;
     const sub = [rest && rest.name, fmtFecha(e.fecha), e.cliente, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).map(escapeHtml).join(' · ');
     return `<div class="rec-card ${e.id===currentCosteoEventoId?'selected':''}" data-id="${e.id}">
       <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(e.nombre)}</div><div class="rec-card-code">${sub || 'sin fecha'}</div></div>
@@ -3396,7 +3415,7 @@ function openCosteoEvento(id){
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
     encargado: '', comision_pct: 0,
     // En un restaurante el evento es de ese restaurante; en Eventos se elige.
-    restaurante_id: esHubEventos() ? null : currentLocation.id
+    restaurante_id: esHub() ? null : currentLocation.id
   };
   renderCosteoList();
   document.getElementById('costeoDetailPane').classList.add('open');
@@ -3541,7 +3560,7 @@ function renderCosteoEventoForm(){
   document.getElementById('costeoDetailBody').innerHTML = `
     <div class="detail-title">${editing ? 'Editar evento' : 'Nuevo evento'}</div>
     <div class="obs-form">
-      ${esHubEventos() ? `
+      ${esHub() ? `
       <div class="field"><label class="field-label">Restaurante del evento</label>
         <select id="evRestaurante">
           <option value="">Elegí el restaurante...</option>
