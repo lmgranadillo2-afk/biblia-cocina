@@ -588,6 +588,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
         <div id="costeoPuntoWrap" style="display:none; margin:10px 16px 0;"><select id="costeoPuntoSelect"></select></div>
         <div class="rec-search"><input type="text" id="costeoSearchInput" placeholder="Buscar plato..."></div>
         <button class="btn btn-accent btn-block" id="costeoNewBtn" style="margin:0 14px 10px; width:calc(100% - 28px);">+ Nuevo plato</button>
+        <button class="btn btn-ghost btn-block" id="costeoToteatBtn" style="margin:0 14px 10px; width:calc(100% - 28px); display:none;">⟳ Sincronizar con Toteat</button>
         <div class="rec-count" id="costeoCount"></div>
         <div class="rec-items" id="costeoItems"></div>
       </div>
@@ -2481,7 +2482,77 @@ async function loadCosteoTodo(){
   await Promise.all(ids.map(id => loadCartaItems(id)));
   renderCosteoPuntoSelect();
 }
+/* Sincronización de la carta con Toteat (Edge Function "toteat-sync"). Primero muestra
+   qué cambiaría; solo guarda cuando el admin confirma. */
+async function toteatInvocar(aplicar){
+  const { data, error } = await supa.functions.invoke('toteat-sync', { body: { location_id: cartaVisibleId(), aplicar } });
+  if(error){
+    let msg = error.message;
+    try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){}
+    throw new Error(msg);
+  }
+  if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida del servidor');
+  return data;
+}
+function renderToteatResumen(r){
+  const lista = (titulo, items, fmt, vacio) => `<div class="section-label">${titulo} (${items.length})</div>` +
+    (items.length ? `<div class="ingredient-ticket" style="max-height:260px; overflow:auto;">${items.map(fmt).join('')}</div>` : `<div class="empty-note">${vacio}</div>`);
+  return `
+    <div class="ev-sum">
+      <div class="ev-sum-row"><span>Productos activos en Toteat</span><span>${r.productos_toteat}</span></div>
+      <div class="ev-sum-row"><span>Ítems en la carta de la app</span><span>${r.carta_app}</span></div>
+      <div class="ev-sum-row"><span>Enlazados por nombre (primera vez)</span><span>${r.vinculados_por_nombre}</span></div>
+    </div>
+    ${lista('Cambios de precio', r.cambios_precio, c => `<div class="ing-row"><div class="ing-name">${escapeHtml(c.nombre)}</div><div class="ing-qty">${fmtMoney(c.antes)} → ${fmtMoney(c.despues)}</div></div>`, 'Ningún precio cambió.')}
+    ${lista('Productos nuevos (se agregan)', r.nuevos, n => `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(n.categoria)}</span>${escapeHtml(n.nombre)}</div><div class="ing-qty">${fmtMoney(n.precio)}</div></div>`, 'No hay productos nuevos.')}
+    ${lista('Ya no están activos en Toteat (se desactivan, no se borran)', r.desactivados, c => `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}</div></div>`, 'Ninguno.')}`;
+}
+async function abrirToteatSync(){
+  clearCosteoDrafts();
+  renderCosteoList();
+  const pane = document.getElementById('costeoDetailPane'), body = document.getElementById('costeoDetailBody');
+  const rest = restauranteDe(cartaVisibleId());
+  pane.classList.add('open');
+  body.innerHTML = `<div class="detail-title">Sincronizar con Toteat</div><div class="empty-note">Consultando la carta de ${escapeHtml(rest ? rest.name : 'este restaurante')} en Toteat...</div>`;
+  let r;
+  try{ r = await toteatInvocar(false); }
+  catch(err){
+    body.innerHTML = `<div class="detail-title">Sincronizar con Toteat</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  const hayCambios = r.cambios_precio.length || r.nuevos.length || r.desactivados.length || r.vinculados_por_nombre;
+  const muchosDesactivados = r.desactivados.length > r.carta_app / 3;
+  body.innerHTML = `
+    <div class="detail-title">Sincronizar con Toteat · ${escapeHtml(r.restaurante)}</div>
+    <div class="ev-dim" style="font-size:13px;">Esto es lo que cambiaría. Todavía no se guardó nada.</div>
+    ${renderToteatResumen(r)}
+    ${muchosDesactivados ? `<div class="empty-note" style="margin-top:10px; color:#B0281C;">Ojo: se desactivarían muchos ítems. Puede que en Toteat los productos tengan otros nombres, o que la API use otra lista de precios. Revisá antes de aplicar.</div>` : ''}
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      ${hayCambios ? '<button class="btn btn-accent btn-block" id="toteatAplicar">Aplicar cambios</button>' : '<div class="empty-note" style="flex:1;">La carta ya está igual a Toteat.</div>'}
+      <button class="btn btn-ghost btn-block" id="toteatCerrar">Cerrar</button>
+    </div>`;
+  document.getElementById('toteatCerrar').addEventListener('click', ()=> pane.classList.remove('open'));
+  const ap = document.getElementById('toteatAplicar');
+  if(ap) ap.addEventListener('click', async ()=>{
+    ap.disabled = true; ap.textContent = 'Aplicando...';
+    try{
+      const res = await toteatInvocar(true);
+      await loadCartaItems(cartaVisibleId());
+      renderCosteoList();
+      body.innerHTML = `<div class="detail-title">Carta sincronizada ✓</div>${renderToteatResumen(res)}
+        <button class="btn btn-ghost btn-block" id="toteatCerrar2" style="margin-top:14px;">Cerrar</button>`;
+      document.getElementById('toteatCerrar2').addEventListener('click', ()=> pane.classList.remove('open'));
+      showToast('Carta sincronizada con Toteat');
+    } catch(err){
+      ap.disabled = false; ap.textContent = 'Aplicar cambios';
+      showToast('No se pudo aplicar: ' + err.message);
+    }
+  });
+}
+document.getElementById('costeoToteatBtn').addEventListener('click', abrirToteatSync);
+
 function renderCosteoPuntoSelect(){
+  document.getElementById('costeoToteatBtn').style.display = (costeoSub === 'carta' && isAdminRole() && cartaVisibleId()) ? '' : 'none';
   const wrap = document.getElementById('costeoPuntoWrap');
   const visible = esHubEventos() && costeoSub === 'carta';
   wrap.style.display = visible ? '' : 'none';
