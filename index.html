@@ -3403,7 +3403,11 @@ function renderCosteoEventoForm(){
     <div class="section-label">Cotización</div>
     ${plantillaCotizacion(d) ? `
     <button class="btn btn-accent btn-block" id="evDocDescargar" style="margin-bottom:6px;">Descargar cotización completa (PDF)</button>
-    <button class="btn btn-ghost btn-small" id="evDocCompleto" style="margin-bottom:10px;">Abrir para imprimir (PDF con texto editable)</button>` : ''}
+    <button class="btn btn-ghost btn-small" id="evDocCompleto" style="margin-bottom:10px;">Abrir para imprimir (PDF con texto editable)</button>` : `
+    <button class="btn btn-ghost btn-block" disabled style="margin-bottom:6px; opacity:.6;">Descargar cotización completa (PDF)</button>
+    <div class="empty-note" style="margin-bottom:10px;">${!d.restaurante_id
+      ? 'Para descargar la cotización completa, elegí arriba el <b>Restaurante del evento</b>.'
+      : `${escapeHtml((restauranteDe(d.restaurante_id) || {}).name || 'Este restaurante')} todavía no tiene plantilla de cotización. Por ahora solo Cantina Dos Santos tiene.`}</div>`}
     <div class="ev-quick" style="align-items:center; margin-top:0;">
       <span class="ev-dim" style="font-size:12px;">Exportar para Canva (solo lo que ve el cliente):</span>
       <button class="btn btn-ghost btn-small" id="evExpPng">Imagen PNG (letra clara)</button>
