@@ -19,6 +19,27 @@ const json = (body: unknown, status = 200) =>
 const norm = (s: unknown) =>
   String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
+// Lee las credenciales del secreto. Acepta JSON y también formatos escritos a mano:
+// comillas curvas, sin comillas, con ":" o "=", separados por comas, espacios o saltos de línea.
+//   {"xir":"5021","xil":"1","xiu":"1003","token":"abc"}   |   xir: 5021, xil: 1, xiu: 1003, token: abc
+function leerCredenciales(raw: string): Record<string, string> {
+  const texto = raw.replace(/[“”„″«»]/g, '"').replace(/[‘’′]/g, "'").trim();
+  try {
+    const obj = JSON.parse(texto);
+    if (obj && typeof obj === "object") {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(obj)) out[k.trim().toLowerCase()] = String(v ?? "").trim();
+      return out;
+    }
+  } catch { /* formato libre: se lee abajo */ }
+  const out: Record<string, string> = {};
+  for (const k of ["xir", "xil", "xiu", "token"]) {
+    const m = texto.match(new RegExp(`["']?\\s*${k}\\s*["']?\\s*[:=]\\s*["']?\\s*([^"',;\\s{}]+)`, "i"));
+    if (m) out[k] = m[1].trim();
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -41,10 +62,9 @@ Deno.serve(async (req) => {
     const secreto = "TOTEAT_" + String(loc.slug).toUpperCase().replace(/[^A-Z0-9]/g, "_");
     const raw = Deno.env.get(secreto);
     if (!raw) return json({ ok: false, error: `Falta el secreto ${secreto} en Supabase (Edge Functions → Secrets).` }, 400);
-    let cred: Record<string, unknown>;
-    try { cred = JSON.parse(raw); } catch { return json({ ok: false, error: `El secreto ${secreto} no tiene el formato correcto (JSON).` }, 400); }
+    const cred = leerCredenciales(raw);
     for (const k of ["xir", "xil", "xiu", "token"]) {
-      if (!cred[k]) return json({ ok: false, error: `Al secreto ${secreto} le falta el dato "${k}".` }, 400);
+      if (!cred[k]) return json({ ok: false, error: `Al secreto ${secreto} le falta el dato "${k}" (o no se pudo leer).` }, 400);
     }
 
     // 3) Carta activa en Toteat (máximo 3 consultas por minuto).
