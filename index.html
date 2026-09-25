@@ -2690,6 +2690,7 @@ function renderFoodcostReporte(r){
     <div class="ev-sum">
       <div class="ev-sum-row"><span>Costo teórico (según recetas)</span><span>${fmtMoney(r.costo_teorico)}</span></div>
       <div class="ev-sum-row total"><span>Food cost teórico</span><span>${fcPct(r.foodcost_teorico)}</span></div>
+      ${r.ventas_sin_costo > 0 ? `<div class="ev-sum-row"><span>Food cost teórico solo de productos con receta<br><span class="ev-dim" style="font-size:12px;">sin ${fmtMoney(r.ventas_sin_costo)} de ventas sin costo</span></span><span>${fcPct(r.ventas_netas - r.ventas_sin_costo > 0 ? Math.round(r.costo_teorico / (r.ventas_netas - r.ventas_sin_costo) * 1000) / 10 : null)}</span></div>` : ''}
       <div class="ev-sum-row"><span>Merma valorizada (inventario)</span><span>${t.ingredientes_con_tomas ? fmtMoney(r.merma_valor) : '—'}</span></div>
       <div class="ev-sum-row"><span>Costo real (teórico + merma)</span><span>${t.ingredientes_con_tomas ? fmtMoney(r.costo_real) : '—'}</span></div>
       <div class="ev-sum-row total"><span>Food cost real</span><span>${fcPct(r.foodcost_real)}</span></div>
