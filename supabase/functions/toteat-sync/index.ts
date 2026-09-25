@@ -1,12 +1,19 @@
-// Supabase Edge Function: sincroniza la carta de un restaurante con Toteat.
+// Supabase Edge Function: sincroniza la carta de los restaurantes con Toteat.
 //
-// Llamada desde la app (usuario admin con sesión):
-//   POST { location_id, aplicar }   aplicar=false → solo muestra qué cambiaría; true → guarda.
+// Dos formas de llamarla:
+//  1) Desde la app (admin con sesión):  POST { location_id, aplicar }
+//     aplicar=false → solo muestra qué cambiaría; true → guarda.
+//  2) Automática (pg_cron, cada madrugada): POST { cron_token }
+//     Sincroniza todos los restaurantes con credenciales y aplica, salvo que algo se vea raro
+//     (Toteat vacío o demasiados productos a desactivar): en ese caso no toca nada y lo deja en el log.
 //
 // Credenciales de Toteat: secretos de Supabase por restaurante, uno por dato (ej. para el slug dos-santos):
 // TOTEAT_DOS_SANTOS_XIR, TOTEAT_DOS_SANTOS_XIL, TOTEAT_DOS_SANTOS_XIU y TOTEAT_DOS_SANTOS_TOKEN.
 // Nunca van en el código ni en la app.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+//
+// La verificación de JWT del gateway va DESACTIVADA: la función valida por su cuenta
+// (sesión de usuario admin, o el token interno del cron guardado en la base).
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -20,9 +27,14 @@ const json = (body: unknown, status = 200) =>
 const norm = (s: unknown) =>
   String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
 
-// Lee las credenciales del secreto. Acepta JSON y también formatos escritos a mano:
-// comillas curvas, sin comillas, con ":" o "=", separados por comas, espacios o saltos de línea.
-//   {"xir":"5021","xil":"1","xiu":"1003","token":"abc"}   |   xir: 5021, xil: 1, xiu: 1003, token: abc
+// En modo automático no se aplica si se desactivaría más de esta fracción de la carta activa.
+const MAX_DESACTIVAR_AUTO = 0.2;
+
+class ErrorSync extends Error {
+  constructor(msg: string, public status = 400) { super(msg); }
+}
+
+// Lee las credenciales del secreto combinado (formato libre o JSON).
 function leerCredenciales(raw: string): Record<string, string> {
   const texto = raw.replace(/[“”„″«»]/g, '"').replace(/[‘’′]/g, "'").trim();
   try {
@@ -41,122 +53,188 @@ function leerCredenciales(raw: string): Record<string, string> {
   return out;
 }
 
+const prefijoSecreto = (slug: string) => "TOTEAT_" + String(slug).toUpperCase().replace(/[^A-Z0-9]/g, "_");
+
+// Credenciales de un restaurante: un secreto por dato (recomendado) o todo junto en TOTEAT_<SLUG>.
+function credenciales(slug: string): { cred: Record<string, string>; faltan: string[]; prefijo: string } {
+  const prefijo = prefijoSecreto(slug);
+  const raw = Deno.env.get(prefijo);
+  const cred: Record<string, string> = raw ? leerCredenciales(raw) : {};
+  for (const k of ["xir", "xil", "xiu", "token"]) {
+    const suelto = Deno.env.get(`${prefijo}_${k.toUpperCase()}`);
+    if (suelto && suelto.trim()) cred[k] = suelto.trim().replace(/^["'“”]+|["'“”]+$/g, "");
+  }
+  return { cred, faltan: ["xir", "xil", "xiu", "token"].filter((k) => !cred[k]), prefijo };
+}
+
+// Compara la carta de Toteat con la de la app y, si aplicar=true, guarda los cambios.
+async function sincronizar(svc: SupabaseClient, loc: { id: string; slug: string; name: string }, aplicar: boolean, automatico: boolean) {
+  const { cred, faltan, prefijo } = credenciales(loc.slug);
+  if (faltan.length) {
+    throw new ErrorSync(`Faltan credenciales de Toteat: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}. Crealos en Supabase → Edge Functions → Secrets.`);
+  }
+
+  // Carta activa en Toteat (máximo 3 consultas por minuto).
+  const qs = new URLSearchParams({ xir: cred.xir, xil: cred.xil, xiu: cred.xiu, xapitoken: cred.token });
+  const r = await fetch("https://api.toteat.com/mw/or/1.0/products?" + qs.toString());
+  const body = await r.json().catch(() => null);
+  if (r.status === 429) throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
+  if (!r.ok || !body || body.ok === false) {
+    throw new ErrorSync("Toteat rechazó la consulta: " + (body?.msg ?? `error ${r.status}`) + ". Revisá las credenciales y que la ruta 'products' esté habilitada en Seguridad.", 502);
+  }
+  const productos = (body.data ?? []).filter((p: any) => !p.isModifier);
+
+  const { data: carta, error: cErr } = await svc.from("carta_items").select("*").eq("location_id", loc.id);
+  if (cErr) throw new ErrorSync("No se pudo leer la carta: " + cErr.message, 500);
+
+  const porToteat = new Map<string, any>();
+  const porNombre = new Map<string, any>();
+  for (const c of carta ?? []) {
+    if (c.toteat_id) porToteat.set(String(c.toteat_id), c);
+    else if (!porNombre.has(norm(c.nombre))) porNombre.set(norm(c.nombre), c);
+  }
+
+  const ahora = new Date().toISOString();
+  let orden = (carta ?? []).reduce((m: number, c: any) => Math.max(m, c.orden ?? 0), 0);
+  const vistos = new Set<string>();
+  const actualizaciones: { id: string; cambios: Record<string, unknown> }[] = [];
+  const cambiosPrecio: { nombre: string; antes: number; despues: number }[] = [];
+  const nuevos: any[] = [];
+  let vinculados = 0;
+
+  for (const p of productos) {
+    const tid = String(p.id);
+    const nombre = String(p.name ?? "").trim();
+    if (!nombre) continue;
+    const precio = Math.round(Number(p.price) || 0);
+    const c = porToteat.get(tid) ?? porNombre.get(norm(nombre));
+    if (c && !vistos.has(c.id)) {
+      vistos.add(c.id);
+      const cambios: Record<string, unknown> = {};
+      if (!c.toteat_id) { cambios.toteat_id = tid; vinculados++; porNombre.delete(norm(c.nombre)); }
+      if (Math.round(Number(c.precio) || 0) !== precio) {
+        cambios.precio = precio;
+        cambiosPrecio.push({ nombre: c.nombre, antes: Math.round(Number(c.precio) || 0), despues: precio });
+      }
+      if (!c.activo) cambios.activo = true;
+      if (Object.keys(cambios).length) actualizaciones.push({ id: c.id, cambios });
+    } else if (!c) {
+      nuevos.push({
+        location_id: loc.id, toteat_id: tid, toteat_sync_at: ahora,
+        categoria: String(p.category ?? "SIN CATEGORÍA").trim().toUpperCase() || "SIN CATEGORÍA",
+        nombre: nombre.toUpperCase(), precio, activo: true, orden: ++orden,
+      });
+    }
+  }
+  // Lo que está activo en la app pero ya no está activo en Toteat se desactiva (no se borra).
+  const activos = (carta ?? []).filter((c: any) => c.activo);
+  const desactivar = activos.filter((c: any) => !vistos.has(c.id));
+
+  const resumen: Record<string, unknown> = {
+    ok: true,
+    restaurante: loc.name,
+    productos_toteat: productos.length,
+    carta_app: (carta ?? []).length,
+    vinculados_por_nombre: vinculados,
+    cambios_precio: cambiosPrecio,
+    nuevos: nuevos.map((n) => ({ nombre: n.nombre, categoria: n.categoria, precio: n.precio })),
+    desactivados: desactivar.map((c: any) => ({ nombre: c.nombre, categoria: c.categoria })),
+    aplicado: false,
+  };
+
+  // Protección del modo automático: ante algo raro, no toca nada y lo deja para revisión manual.
+  if (automatico) {
+    if (!productos.length) { resumen.revision = "Toteat devolvió la carta vacía."; return resumen; }
+    if (activos.length && desactivar.length > activos.length * MAX_DESACTIVAR_AUTO) {
+      resumen.revision = `Se desactivarían ${desactivar.length} de ${activos.length} productos activos.`;
+      return resumen;
+    }
+  }
+  if (!aplicar) return resumen;
+
+  for (const a of actualizaciones) {
+    const { error } = await svc.from("carta_items").update(a.cambios).eq("id", a.id);
+    if (error) throw new ErrorSync("Error actualizando la carta: " + error.message, 500);
+  }
+  if (vistos.size) {
+    const { error } = await svc.from("carta_items").update({ toteat_sync_at: ahora }).in("id", [...vistos]);
+    if (error) throw new ErrorSync("Error marcando la sincronización: " + error.message, 500);
+  }
+  if (nuevos.length) {
+    const { error } = await svc.from("carta_items").upsert(nuevos, { onConflict: "location_id,categoria,nombre", ignoreDuplicates: true });
+    if (error) throw new ErrorSync("Error agregando productos nuevos: " + error.message, 500);
+  }
+  if (desactivar.length) {
+    const { error } = await svc.from("carta_items").update({ activo: false }).in("id", desactivar.map((c: any) => c.id));
+    if (error) throw new ErrorSync("Error desactivando productos: " + error.message, 500);
+  }
+  resumen.aplicado = true;
+  return resumen;
+}
+
+async function registrar(svc: SupabaseClient, locationId: string, origen: string, resumen: Record<string, unknown> | null, error: string | null) {
+  await svc.from("toteat_sync_log").insert({
+    location_id: locationId, origen,
+    aplicado: !!resumen?.aplicado,
+    resumen: resumen ? {
+      productos_toteat: resumen.productos_toteat,
+      cambios_precio: (resumen.cambios_precio as unknown[])?.length ?? 0,
+      nuevos: (resumen.nuevos as unknown[])?.length ?? 0,
+      desactivados: (resumen.desactivados as unknown[])?.length ?? 0,
+      revision: resumen.revision ?? null,
+    } : null,
+    error,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const svc = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   try {
-    const url = Deno.env.get("SUPABASE_URL")!;
-    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const payload = await req.json().catch(() => ({}));
 
-    // 1) Quién llama: tiene que tener sesión, acceso al punto y ser admin.
+    // ---- Modo automático (pg_cron) ----
+    if (payload.cron_token) {
+      const { data: cfg } = await svc.from("toteat_cron_config").select("token").eq("id", 1).maybeSingle();
+      if (!cfg || cfg.token !== payload.cron_token) return json({ ok: false, error: "Token de cron inválido." }, 401);
+      const { data: locs } = await svc.from("locations").select("id, slug, name").eq("activo", true);
+      const resultados: Record<string, unknown>[] = [];
+      for (const loc of locs ?? []) {
+        if (credenciales(loc.slug).faltan.length === 4) continue; // restaurante sin Toteat configurado
+        try {
+          const res = await sincronizar(svc, loc, true, true);
+          await registrar(svc, loc.id, "automatico", res, null);
+          resultados.push({ restaurante: loc.name, aplicado: res.aplicado, revision: res.revision ?? null });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await registrar(svc, loc.id, "automatico", null, msg);
+          resultados.push({ restaurante: loc.name, error: msg });
+        }
+      }
+      return json({ ok: true, resultados });
+    }
+
+    // ---- Modo manual (app) ----
     const userClient = createClient(url, anon, { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ ok: false, error: "Sesión inválida. Volvé a entrar a la app." }, 401);
 
-    const { location_id, aplicar } = await req.json();
+    const { location_id, aplicar } = payload;
     const { data: loc } = await userClient.from("locations").select("id, slug, name").eq("id", location_id).maybeSingle();
     if (!loc) return json({ ok: false, error: "No tenés acceso a ese restaurante." }, 403);
     const { data: prof } = await userClient.from("profiles").select("role, is_super_admin").eq("id", user.id).maybeSingle();
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
-    // 2) Credenciales del restaurante. Forma simple (recomendada): un secreto por dato,
-    //    TOTEAT_DOS_SANTOS_XIR, _XIL, _XIU y _TOKEN. También acepta todo junto en TOTEAT_DOS_SANTOS.
-    const secreto = "TOTEAT_" + String(loc.slug).toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    const raw = Deno.env.get(secreto);
-    const cred: Record<string, string> = raw ? leerCredenciales(raw) : {};
-    for (const k of ["xir", "xil", "xiu", "token"]) {
-      const suelto = Deno.env.get(`${secreto}_${k.toUpperCase()}`);
-      if (suelto && suelto.trim()) cred[k] = suelto.trim().replace(/^["'“”]+|["'“”]+$/g, "");
+    try {
+      const res = await sincronizar(svc, loc, !!aplicar, false);
+      if (aplicar) await registrar(svc, loc.id, "manual", res, null);
+      return json(res);
+    } catch (e) {
+      if (e instanceof ErrorSync) return json({ ok: false, error: e.message }, e.status);
+      throw e;
     }
-    const faltan = ["xir", "xil", "xiu", "token"].filter((k) => !cred[k]);
-    if (faltan.length) {
-      return json({ ok: false, error: `Faltan credenciales de Toteat: ${faltan.map((k) => `${secreto}_${k.toUpperCase()}`).join(", ")}. Crealos en Supabase → Edge Functions → Secrets.` }, 400);
-    }
-
-    // 3) Carta activa en Toteat (máximo 3 consultas por minuto).
-    const qs = new URLSearchParams({ xir: String(cred.xir), xil: String(cred.xil), xiu: String(cred.xiu), xapitoken: String(cred.token) });
-    const r = await fetch("https://api.toteat.com/mw/or/1.0/products?" + qs.toString());
-    const body = await r.json().catch(() => null);
-    if (r.status === 429) return json({ ok: false, error: "Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo." }, 429);
-    if (!r.ok || !body || body.ok === false) {
-      return json({ ok: false, error: "Toteat rechazó la consulta: " + (body?.msg ?? `error ${r.status}`) + ". Revisá las credenciales y que la ruta 'products' esté habilitada en Seguridad." }, 502);
-    }
-    const productos = (body.data ?? []).filter((p: any) => !p.isModifier);
-
-    // 4) Comparar con la carta de la app.
-    const svc = createClient(url, service);
-    const { data: carta, error: cErr } = await svc.from("carta_items").select("*").eq("location_id", loc.id);
-    if (cErr) return json({ ok: false, error: "No se pudo leer la carta: " + cErr.message }, 500);
-
-    const porToteat = new Map<string, any>();
-    const porNombre = new Map<string, any>();
-    for (const c of carta ?? []) {
-      if (c.toteat_id) porToteat.set(String(c.toteat_id), c);
-      else if (!porNombre.has(norm(c.nombre))) porNombre.set(norm(c.nombre), c);
-    }
-
-    const ahora = new Date().toISOString();
-    let orden = (carta ?? []).reduce((m: number, c: any) => Math.max(m, c.orden ?? 0), 0);
-    const vistos = new Set<string>();
-    const actualizaciones: { id: string; cambios: Record<string, unknown> }[] = [];
-    const cambiosPrecio: { nombre: string; antes: number; despues: number }[] = [];
-    const nuevos: any[] = [];
-    let vinculados = 0;
-
-    for (const p of productos) {
-      const tid = String(p.id);
-      const nombre = String(p.name ?? "").trim();
-      if (!nombre) continue;
-      const precio = Math.round(Number(p.price) || 0);
-      const c = porToteat.get(tid) ?? porNombre.get(norm(nombre));
-      if (c && !vistos.has(c.id)) {
-        vistos.add(c.id);
-        const cambios: Record<string, unknown> = { toteat_sync_at: ahora };
-        if (!c.toteat_id) { cambios.toteat_id = tid; vinculados++; porNombre.delete(norm(c.nombre)); }
-        if (Math.round(Number(c.precio) || 0) !== precio) {
-          cambios.precio = precio;
-          cambiosPrecio.push({ nombre: c.nombre, antes: Math.round(Number(c.precio) || 0), despues: precio });
-        }
-        if (!c.activo) cambios.activo = true;
-        actualizaciones.push({ id: c.id, cambios });
-      } else if (!c) {
-        nuevos.push({
-          location_id: loc.id, toteat_id: tid, toteat_sync_at: ahora,
-          categoria: String(p.category ?? "SIN CATEGORÍA").trim().toUpperCase() || "SIN CATEGORÍA",
-          nombre: nombre.toUpperCase(), precio, activo: true, orden: ++orden,
-        });
-      }
-    }
-    // Lo que está activo en la app pero ya no está activo en Toteat se desactiva (no se borra).
-    const desactivar = (carta ?? []).filter((c: any) => c.activo && !vistos.has(c.id));
-
-    const resumen = {
-      ok: true,
-      restaurante: loc.name,
-      productos_toteat: productos.length,
-      carta_app: (carta ?? []).length,
-      vinculados_por_nombre: vinculados,
-      cambios_precio: cambiosPrecio,
-      nuevos: nuevos.map((n) => ({ nombre: n.nombre, categoria: n.categoria, precio: n.precio })),
-      desactivados: desactivar.map((c: any) => ({ nombre: c.nombre, categoria: c.categoria })),
-      aplicado: false,
-    };
-    if (!aplicar) return json(resumen);
-
-    // 5) Guardar.
-    for (const a of actualizaciones) {
-      const { error } = await svc.from("carta_items").update(a.cambios).eq("id", a.id);
-      if (error) return json({ ok: false, error: "Error actualizando la carta: " + error.message }, 500);
-    }
-    if (nuevos.length) {
-      const { error } = await svc.from("carta_items").upsert(nuevos, { onConflict: "location_id,categoria,nombre", ignoreDuplicates: true });
-      if (error) return json({ ok: false, error: "Error agregando productos nuevos: " + error.message }, 500);
-    }
-    if (desactivar.length) {
-      const { error } = await svc.from("carta_items").update({ activo: false }).in("id", desactivar.map((c: any) => c.id));
-      if (error) return json({ ok: false, error: "Error desactivando productos: " + error.message }, 500);
-    }
-    return json({ ...resumen, aplicado: true });
   } catch (e) {
     return json({ ok: false, error: "Error inesperado: " + (e instanceof Error ? e.message : String(e)) }, 500);
   }

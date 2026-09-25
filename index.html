@@ -2516,6 +2516,17 @@ async function abrirToteatSync(){
   const rest = restauranteDe(cartaVisibleId());
   pane.classList.add('open');
   body.innerHTML = `<div class="detail-title">Sincronizar con Toteat</div><div class="empty-note">Consultando la carta de ${escapeHtml(rest ? rest.name : 'este restaurante')} en Toteat...</div>`;
+  // Última sincronización automática: si quedó algo para revisar o hubo error, se avisa arriba.
+  let avisoAuto = '';
+  const { data: logs } = await supa.from('toteat_sync_log').select('*').eq('location_id', cartaVisibleId()).eq('origen', 'automatico').order('creado', { ascending: false }).limit(1);
+  const ult = logs && logs[0];
+  if(ult){
+    const cuando = new Date(ult.creado).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    const rev = ult.error || (ult.resumen && ult.resumen.revision);
+    avisoAuto = rev
+      ? `<div class="empty-note" style="color:#B0281C; margin-bottom:10px;">La sincronización automática del ${cuando} no aplicó cambios: ${escapeHtml(rev)} Revisá abajo y aplicá a mano si está bien.</div>`
+      : `<div class="ev-dim" style="font-size:13px; margin-bottom:6px;">Última sincronización automática: ${cuando} ✓</div>`;
+  }
   let r;
   try{ r = await toteatInvocar(false); }
   catch(err){
@@ -2526,6 +2537,7 @@ async function abrirToteatSync(){
   const muchosDesactivados = r.desactivados.length > r.carta_app / 3;
   body.innerHTML = `
     <div class="detail-title">Sincronizar con Toteat · ${escapeHtml(r.restaurante)}</div>
+    ${avisoAuto}
     <div class="ev-dim" style="font-size:13px;">Esto es lo que cambiaría. Todavía no se guardó nada.</div>
     ${renderToteatResumen(r)}
     ${muchosDesactivados ? `<div class="empty-note" style="margin-top:10px; color:#B0281C;">Ojo: se desactivarían muchos ítems. Puede que en Toteat los productos tengan otros nombres, o que la API use otra lista de precios. Revisá antes de aplicar.</div>` : ''}
@@ -2571,7 +2583,9 @@ function renderCosteoCartaList(){
   const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
   const list = CARTA_ITEMS.filter(c => !q || c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q));
   const wrap = document.getElementById('costeoItems');
-  document.getElementById('costeoCount').textContent = list.length + ' ítem' + (list.length===1?'':'s');
+  const ultimaSync = CARTA_ITEMS.map(c => c.toteat_sync_at).filter(Boolean).sort().pop();
+  document.getElementById('costeoCount').textContent = list.length + ' ítem' + (list.length===1?'':'s')
+    + (ultimaSync ? ' · Toteat: ' + new Date(ultimaSync).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '');
   if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">' + (CARTA_ITEMS.length ? 'Sin resultados.' : 'Este punto todavía no tiene carta cargada.') + '</div>'; return; }
   let html = '', lastCat = null;
   list.forEach(c => {
