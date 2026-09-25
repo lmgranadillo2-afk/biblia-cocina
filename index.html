@@ -584,6 +584,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
           <button id="costeosub-eventos">Eventos</button>
           <button id="costeosub-carta">Carta</button>
           <button id="costeosub-cargos">Cargos</button>
+          <button id="costeosub-foodcost" style="display:none">Food cost</button>
         </div>
         <div id="costeoPuntoWrap" style="display:none; margin:10px 16px 0;"><select id="costeoPuntoSelect"></select></div>
         <div class="rec-search"><input type="text" id="costeoSearchInput" placeholder="Buscar plato..."></div>
@@ -1664,6 +1665,7 @@ function switchTab(name){
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
     // En el punto Eventos no hay recetas: arranca en la pestaña Eventos y oculta Platos.
     document.getElementById('costeosub-platos').style.display = esHubEventos() ? 'none' : '';
+    document.getElementById('costeosub-foodcost').style.display = isAdminRole() ? '' : 'none';
     if(esHubEventos() && costeoSub === 'platos') switchCosteoSub('eventos'); else renderCosteoList();
   }); }
 }
@@ -1973,6 +1975,7 @@ function renderCosteoList(){
   if(costeoSub === 'cargos') return renderCosteoCargosList();
   if(costeoSub === 'eventos') return renderCosteoEventosList();
   if(costeoSub === 'carta') return renderCosteoCartaList();
+  if(costeoSub === 'foodcost') return renderFoodcostPanel();
   const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
   const list = COSTEO_PLATOS.filter(p => !q || p.nombre.toUpperCase().includes(q));
   const wrap = document.getElementById('costeoItems');
@@ -2007,7 +2010,8 @@ const COSTEO_SUBS = {
   platos:  { placeholder: 'Buscar plato...',            nuevo: '+ Nuevo plato',  soloAdmin: false },
   eventos: { placeholder: 'Buscar evento o cliente...', nuevo: '+ Nuevo evento', soloAdmin: false },
   carta:   { placeholder: 'Buscar en la carta...',      nuevo: '+ Nuevo ítem',   soloAdmin: true },
-  cargos:  { placeholder: 'Buscar cargo...',            nuevo: '+ Nuevo cargo',  soloAdmin: true }
+  cargos:  { placeholder: 'Buscar cargo...',            nuevo: '+ Nuevo cargo',  soloAdmin: true },
+  foodcost:{ placeholder: '',                           nuevo: '',               soloAdmin: true, sinLista: true }
 };
 function clearCosteoDrafts(){
   costeoPlatoDraft = null; currentCosteoPlatoId = null;
@@ -2022,9 +2026,10 @@ function switchCosteoSub(name){
   const search = document.getElementById('costeoSearchInput');
   search.value = '';
   search.placeholder = cfg.placeholder;
+  search.parentElement.style.display = cfg.sinLista ? 'none' : '';
   const newBtn = document.getElementById('costeoNewBtn');
   newBtn.textContent = cfg.nuevo;
-  newBtn.style.display = (cfg.soloAdmin && !isAdminRole()) ? 'none' : '';
+  newBtn.style.display = (cfg.sinLista || (cfg.soloAdmin && !isAdminRole())) ? 'none' : '';
   clearCosteoDrafts();
   document.getElementById('costeoDetailPane').classList.remove('open');
   document.getElementById('costeoDetailBody').innerHTML = '';
@@ -2597,14 +2602,105 @@ async function abrirToteatSync(){
 }
 document.getElementById('costeoToteatBtn').addEventListener('click', abrirToteatSync);
 
+/* ---------- COSTEO: FOOD COST (ventas e inventario de Toteat) ---------- */
+// Semana pasada (lunes a domingo) en hora de Colombia, como 'YYYY-MM-DD'.
+function semanaPasada(){
+  const hoy = new Date(Date.now() - 5 * 3600 * 1000);
+  const dow = (hoy.getUTCDay() + 6) % 7;                 // 0 = lunes
+  const lunes = new Date(hoy.getTime() - (dow + 7) * 86400000);
+  const domingo = new Date(lunes.getTime() + 6 * 86400000);
+  return { ini: lunes.toISOString().slice(0, 10), end: domingo.toISOString().slice(0, 10) };
+}
+let foodcostFechas = null;
+function renderFoodcostPanel(){
+  if(!foodcostFechas) foodcostFechas = semanaPasada();
+  const rest = restauranteDe(cartaVisibleId());
+  document.getElementById('costeoCount').textContent = rest ? 'Food cost · ' + rest.name : 'Food cost';
+  const wrap = document.getElementById('costeoItems');
+  wrap.innerHTML = `
+    <div class="obs-form" style="margin:0 14px;">
+      <div class="field"><label class="field-label">Desde</label><input type="date" id="fcIni" value="${foodcostFechas.ini}"></div>
+      <div class="field"><label class="field-label">Hasta</label><input type="date" id="fcEnd" value="${foodcostFechas.end}"></div>
+      <div class="ev-dim" style="font-size:12px; margin-bottom:10px;">Máximo 15 días por reporte (límite de Toteat). Por defecto: la semana pasada.</div>
+      <button class="btn btn-accent btn-block" id="fcGenerar">Generar reporte</button>
+    </div>`;
+  document.getElementById('fcIni').addEventListener('change', e=>{ foodcostFechas.ini = e.target.value; });
+  document.getElementById('fcEnd').addEventListener('change', e=>{ foodcostFechas.end = e.target.value; });
+  document.getElementById('fcGenerar').addEventListener('click', generarFoodcost);
+}
+
+async function generarFoodcost(){
+  const { ini, end } = foodcostFechas;
+  const dias = (new Date(end) - new Date(ini)) / 86400000 + 1;
+  if(!ini || !end || dias < 1){ showToast('Revisá las fechas'); return; }
+  if(dias > 15){ showToast('Toteat permite máximo 15 días por consulta'); return; }
+  const pane = document.getElementById('costeoDetailPane'), body = document.getElementById('costeoDetailBody');
+  pane.classList.add('open');
+  body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note">Consultando ventas e inventario en Toteat... puede tardar unos segundos.</div>`;
+  const btn = document.getElementById('fcGenerar'); if(btn){ btn.disabled = true; btn.textContent = 'Generando...'; }
+  try{
+    const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), accion: 'foodcost', ini: ini.replace(/-/g, ''), end: end.replace(/-/g, '') } });
+    if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
+    if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
+    body.innerHTML = renderFoodcostReporte(data);
+  } catch(err){
+    body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
+  } finally {
+    const b2 = document.getElementById('fcGenerar'); if(b2){ b2.disabled = false; b2.textContent = 'Generar reporte'; }
+  }
+}
+
+function fcColor(p){ return p === null || p === undefined ? '' : (p <= 30 ? '#2F7A4D' : (p <= 38 ? '#C1440E' : '#B0281C')); }
+function fcPct(p){ return p === null || p === undefined ? '—' : `<span style="color:${fcColor(p)}; font-weight:700;">${p.toLocaleString('es-CO', {maximumFractionDigits:1})}%</span>`; }
+const fcFecha = s => s ? `${s.slice(6,8)}/${s.slice(4,6)}` : '';
+
+function renderFoodcostReporte(r){
+  if(!r.pagos) return `<div class="detail-title">Food cost · ${escapeHtml(r.restaurante)}</div>
+    <div class="empty-note">Toteat no devolvió ventas entre el ${fcFecha(r.ini)} y el ${fcFecha(r.end)}. Si este restaurante todavía no está en el nuevo Toteat, el reporte no está disponible.</div>`;
+  const tabla = (cols, filas) => `<div class="ev-table-wrap"><table class="ev-table"><thead><tr>${cols.map((c,i)=>`<th class="${i?'num':''}">${c}</th>`).join('')}</tr></thead><tbody>${filas.join('') || `<tr><td colspan="${cols.length}" class="ev-dim">Sin datos.</td></tr>`}</tbody></table></div>`;
+  const t = r.tomas || {};
+  const avisoTomas = t.ingredientes_con_tomas
+    ? `<div class="ev-dim" style="font-size:13px; margin-top:6px;">Merma calculada con las tomas de inventario de Toteat entre el ${fcFecha(t.primera)} y el ${fcFecha(t.ultima)}: ${t.ingredientes_con_tomas} ingredientes con tomas${t.ingredientes_sin_tomas ? `, ${t.ingredientes_sin_tomas} sin tomas (no entran en la merma)` : ''}.</div>`
+    : `<div class="empty-note" style="margin-top:8px; color:#C1440E;">No hay dos tomas de inventario en Toteat dentro del período, así que no se puede calcular la merma ni el food cost real. Para tenerlo, hagan toma de inventario al inicio y al final de la semana (por ejemplo, lunes a primera hora).</div>`;
+  const avisoSinCosto = r.ventas_sin_costo > r.ventas_netas * 0.02
+    ? `<div class="empty-note" style="margin-top:8px;">${fmtMoney(r.ventas_sin_costo)} en ventas son de productos sin receta o costo en Toteat: no suman al costo teórico, así que el food cost teórico real es algo mayor.</div>` : '';
+  return `
+    <div class="detail-title">Food cost · ${escapeHtml(r.restaurante)}</div>
+    <div class="ev-dim" style="font-size:13px;">Del ${fcFecha(r.ini)} al ${fcFecha(r.end)} · ${r.pagos} pagos</div>
+    <div class="yield-stamp small"><span class="label">Ventas netas (sin impuestos)</span><span class="value">${fmtMoney(r.ventas_netas)}</span></div>
+    <div class="ev-sum">
+      <div class="ev-sum-row"><span>Costo teórico (según recetas)</span><span>${fmtMoney(r.costo_teorico)}</span></div>
+      <div class="ev-sum-row total"><span>Food cost teórico</span><span>${fcPct(r.foodcost_teorico)}</span></div>
+      <div class="ev-sum-row"><span>Merma valorizada (inventario)</span><span>${t.ingredientes_con_tomas ? fmtMoney(r.merma_valor) : '—'}</span></div>
+      <div class="ev-sum-row"><span>Costo real (teórico + merma)</span><span>${t.ingredientes_con_tomas ? fmtMoney(r.costo_real) : '—'}</span></div>
+      <div class="ev-sum-row total"><span>Food cost real</span><span>${fcPct(r.foodcost_real)}</span></div>
+    </div>
+    ${avisoTomas}${avisoSinCosto}
+
+    <div class="section-label">Por categoría</div>
+    ${tabla(['Categoría','Ventas','Costo','Food cost'], r.categorias.map(c=>`<tr><td>${escapeHtml(c.categoria)}</td><td class="num">${fmtMoney(c.ventas)}</td><td class="num">${fmtMoney(c.costo)}</td><td class="num">${fcPct(c.foodcost)}</td></tr>`))}
+
+    ${t.ingredientes_con_tomas ? `<div class="section-label">Dónde se pierde más (merma por ingrediente)</div>
+    ${tabla(['Ingrediente','Faltante','Valor'], r.top_mermas.filter(m=>m.valor>0).map(m=>`<tr><td>${escapeHtml(m.ingrediente)}</td><td class="num">${fmtQty(m.cantidad)} ${escapeHtml(m.unidad)}</td><td class="num" style="color:#B0281C;">${fmtMoney(m.valor)}</td></tr>`))}
+    ${r.top_sobrantes.length ? `<div class="ev-dim" style="font-size:12px; margin-top:6px;">Sobrantes (hay más de lo esperado, puede ser un conteo o una compra mal registrada): ${r.top_sobrantes.map(s=>`${escapeHtml(s.ingrediente)} ${fmtMoney(-s.valor)}`).join(' · ')}</div>` : ''}` : ''}
+
+    <div class="section-label">Productos con food cost más alto</div>
+    ${tabla(['Producto','Vendidos','Ventas','Food cost'], r.peores_productos.map(p=>`<tr><td>${escapeHtml(p.nombre)}</td><td class="num">${fmtQty(p.cantidad)}</td><td class="num">${fmtMoney(p.ventas)}</td><td class="num">${fcPct(p.foodcost)}</td></tr>`))}
+
+    <div class="section-label">Más vendidos</div>
+    ${tabla(['Producto','Vendidos','Ventas','Food cost'], r.mas_vendidos.map(p=>`<tr><td>${escapeHtml(p.nombre)}</td><td class="num">${fmtQty(p.cantidad)}</td><td class="num">${fmtMoney(p.ventas)}</td><td class="num">${fcPct(p.foodcost)}</td></tr>`))}
+    <div class="ev-dim" style="font-size:12px; margin-top:10px;">Colores: verde ≤ 30%, naranja ≤ 38%, rojo &gt; 38%.</div>`;
+}
+
 function renderCosteoPuntoSelect(){
   document.getElementById('costeoToteatBtn').style.display = (costeoSub === 'carta' && isAdminRole() && cartaVisibleId()) ? '' : 'none';
   const wrap = document.getElementById('costeoPuntoWrap');
-  const visible = esHubEventos() && costeoSub === 'carta';
+  const visible = esHubEventos() && (costeoSub === 'carta' || costeoSub === 'foodcost');
   wrap.style.display = visible ? '' : 'none';
   if(!visible) return;
+  const prefijo = costeoSub === 'carta' ? 'Carta de ' : '';
   document.getElementById('costeoPuntoSelect').innerHTML = RESTAURANTES.map(r =>
-    `<option value="${r.id}" ${r.id === cartaPuntoId ? 'selected' : ''}>Carta de ${escapeHtml(r.name)}</option>`).join('');
+    `<option value="${r.id}" ${r.id === cartaPuntoId ? 'selected' : ''}>${prefijo}${escapeHtml(r.name)}</option>`).join('');
 }
 function toNum(v){
   return parseFloat(String(v === null || v === undefined ? '' : v).replace(',', '.')) || 0;

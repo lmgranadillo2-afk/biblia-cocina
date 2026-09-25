@@ -244,6 +244,106 @@ async function sincronizarCostos(svc: SupabaseClient, loc: { id: string; slug: s
   return resumen;
 }
 
+// Consulta genérica a la API de Toteat (GET) con las credenciales del restaurante.
+async function toteatGet(cred: Record<string, string>, ruta: string, extra: Record<string, string>) {
+  const qs = new URLSearchParams({ xir: cred.xir, xil: cred.xil, xiu: cred.xiu, xapitoken: cred.token, ...extra });
+  const r = await fetch(`https://api.toteat.com/mw/or/1.0/${ruta}?` + qs.toString());
+  const body = await r.json().catch(() => null);
+  if (r.status === 429) throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
+  if (!r.ok || !body || body.ok === false) {
+    throw new ErrorSync(`Toteat rechazó la consulta '${ruta}': ` + (typeof body?.msg === "string" ? body.msg : JSON.stringify(body?.msg ?? r.status)) + `. Revisá que la ruta '${ruta}' esté habilitada en Seguridad.`, 502);
+  }
+  return body;
+}
+const sumarDia = (yyyymmdd: string, dias: number) => {
+  const d = new Date(Date.UTC(+yyyymmdd.slice(0, 4), +yyyymmdd.slice(4, 6) - 1, +yyyymmdd.slice(6, 8)) + dias * 86400000);
+  return d.toISOString().slice(0, 10).replace(/-/g, "");
+};
+
+// Food cost de un período (máx. 15 días):
+//  - Ventas netas y costo teórico (recetas de Toteat) desde las ventas.
+//  - Merma desde el inventario: entre la primera y la última toma física del período,
+//    lo esperado (inicial + compras + transformaciones + uso por ventas) contra lo contado.
+async function foodCost(loc: { id: string; slug: string; name: string }, ini: string, end: string) {
+  const { cred, faltan, prefijo } = credenciales(loc.slug);
+  if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
+  if (!/^\d{8}$/.test(ini) || !/^\d{8}$/.test(end) || end < ini) throw new ErrorSync("Fechas inválidas.");
+
+  // ---- Ventas ----
+  const ventasBody = await toteatGet(cred, "sales", { ini, end });
+  let ventasNetas = 0, costoTeorico = 0, ventasSinCosto = 0, pagos = 0;
+  const porCategoria = new Map<string, { ventas: number; costo: number }>();
+  const porProducto = new Map<string, { nombre: string; categoria: string; cantidad: number; ventas: number; costo: number }>();
+  for (const t of ventasBody.data ?? []) {
+    pagos++;
+    for (const p of t.products ?? []) {
+      const cant = Number(p.quantity) || 0;
+      const neto = (Number(p.payed) || 0) - (Number(p.taxes) || 0);
+      const costo = Number(p.totalCost ?? p["totalCost*"]) || (Number(p.unitCost ?? p["unitCost*"]) || 0) * cant;
+      ventasNetas += neto; costoTeorico += costo;
+      if (!costo && neto > 0) ventasSinCosto += neto;
+      const cat = String(p.hierarchyName ?? "Sin categoría");
+      const c = porCategoria.get(cat) ?? { ventas: 0, costo: 0 };
+      c.ventas += neto; c.costo += costo; porCategoria.set(cat, c);
+      const key = String(p.id ?? p.name);
+      const pr = porProducto.get(key) ?? { nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0, costo: 0 };
+      pr.cantidad += cant; pr.ventas += neto; pr.costo += costo; porProducto.set(key, pr);
+    }
+  }
+
+  // ---- Inventario (se pide un día más para tener la toma de cierre) ----
+  const invBody = await toteatGet(cred, "inventorystate", { initial_date: ini, final_date: sumarDia(end, 1) });
+  let mermaValor = 0, ingredientesConTomas = 0, ingredientesSinTomas = 0;
+  let primeraToma: string | null = null, ultimaToma: string | null = null;
+  const mermas: { ingrediente: string; unidad: string; cantidad: number; valor: number }[] = [];
+  for (const ing of invBody.data ?? []) {
+    let cantMerma = 0, costoUnit = 0, tuvoVentana = false;
+    for (const w of ing.warehouses ?? []) {
+      const dias = [...(w.inventories ?? [])].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+      for (const d of dias) if (Number(d.cost) > 0) costoUnit = Number(d.cost);
+      const tomas = dias.map((d: any, i: number) => ({ d, i })).filter((x: any) => x.d.is_taken);
+      if (tomas.length < 2) continue;
+      const a = tomas[0], b = tomas[tomas.length - 1];
+      tuvoVentana = true;
+      let esperado = Number(a.d.initial_inventory) || 0;
+      for (let i = a.i; i < b.i; i++) {
+        const d = dias[i];
+        esperado += (Number(d.purchase) || 0) + (Number(d.transformed) || 0) + (Number(d.use) || 0);
+      }
+      cantMerma += esperado - (Number(b.d.initial_inventory) || 0); // positivo = falta producto
+      const fa = String(a.d.date), fb = String(b.d.date);
+      if (!primeraToma || fa < primeraToma) primeraToma = fa;
+      if (!ultimaToma || fb > ultimaToma) ultimaToma = fb;
+    }
+    if (!tuvoVentana) { ingredientesSinTomas++; continue; }
+    ingredientesConTomas++;
+    const valor = cantMerma * costoUnit;
+    mermaValor += valor;
+    if (Math.abs(valor) >= 1) mermas.push({ ingrediente: String(ing.product ?? ""), unidad: String(ing.unit ?? ""), cantidad: Math.round(cantMerma * 1000) / 1000, valor: Math.round(valor) });
+  }
+  mermas.sort((x, y) => y.valor - x.valor);
+
+  const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
+  const productos = [...porProducto.values()].filter((p) => p.ventas > 0 && p.costo > 0)
+    .map((p) => ({ ...p, ventas: Math.round(p.ventas), costo: Math.round(p.costo), foodcost: pct(p.costo, p.ventas) }));
+  return {
+    ok: true, tipo: "foodcost", restaurante: loc.name, ini, end,
+    pagos, ventas_netas: Math.round(ventasNetas), costo_teorico: Math.round(costoTeorico),
+    foodcost_teorico: pct(costoTeorico, ventasNetas),
+    ventas_sin_costo: Math.round(ventasSinCosto),
+    merma_valor: Math.round(mermaValor),
+    costo_real: Math.round(costoTeorico + mermaValor),
+    foodcost_real: ingredientesConTomas ? pct(costoTeorico + mermaValor, ventasNetas) : null,
+    tomas: { primera: primeraToma, ultima: ultimaToma, ingredientes_con_tomas: ingredientesConTomas, ingredientes_sin_tomas: ingredientesSinTomas },
+    categorias: [...porCategoria.entries()].map(([categoria, v]) => ({ categoria, ventas: Math.round(v.ventas), costo: Math.round(v.costo), foodcost: pct(v.costo, v.ventas) }))
+      .sort((a, b) => b.ventas - a.ventas),
+    peores_productos: productos.filter((p) => p.cantidad >= 3).sort((a, b) => (b.foodcost ?? 0) - (a.foodcost ?? 0)).slice(0, 12),
+    mas_vendidos: productos.sort((a, b) => b.ventas - a.ventas).slice(0, 12),
+    top_mermas: mermas.slice(0, 15),
+    top_sobrantes: mermas.filter((m) => m.valor < 0).sort((a, b) => a.valor - b.valor).slice(0, 5),
+  };
+}
+
 async function registrar(svc: SupabaseClient, locationId: string, origen: string, resumen: Record<string, unknown> | null, error: string | null) {
   await svc.from("toteat_sync_log").insert({
     location_id: locationId, origen,
@@ -310,6 +410,9 @@ Deno.serve(async (req) => {
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
     try {
+      if (accion === "foodcost") {
+        return json(await foodCost(loc, String(payload.ini ?? ""), String(payload.end ?? "")));
+      }
       if (accion === "costos") {
         const res = await sincronizarCostos(svc, loc, !!aplicar);
         return json(res);
