@@ -2486,8 +2486,8 @@ async function loadCosteoTodo(){
    qué cambiaría; solo guarda cuando el admin confirma. */
 // Nombre con que quedó desplegada la función en Supabase (código en supabase/functions/toteat-sync).
 const TOTEAT_FUNCION = 'dynamic-endpoint';
-async function toteatInvocar(aplicar){
-  const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), aplicar } });
+async function toteatInvocar(aplicar, accion){
+  const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), aplicar, accion } });
   if(error){
     let msg = error.message;
     try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){}
@@ -2546,6 +2546,38 @@ async function abrirToteatSync(){
       <button class="btn btn-ghost btn-block" id="toteatCerrar">Cerrar</button>
     </div>`;
   document.getElementById('toteatCerrar').addEventListener('click', ()=> pane.classList.remove('open'));
+  body.insertAdjacentHTML('beforeend', `
+    <div class="section-label">Costos desde Toteat</div>
+    <div class="ev-dim" style="font-size:13px;">Trae el costo unitario de los productos vendidos en los últimos 15 días (según las recetas de Toteat). Lo que no se vendió conserva su costo. Solo funciona en restaurantes que ya usan el nuevo Toteat.</div>
+    <button class="btn btn-ghost btn-block" id="toteatCostos" style="margin-top:8px;">Revisar costos desde Toteat</button>
+    <div id="toteatCostosRes"></div>`);
+  document.getElementById('toteatCostos').addEventListener('click', async e=>{
+    const btn = e.currentTarget, box = document.getElementById('toteatCostosRes');
+    btn.disabled = true; btn.textContent = 'Consultando ventas en Toteat...';
+    try{
+      const c = await toteatInvocar(false, 'costos');
+      if(!c.ventas){ box.innerHTML = '<div class="empty-note" style="margin-top:8px;">Toteat no devolvió ventas de los últimos 15 días para este restaurante (puede que todavía no esté en el nuevo Toteat). Los costos se mantienen como están.</div>'; return; }
+      box.innerHTML = `<div class="ev-sum" style="margin-top:8px;">
+          <div class="ev-sum-row"><span>Ventas analizadas (${escapeHtml(c.periodo)})</span><span>${c.ventas}</span></div>
+          <div class="ev-sum-row"><span>Productos de la carta con costo en Toteat</span><span>${c.carta_con_costo_toteat}</span></div>
+        </div>
+        <div class="section-label">Costos que cambian (${c.cambios_costo.length})</div>
+        ${c.cambios_costo.length ? `<div class="ingredient-ticket" style="max-height:260px; overflow:auto;">${c.cambios_costo.map(x=>`<div class="ing-row"><div class="ing-name">${escapeHtml(x.nombre)}</div><div class="ing-qty">${x.antes === null ? 'sin costo' : fmtMoney(x.antes)} → ${fmtMoney(x.despues)}</div></div>`).join('')}</div>
+          <button class="btn btn-accent btn-block" id="toteatCostosAplicar" style="margin-top:10px;">Aplicar costos</button>` : '<div class="empty-note">Los costos ya están al día.</div>'}`;
+      const apc = document.getElementById('toteatCostosAplicar');
+      if(apc) apc.addEventListener('click', async ()=>{
+        apc.disabled = true; apc.textContent = 'Aplicando...';
+        try{
+          const res = await toteatInvocar(true, 'costos');
+          await loadCartaItems(cartaVisibleId()); renderCosteoList();
+          box.innerHTML = `<div class="empty-note" style="margin-top:8px;">✓ ${res.cambios_costo.length} costos actualizados.</div>`;
+          showToast('Costos actualizados desde Toteat');
+        } catch(err){ apc.disabled = false; apc.textContent = 'Aplicar costos'; showToast('No se pudo aplicar: ' + err.message); }
+      });
+    } catch(err){
+      box.innerHTML = `<div class="empty-note" style="margin-top:8px; color:#B0281C;">${escapeHtml(err.message)}</div>`;
+    } finally { btn.disabled = false; btn.textContent = 'Revisar costos desde Toteat'; }
+  });
   const ap = document.getElementById('toteatAplicar');
   if(ap) ap.addEventListener('click', async ()=>{
     ap.disabled = true; ap.textContent = 'Aplicando...';

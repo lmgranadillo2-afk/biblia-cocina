@@ -284,6 +284,16 @@ Deno.serve(async (req) => {
           await registrar(svc, loc.id, "automatico", null, msg);
           resultados.push({ restaurante: loc.name, error: msg });
         }
+        // Costos desde las ventas (solo cambian costos; lo no vendido conserva el suyo).
+        try {
+          const rc = await sincronizarCostos(svc, loc, true);
+          await svc.from("toteat_sync_log").insert({
+            location_id: loc.id, origen: "automatico-costos", aplicado: true,
+            resumen: { ventas: rc.ventas, cambios_costo: (rc.cambios_costo as unknown[]).length },
+          });
+        } catch (e) {
+          await svc.from("toteat_sync_log").insert({ location_id: loc.id, origen: "automatico-costos", aplicado: false, error: e instanceof Error ? e.message : String(e) });
+        }
       }
       return json({ ok: true, resultados });
     }
