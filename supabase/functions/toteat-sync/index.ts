@@ -172,6 +172,78 @@ async function sincronizar(svc: SupabaseClient, loc: { id: string; slug: string;
   return resumen;
 }
 
+// Fecha YYYYMMDD en hora de Colombia (UTC-5), desplazada `dias` hacia atrás.
+function fechaToteat(dias: number) {
+  const d = new Date(Date.now() - 5 * 3600 * 1000 - dias * 86400 * 1000);
+  return d.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+// Costos por producto desde las ventas de los últimos 15 días (campo unitCost, solo "nuevo Toteat").
+// Toma el costo más reciente de cada producto vendido; lo no vendido conserva su costo.
+async function sincronizarCostos(svc: SupabaseClient, loc: { id: string; slug: string; name: string }, aplicar: boolean) {
+  const { cred, faltan, prefijo } = credenciales(loc.slug);
+  if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
+
+  const ini = fechaToteat(14), end = fechaToteat(0);
+  const qs = new URLSearchParams({ xir: cred.xir, xil: cred.xil, xiu: cred.xiu, xapitoken: cred.token, ini, end });
+  const r = await fetch("https://api.toteat.com/mw/or/1.0/sales?" + qs.toString());
+  const body = await r.json().catch(() => null);
+  if (r.status === 429) throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
+  if (!r.ok || !body || body.ok === false) {
+    throw new ErrorSync("Toteat rechazó la consulta de ventas: " + (typeof body?.msg === "string" ? body.msg : JSON.stringify(body?.msg ?? r.status)) + ". Revisá que la ruta 'sales' esté habilitada en Seguridad.", 502);
+  }
+  const ventas = (body.data ?? []).filter((t: any) => t.fiscalType !== "NC")
+    .sort((a: any, b: any) => String(a.dateClosed ?? "").localeCompare(String(b.dateClosed ?? "")));
+
+  // Último costo unitario conocido de cada producto (por ID y por nombre).
+  const porId = new Map<string, number>(), porNombre = new Map<string, number>();
+  const vendidos = new Map<string, { id: string; name: string; unitCost: number }>();
+  let lineas = 0, lineasConCosto = 0;
+  for (const t of ventas) {
+    for (const p of t.products ?? []) {
+      lineas++;
+      const costo = Number(p.unitCost ?? p["unitCost*"]);
+      const id = String(p.id ?? ""), nombre = String(p.name ?? "");
+      vendidos.set(id || norm(nombre), { id, name: nombre, unitCost: costo || 0 });
+      if (!(costo > 0) || !(Number(p.quantity) > 0)) continue;
+      lineasConCosto++;
+      if (id) porId.set(id, costo);
+      if (nombre) porNombre.set(norm(nombre), costo);
+    }
+  }
+
+  const { data: carta, error: cErr } = await svc.from("carta_items").select("id, nombre, categoria, costo, toteat_id").eq("location_id", loc.id);
+  if (cErr) throw new ErrorSync("No se pudo leer la carta: " + cErr.message, 500);
+
+  const cambios: { id: string; nombre: string; antes: number | null; despues: number }[] = [];
+  let conCostoToteat = 0;
+  for (const c of carta ?? []) {
+    const nuevo = (c.toteat_id && porId.get(String(c.toteat_id))) ?? porNombre.get(norm(c.nombre));
+    if (!nuevo) continue;
+    conCostoToteat++;
+    const redondo = Math.round(nuevo * 100) / 100;
+    const antes = c.costo === null || c.costo === undefined ? null : Math.round(Number(c.costo) * 100) / 100;
+    if (antes !== redondo) cambios.push({ id: c.id, nombre: c.nombre, antes, despues: redondo });
+  }
+
+  const resumen: Record<string, unknown> = {
+    ok: true, tipo: "costos", restaurante: loc.name, periodo: `${ini}-${end}`,
+    ventas: ventas.length, lineas_vendidas: lineas, lineas_con_costo: lineasConCosto,
+    productos_vendidos: vendidos.size, carta_con_costo_toteat: conCostoToteat,
+    cambios_costo: cambios.map(({ nombre, antes, despues }) => ({ nombre, antes, despues })),
+    // Diagnóstico: algunos productos vendidos tal como los manda Toteat (sin datos sensibles).
+    muestra_vendidos: [...vendidos.values()].slice(0, 8),
+    aplicado: false,
+  };
+  if (!aplicar) return resumen;
+  for (const c of cambios) {
+    const { error } = await svc.from("carta_items").update({ costo: c.despues }).eq("id", c.id);
+    if (error) throw new ErrorSync("Error guardando costos: " + error.message, 500);
+  }
+  resumen.aplicado = true;
+  return resumen;
+}
+
 async function registrar(svc: SupabaseClient, locationId: string, origen: string, resumen: Record<string, unknown> | null, error: string | null) {
   await svc.from("toteat_sync_log").insert({
     location_id: locationId, origen,
@@ -221,13 +293,17 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ ok: false, error: "Sesión inválida. Volvé a entrar a la app." }, 401);
 
-    const { location_id, aplicar } = payload;
+    const { location_id, aplicar, accion } = payload;
     const { data: loc } = await userClient.from("locations").select("id, slug, name").eq("id", location_id).maybeSingle();
     if (!loc) return json({ ok: false, error: "No tenés acceso a ese restaurante." }, 403);
     const { data: prof } = await userClient.from("profiles").select("role, is_super_admin").eq("id", user.id).maybeSingle();
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
     try {
+      if (accion === "costos") {
+        const res = await sincronizarCostos(svc, loc, !!aplicar);
+        return json(res);
+      }
       const res = await sincronizar(svc, loc, !!aplicar, false);
       if (aplicar) await registrar(svc, loc.id, "manual", res, null);
       return json(res);
