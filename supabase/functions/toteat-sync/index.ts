@@ -3,8 +3,9 @@
 // Llamada desde la app (usuario admin con sesión):
 //   POST { location_id, aplicar }   aplicar=false → solo muestra qué cambiaría; true → guarda.
 //
-// Credenciales de Toteat: un secreto por restaurante, con nombre TOTEAT_<SLUG> (ej. TOTEAT_DOS_SANTOS)
-// y valor JSON: {"xir":"...","xil":"...","xiu":"...","token":"..."}. Nunca van en el código ni en la app.
+// Credenciales de Toteat: secretos de Supabase por restaurante, uno por dato (ej. para el slug dos-santos):
+// TOTEAT_DOS_SANTOS_XIR, TOTEAT_DOS_SANTOS_XIL, TOTEAT_DOS_SANTOS_XIU y TOTEAT_DOS_SANTOS_TOKEN.
+// Nunca van en el código ni en la app.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
@@ -58,13 +59,18 @@ Deno.serve(async (req) => {
     const { data: prof } = await userClient.from("profiles").select("role, is_super_admin").eq("id", user.id).maybeSingle();
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
-    // 2) Credenciales del restaurante.
+    // 2) Credenciales del restaurante. Forma simple (recomendada): un secreto por dato,
+    //    TOTEAT_DOS_SANTOS_XIR, _XIL, _XIU y _TOKEN. También acepta todo junto en TOTEAT_DOS_SANTOS.
     const secreto = "TOTEAT_" + String(loc.slug).toUpperCase().replace(/[^A-Z0-9]/g, "_");
     const raw = Deno.env.get(secreto);
-    if (!raw) return json({ ok: false, error: `Falta el secreto ${secreto} en Supabase (Edge Functions → Secrets).` }, 400);
-    const cred = leerCredenciales(raw);
+    const cred: Record<string, string> = raw ? leerCredenciales(raw) : {};
     for (const k of ["xir", "xil", "xiu", "token"]) {
-      if (!cred[k]) return json({ ok: false, error: `Al secreto ${secreto} le falta el dato "${k}" (o no se pudo leer).` }, 400);
+      const suelto = Deno.env.get(`${secreto}_${k.toUpperCase()}`);
+      if (suelto && suelto.trim()) cred[k] = suelto.trim().replace(/^["'“”]+|["'“”]+$/g, "");
+    }
+    const faltan = ["xir", "xil", "xiu", "token"].filter((k) => !cred[k]);
+    if (faltan.length) {
+      return json({ ok: false, error: `Faltan credenciales de Toteat: ${faltan.map((k) => `${secreto}_${k.toUpperCase()}`).join(", ")}. Crealos en Supabase → Edge Functions → Secrets.` }, 400);
     }
 
     // 3) Carta activa en Toteat (máximo 3 consultas por minuto).
