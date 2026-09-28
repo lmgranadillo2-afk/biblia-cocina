@@ -726,8 +726,8 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
             <select id="mbhEstado">
               <option value="">Todos</option>
               <option value="pendiente">Pendiente</option>
-              <option value="aprobado">Aprobado</option>
-              <option value="rechazado">Rechazado</option>
+              <option value="aprobado">Ingresada</option>
+              <option value="rechazado">Denegada</option>
             </select>
           </div>
           <button class="btn btn-accent btn-small" id="mbhFilterApply">Filtrar</button>
@@ -872,8 +872,8 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
               <select id="bhEstado">
                 <option value="">Todos</option>
                 <option value="pendiente">Pendiente</option>
-                <option value="aprobado">Aprobado</option>
-                <option value="rechazado">Rechazado</option>
+                <option value="aprobado">Ingresada</option>
+                <option value="rechazado">Denegada</option>
               </select>
             </div>
             <button class="btn btn-accent btn-small" id="bhFilterApply">Filtrar</button>
@@ -1243,13 +1243,13 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div><span>Registrado por</span><b id="bajaReviewQuien"></b></div>
     </div>
     <div class="field" id="bajaRejectBox" style="display:none;">
-      <label class="field-label">Motivo de rechazo</label>
-      <textarea id="bajaRejectMotivo" placeholder="Explica por qué se rechaza..."></textarea>
+      <label class="field-label">Motivo por el que se deniega</label>
+      <textarea id="bajaRejectMotivo" placeholder="Explica por qué se deniega..."></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="bajaReviewCancel">Cerrar</button>
-      <button class="btn btn-danger" id="bajaReviewReject">Rechazar</button>
-      <button class="btn btn-accent" id="bajaReviewApprove">Aprobar</button>
+      <button class="btn btn-danger" id="bajaReviewReject">Denegar</button>
+      <button class="btn btn-accent" id="bajaReviewApprove">Marcar como ingresada</button>
     </div>
   </div>
 </div>
@@ -5652,15 +5652,30 @@ async function loadMyBajas(){
   renderBajaKanban(list, document.getElementById('bajaKanban'), 'own');
 }
 
+// Bajas: Pendiente → Ingresada (descontada del inventario) o Denegada. En la base se guardan
+// como 'aprobado' y 'rechazado'; estas etiquetas son las que se muestran.
+const BAJA_COLUMNS = [
+  { key:'pendiente', label:'Pendiente' },
+  { key:'aprobado', label:'Ingresada' },
+  { key:'rechazado', label:'Denegada' }
+];
+const BAJA_ESTADO_LABEL = { pendiente:'pendiente', aprobado:'ingresada', rechazado:'denegada' };
+// Pueden resolver bajas los admin, desde Admin → Bajas o desde el módulo Bajas.
+function puedeResolverBaja(mode){ return mode === 'admin' || isAdminRole(); }
+
 function bajaKanbanCardHtml(b, mode){
   const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
   const registrada = new Date(b.created_at);
   const fechaCorta = registrada.toLocaleDateString('es-CO', {day:'numeric', month:'short'});
   let extra = '';
   if(b.status === 'rechazado' && b.rechazo_motivo){
-    extra = `<div class="kc-items"><b style="color:var(--danger);">Motivo:</b> ${escapeHtml(b.rechazo_motivo)}</div>`;
+    extra = `<div class="kc-items"><b style="color:var(--danger);">Denegada:</b> ${escapeHtml(b.rechazo_motivo)}</div>`;
   }
-  const clickable = mode === 'admin' && b.status === 'pendiente';
+  if(b.status !== 'pendiente' && b.resuelto_por){
+    const cuando = b.resuelto_at ? new Date(b.resuelto_at).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+    extra += `<div class="kc-items ev-dim" style="font-size:12px;">${b.status === 'aprobado' ? 'Ingresada' : 'Denegada'} por ${escapeHtml(b.resuelto_por)}${cuando ? ' · ' + cuando : ''}</div>`;
+  }
+  const clickable = puedeResolverBaja(mode) && b.status === 'pendiente';
   return `<div class="kanban-card ${b.status}" data-baja-id="${b.id}" style="${clickable?'':'cursor:default;'}">
     <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)}</div>
     <div class="kc-meta">${tipoLabel} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · ${fechaCorta}${mode==='admin' ? '<br>' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
@@ -5670,7 +5685,7 @@ function bajaKanbanCardHtml(b, mode){
 }
 
 function renderBajaKanban(list, boardEl, mode){
-  boardEl.innerHTML = KANBAN_COLUMNS.map(col => {
+  boardEl.innerHTML = BAJA_COLUMNS.map(col => {
     const items = list.filter(b => b.status === col.key);
     const cards = items.length === 0
       ? '<div class="kanban-empty">Sin bajas</div>'
@@ -5685,7 +5700,7 @@ function renderBajaKanban(list, boardEl, mode){
     </div>`;
   }).join('');
 
-  if(mode === 'admin'){
+  if(puedeResolverBaja(mode)){
     boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
       el.addEventListener('click', ()=>openBajaReview(el.dataset.bajaId, list));
     });
@@ -5694,6 +5709,8 @@ function renderBajaKanban(list, boardEl, mode){
 
 /* ---------- ADMIN: revisar bajas ---------- */
 let currentReviewBajaId = null;
+// Refresca el tablero de Bajas y el de Admin → Bajas (el que esté en pantalla).
+function recargarBajas(){ loadMyBajas(); loadAdminBajas(); }
 
 async function loadAdminBajas(){
   const { monday, sunday } = getWeekRange(new Date());
@@ -5729,11 +5746,11 @@ document.getElementById('bajaReviewApprove').addEventListener('click', async ()=
   const { error } = await supa.from('bajas').update({
     status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
   }).eq('id', currentReviewBajaId);
-  if(error){ showToast('Error al aprobar: ' + error.message); return; }
-  showToast('Baja aprobada');
+  if(error){ showToast('Error al marcar como ingresada: ' + error.message); return; }
+  showToast('Baja marcada como ingresada');
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
-  loadAdminBajas();
+  recargarBajas();
 });
 
 document.getElementById('bajaReviewReject').addEventListener('click', async ()=>{
@@ -5744,15 +5761,15 @@ document.getElementById('bajaReviewReject').addEventListener('click', async ()=>
     return;
   }
   const motivo = document.getElementById('bajaRejectMotivo').value.trim();
-  if(!motivo){ showToast('Escribe el motivo de rechazo'); return; }
+  if(!motivo){ showToast('Escribe el motivo por el que se deniega'); return; }
   const { error } = await supa.from('bajas').update({
     status: 'rechazado', rechazo_motivo: motivo, resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
   }).eq('id', currentReviewBajaId);
-  if(error){ showToast('Error al rechazar: ' + error.message); return; }
-  showToast('Baja rechazada');
+  if(error){ showToast('Error al denegar: ' + error.message); return; }
+  showToast('Baja denegada');
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
-  loadAdminBajas();
+  recargarBajas();
 });
 
 /* ---------- ADMIN: historial completo de bajas ---------- */
@@ -5793,10 +5810,10 @@ function renderBajaHistory(){
   box.innerHTML = list.map(b => {
     const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
     return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${b.status}</span></div>
+      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${BAJA_ESTADO_LABEL[b.status] || b.status}</span></div>
       <div class="kc-meta">${tipoLabel} · Fecha: ${b.fecha} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)} · ${escapeHtml(b.creado_por_nombre||'')}</div>
       <div class="kc-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
-      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
+      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo por el que se denegó:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -5839,10 +5856,10 @@ function renderMyBajaHistory(){
   box.innerHTML = list.map(b => {
     const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
     return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${b.status}</span></div>
+      <div class="kc-title">${b.codigo ? `<span style="font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:11px;">${b.codigo}</span> · ` : ''}${escapeHtml(b.item_name)} <span class="oe-status-badge ${b.status}" style="margin-left:8px;">${BAJA_ESTADO_LABEL[b.status] || b.status}</span></div>
       <div class="kc-meta">${tipoLabel} · Fecha: ${b.fecha} · ${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</div>
       <div class="kc-items"><b>Motivo:</b> ${escapeHtml(b.motivo)}</div>
-      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo del rechazo:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
+      ${b.status==='rechazado' && b.rechazo_motivo ? `<div class="kc-items"><b style="color:var(--danger);">Motivo por el que se denegó:</b> ${escapeHtml(b.rechazo_motivo)}</div>` : ''}
     </div>`;
   }).join('');
 }
