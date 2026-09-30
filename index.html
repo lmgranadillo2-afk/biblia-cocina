@@ -3849,10 +3849,12 @@ function renderCosteoEventoForm(){
       if(!q){ results.innerHTML = ''; return; }
       if(!d.restaurante_id){ results.innerHTML = '<div class="empty-note">Primero elegí el restaurante del evento.</div>'; return; }
       const carta = CARTA_POR_PUNTO[cartaDeRestaurante(d.restaurante_id)] || [];
-      const candidates = carta.filter(c => c.activo && (c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q))).slice(0, 25);
+      // También aparecen los inactivos (al final y marcados): en eventos a veces se ofrece algo que el POS tiene apagado.
+      const candidates = carta.filter(c => c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q))
+        .sort((a, b) => (b.activo ? 1 : 0) - (a.activo ? 1 : 0)).slice(0, 25);
       if(candidates.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
       results.innerHTML = `<div class="ingredient-ticket" style="margin-top:10px;">` + candidates.map(c=>
-        `<div class="ing-row ev-carta-pick" data-id="${c.id}" style="cursor:pointer;"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}</div><div class="ing-qty">${fmtMoney(c.precio)}</div></div>`
+        `<div class="ing-row ev-carta-pick" data-id="${c.id}" style="cursor:pointer;${c.activo ? '' : ' opacity:.6;'}"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}${c.activo ? '' : ' <span class="ev-dim" style="font-size:11px;">· inactivo en Toteat</span>'}</div><div class="ing-qty">${fmtMoney(c.precio)}</div></div>`
       ).join('') + `</div>`;
       results.querySelectorAll('.ev-carta-pick').forEach(el=>{
         el.addEventListener('click', ()=>{
