@@ -3177,8 +3177,37 @@ const PLANTILLAS_COTIZACION = {
     tablaTop: 520, tablaBottom: 1540, tablaLeft: 50, tablaWidth: 1320,
     // Tapa la dirección de Medellín del pie de página con la de Cali.
     pie: { x: 790, y: 1846, w: 440, h: 70, bg: '#A37B58', color: '#FFFFFF', lineas: ['CL 16A #122-31', 'CALI - COLOMBIA'] }
+  },
+  // Canta Corazón: presentación horizontal 1920×1080 (16:9), impresa sobre el ancho de un A4.
+  'canta-corazon-mtdsga9t': {
+    carpeta: 'plantillas/canta-corazon/',
+    portada: 'portada.jpg', tabla: 'tabla.jpg', fijas: ['politicas.jpg', 'fotos-1.jpg', 'fotos-2.jpg'],
+    ancho: 1920, alto: 1080, mm: [297, 167.06],
+    tablaTop: 70, tablaBottom: 800, tablaLeft: 90, tablaWidth: 1740,
+    portadaTop: 250, portadaLineasTop: 360,
+    fuentesUrl: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap',
+    css: `
+      .pl-portada-txt{font-family:'Montserrat',sans-serif;}
+      .pl-cliente{color:#FFFFFF; font-size:64px; font-weight:600; letter-spacing:5px;}
+      .pl-linea{color:#FFFFFF; font-size:40px; font-weight:500; letter-spacing:4px; line-height:60px;}
+      .pl-horario{color:#FFFFFF; font-family:'Montserrat',sans-serif; font-size:30px;}
+      .pl-tabla-zona{font-family:'Montserrat',sans-serif; color:#2B1A12;}
+      table.pl-tabla{font-size:18px;}
+      table.pl-tabla th, .pl-detalles-bar{background:#C25B33; border-color:#8C4A30;}
+      table.pl-tabla td, table.pl-totales td{border-color:#8C4A30;}
+      .pl-detalles{border-bottom-color:#8C4A30;}
+      .pl-desc{font-size:15px; color:#4A3228;}
+      .pl-pagar td.pl-money{background:#EDAA90;}
+    `
   }
 };
+// Campos opcionales de una plantilla: ancho/alto (px de la imagen, por defecto 1414×2000 A4 vertical),
+// mm (tamaño de hoja), portadaTop/portadaLineasTop (posición de los textos de portada),
+// fuentesUrl (Google Fonts), css (estilos propios) y pie (texto que tapa parte del pie de página).
+function plantillaGeo(pl){
+  const ancho = pl.ancho || 1414, alto = pl.alto || 2000, mm = pl.mm || [210, 297];
+  return { ancho, alto, mm, escala: (mm[0] / 25.4 * 96) / ancho };
+}
 // Bloque de texto que tapa una parte del pie de página impreso en la imagen (ej. la dirección).
 function pieHtml(pl){
   const p = pl && pl.pie;
@@ -3283,6 +3312,15 @@ function cotizacionTotalesHtml(d, t){
   </tr></table>`;
 }
 
+function cotizDocCss(pl){
+  const g = plantillaGeo(pl);
+  return COTIZ_DOC_CSS
+    .replace('@page{size:A4; margin:0;}', `@page{size:${g.mm[0]}mm ${g.mm[1]}mm; margin:0;}`)
+    .replace('.pl-page{width:210mm; height:297mm;', `.pl-page{width:${g.mm[0]}mm; height:${g.mm[1]}mm;`)
+    .replace('width:1414px; height:2000px; transform-origin:0 0; transform:scale(0.56133);', `width:${g.ancho}px; height:${g.alto}px; transform-origin:0 0; transform:scale(${g.escala.toFixed(5)});`)
+    .replace('.pl-bg{position:absolute; inset:0; width:1414px; height:2000px;}', `.pl-bg{position:absolute; inset:0; width:${g.ancho}px; height:${g.alto}px;}`)
+    + (pl.css || '');
+}
 const COTIZ_DOC_CSS = `
 @page{size:A4; margin:0;}
 *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
@@ -3365,13 +3403,16 @@ async function eventoDescargarPdf(d){
       doc.head.appendChild(s);
     });
     const paginas = [...doc.querySelectorAll('.pl-page')];
-    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const g = plantillaGeo(pl);
+    const orient = g.mm[0] > g.mm[1] ? 'landscape' : 'portrait';
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: g.mm, orientation: orient, compress: true });
+    const anchoPx = Math.max(1654, g.ancho);
     for(let i = 0; i < paginas.length; i++){
       const p = paginas[i];
       p.style.margin = '0'; p.style.boxShadow = 'none';
-      const canvas = await win.html2canvas(p, { scale: 1654 / p.offsetWidth, useCORS: true, backgroundColor: '#ffffff' });
-      if(i > 0) pdf.addPage('a4', 'portrait');
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
+      const canvas = await win.html2canvas(p, { scale: anchoPx / p.offsetWidth, useCORS: true, backgroundColor: '#ffffff' });
+      if(i > 0) pdf.addPage(g.mm, orient);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, g.mm[0], g.mm[1]);
     }
     pdf.save(cotizNombreArchivo(d, 'pdf'));
   } finally {
@@ -3386,8 +3427,8 @@ function eventoDocumentoHtml(d, pl, imprimir){
   const pagina = (bg, contenido) => `<div class="pl-page"><div class="pl-scale"><img class="pl-bg" src="${url(bg)}">${contenido || ''}</div></div>`;
 
   const portada = pagina(pl.portada, `
-    <div class="pl-portada-txt pl-cliente" style="top:672px;">${escapeHtml(d.cliente || d.nombre || '')}</div>
-    <div class="pl-portada-txt" style="top:772px;">
+    <div class="pl-portada-txt pl-cliente" style="top:${pl.portadaTop || 672}px;">${escapeHtml(d.cliente || d.nombre || '')}</div>
+    <div class="pl-portada-txt" style="top:${pl.portadaLineasTop || 772}px;">
       ${d.fecha ? `<div class="pl-linea">${escapeHtml(fechaLarga(d.fecha))}</div>` : ''}
       ${toNum(d.invitados) ? `<div class="pl-linea">${toNum(d.invitados)} personas</div>` : ''}
       ${(d.horario || '').trim() ? `<div class="pl-horario">${escapeHtml(d.horario.trim())}</div>` : ''}
@@ -3401,8 +3442,8 @@ function eventoDocumentoHtml(d, pl, imprimir){
 
   return `<!doctype html><html><head><meta charset="utf-8">
     <title>${escapeHtml(cotizNombreArchivo(d, 'pdf').replace(/\.pdf$/, ''))}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>${COTIZ_DOC_CSS}</style></head><body>
+    <link href="${pl.fuentesUrl || 'https://fonts.googleapis.com/css2?family=Bitter:wght@400;500;700&display=swap'}" rel="stylesheet">
+    <style>${cotizDocCss(pl)}</style></head><body>
     ${portada}
     <div id="tablas"></div>
     ${pl.fijas.map(f => pagina(f, pieHtml(pl))).join('')}
