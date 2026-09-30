@@ -2905,6 +2905,8 @@ let currentCosteoEventoId = null;
 let costeoEventoDraft = null;
 const EVENTO_OTROS_RAPIDOS = ['Menaje', 'Experiencia', 'DJ'];
 const EVENTO_TIEMPOS_BASE = ['Entrada', 'Fuerte', 'Postre'];
+// Grupos de bebidas: se agregan con un botón y funcionan igual que un tiempo (opciones al precio más alto).
+const EVENTO_GRUPOS_BEBIDAS = ['Bebidas sin licor', 'Bebidas con licor'];
 
 async function loadCosteoEventos(){
   // Eventos ve todos; cada restaurante ve los que se hacen en él.
@@ -2992,7 +2994,7 @@ function eventoCotizacionFilas(d, t){
   const factorPersonal = 1 + toNum(d.margen_personal_pct) / 100;
   const tiempos = (d.tiempos || []).map((tp, idx) => ({ tp, c: t.tiemposCalc[idx] })).filter(x => (x.tp.opciones || []).length);
   if(tiempos.length){
-    filas.push({ tipo: 'sec', concepto: 'Menú' });
+    filas.push({ tipo: 'sec', concepto: tiempos.some(x => /bebida/i.test(x.tp.nombre || '')) ? 'Menú y bebidas' : 'Menú' });
     tiempos.forEach(({ tp, c }) => {
       const individual = tp.modo === 'individual', n = tp.opciones.length;
       filas.push({ tipo: 'tiempo', concepto: tp.nombre || 'Tiempo', nota: !individual && n > 1 ? `${n} opciones, se elige una` : '', cant: c.cant, sub: c.venta });
@@ -3002,7 +3004,7 @@ function eventoCotizacionFilas(d, t){
     });
   }
   if((d.items || []).length){
-    filas.push({ tipo: 'sec', concepto: tiempos.length ? 'Bebidas y otros de carta' : 'Carta' });
+    filas.push({ tipo: 'sec', concepto: tiempos.length ? 'Otros de carta' : 'Carta' });
     d.items.forEach(i => filas.push({ tipo: 'fila', concepto: i.nombre, cant: toNum(i.cantidad), unit: toNum(i.precio), sub: toNum(i.precio) * toNum(i.cantidad) }));
   }
   if((d.personal || []).length){
@@ -3564,7 +3566,7 @@ function renderCosteoEventoForm(){
       </div>
     </div>`;
   }).join('');
-  const tiemposFaltantes = EVENTO_TIEMPOS_BASE.filter(n => !d.tiempos.some(tp => (tp.nombre || '').trim().toLowerCase() === n.toLowerCase()));
+  const tiemposFaltantes = EVENTO_TIEMPOS_BASE.concat(EVENTO_GRUPOS_BEBIDAS).filter(n => !d.tiempos.some(tp => (tp.nombre || '').trim().toLowerCase() === n.toLowerCase()));
 
   const personalRows = d.personal.map((p, idx) => `
     <div class="ev-line">
@@ -3619,15 +3621,15 @@ function renderCosteoEventoForm(){
       <div class="field" style="margin-bottom:0;"><label class="field-label">Notas</label><textarea id="evNotas" placeholder="Horario, montaje, restricciones...">${escapeHtml(d.notas)}</textarea></div>
     </div>
 
-    <div class="section-label">Menú por tiempos</div>
-    <div class="ev-dim" style="margin:-4px 0 10px; font-size:13px;">Cada tiempo se cobra una vez: la opción más cara × porciones. El cliente ve todas las opciones con ese precio. Porciones vacío = invitados.</div>
+    <div class="section-label">Menú y bebidas por grupos</div>
+    <div class="ev-dim" style="margin:-4px 0 10px; font-size:13px;">Cada grupo (entrada, fuerte, postre, bebidas...) se cobra una vez: la opción más cara × porciones. El cliente ve todas las opciones con ese precio. Porciones vacío = invitados. Desmarcando la casilla, cada opción lleva su propia cantidad.</div>
     ${tiemposHtml || '<div class="empty-note" style="margin-bottom:10px;">Sin tiempos.</div>'}
     <div class="ev-quick" style="margin-top:0;">
       ${tiemposFaltantes.map(n=>`<button class="btn btn-ghost btn-small ev-t-add" data-nombre="${n}">+ ${n}</button>`).join('')}
-      <button class="btn btn-ghost btn-small ev-t-add" data-nombre="">+ Otro tiempo</button>
+      <button class="btn btn-ghost btn-small ev-t-add" data-nombre="">+ Otro grupo</button>
     </div>
 
-    <div class="section-label">Bebidas y otros de carta</div>
+    <div class="section-label">Otros de carta (cada uno con su precio)</div>
     <div class="ingredient-ticket">${itemRows || '<div class="empty-note" style="border:none;">Sin ítems (cada uno con su propio precio).</div>'}</div>
     <div class="obs-form">
       <div class="field" style="margin-bottom:0;"><label class="field-label">Agregar de la carta</label><input type="text" id="evCartaSearch" placeholder="Buscar bebida, botella, plato..."></div>
