@@ -99,6 +99,8 @@ async function sincronizar(svc: SupabaseClient, loc: { id: string; slug: string;
   const vistos = new Set<string>();
   const actualizaciones: { id: string; cambios: Record<string, unknown> }[] = [];
   const cambiosPrecio: { nombre: string; antes: number; despues: number }[] = [];
+  // Precios fijados a mano en la app (precio_manual): Toteat no los cambia, solo se informan.
+  const preciosFijos: { nombre: string; app: number; toteat: number }[] = [];
   const nuevos: any[] = [];
   let vinculados = 0;
 
@@ -113,8 +115,12 @@ async function sincronizar(svc: SupabaseClient, loc: { id: string; slug: string;
       const cambios: Record<string, unknown> = {};
       if (!c.toteat_id) { cambios.toteat_id = tid; vinculados++; porNombre.delete(norm(c.nombre)); }
       if (Math.round(Number(c.precio) || 0) !== precio) {
-        cambios.precio = precio;
-        cambiosPrecio.push({ nombre: c.nombre, antes: Math.round(Number(c.precio) || 0), despues: precio });
+        if (c.precio_manual) {
+          preciosFijos.push({ nombre: c.nombre, app: Math.round(Number(c.precio) || 0), toteat: precio });
+        } else {
+          cambios.precio = precio;
+          cambiosPrecio.push({ nombre: c.nombre, antes: Math.round(Number(c.precio) || 0), despues: precio });
+        }
       }
       if (!c.activo) cambios.activo = true;
       if (Object.keys(cambios).length) actualizaciones.push({ id: c.id, cambios });
@@ -137,6 +143,7 @@ async function sincronizar(svc: SupabaseClient, loc: { id: string; slug: string;
     carta_app: (carta ?? []).length,
     vinculados_por_nombre: vinculados,
     cambios_precio: cambiosPrecio,
+    precios_fijos: preciosFijos,
     nuevos: nuevos.map((n) => ({ nombre: n.nombre, categoria: n.categoria, precio: n.precio })),
     desactivados: desactivar.map((c: any) => ({ nombre: c.nombre, categoria: c.categoria })),
     aplicado: false,

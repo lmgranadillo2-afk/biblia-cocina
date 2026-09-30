@@ -2539,6 +2539,7 @@ function renderToteatResumen(r){
       <div class="ev-sum-row"><span>Enlazados por nombre (primera vez)</span><span>${r.vinculados_por_nombre}</span></div>
     </div>
     ${lista('Cambios de precio', r.cambios_precio, c => `<div class="ing-row"><div class="ing-name">${escapeHtml(c.nombre)}</div><div class="ing-qty">${fmtMoney(c.antes)} → ${fmtMoney(c.despues)}</div></div>`, 'Ningún precio cambió.')}
+    ${(r.precios_fijos || []).length ? lista('Precios fijos en la app (Toteat tiene otro, no se cambian)', r.precios_fijos, c => `<div class="ing-row"><div class="ing-name">🔒 ${escapeHtml(c.nombre)}</div><div class="ing-qty">app ${fmtMoney(c.app)} · Toteat ${fmtMoney(c.toteat)}</div></div>`, '') : ''}
     ${lista('Productos nuevos (se agregan)', r.nuevos, n => `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(n.categoria)}</span>${escapeHtml(n.nombre)}</div><div class="ing-qty">${fmtMoney(n.precio)}</div></div>`, 'No hay productos nuevos.')}
     ${lista('Ya no están activos en Toteat (se desactivan, no se borran)', r.desactivados, c => `<div class="ing-row"><div class="ing-name"><span class="ing-code">${escapeHtml(c.categoria)}</span>${escapeHtml(c.nombre)}</div></div>`, 'Ninguno.')}`;
 }
@@ -2795,7 +2796,7 @@ function renderCosteoCartaList(){
       lastCat = c.categoria;
     }
     html += `<div class="rec-card ${c.id===currentCosteoCartaId?'selected':''}" data-id="${c.id}" style="${c.activo?'':'opacity:.5;'}">
-      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(c.nombre)}</div><div class="rec-card-code">${c.activo ? (hasValue(c.costo) ? 'costo ' + fmtMoney(c.costo) : 'sin costo') : 'inactivo'}</div></div>
+      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(c.nombre)}</div><div class="rec-card-code">${c.activo ? (hasValue(c.costo) ? 'costo ' + fmtMoney(c.costo) : 'sin costo') : 'inactivo'}${c.precio_manual ? ' · 🔒 precio fijo' : ''}</div></div>
       <div class="rec-card-yield">${fmtMoney(c.precio)}</div>
     </div>`;
   });
@@ -2808,8 +2809,9 @@ function openCosteoCarta(id){
   const existing = id ? CARTA_ITEMS.find(c=>c.id===id) : null;
   costeoCartaDraft = existing ? {
     id: existing.id, categoria: existing.categoria, nombre: existing.nombre, descripcion: existing.descripcion || '',
-    precio: existing.precio || 0, costo: hasValue(existing.costo) ? String(existing.costo) : '', activo: existing.activo
-  } : { id: null, categoria: '', nombre: '', descripcion: '', precio: 0, costo: '', activo: true };
+    precio: existing.precio || 0, costo: hasValue(existing.costo) ? String(existing.costo) : '', activo: existing.activo,
+    precio_manual: !!existing.precio_manual, precio_original: existing.precio || 0, toteat_id: existing.toteat_id || null
+  } : { id: null, categoria: '', nombre: '', descripcion: '', precio: 0, costo: '', activo: true, precio_manual: false, precio_original: 0, toteat_id: null };
   renderCosteoList();
   document.getElementById('costeoDetailPane').classList.add('open');
   renderCosteoCartaForm();
@@ -2845,6 +2847,11 @@ function renderCosteoCartaForm(){
         <label class="field-label" style="margin:0;">Activo (se puede cotizar)</label>
         <input type="checkbox" id="ctActivo" ${d.activo?'checked':''} style="width:auto;" ${dis}>
       </div>
+      ${d.toteat_id ? `<div class="field" style="display:flex; align-items:center; justify-content:space-between; margin:12px 0 0;">
+        <label class="field-label" style="margin:0;">🔒 Precio fijo <span class="ev-dim" style="text-transform:none; letter-spacing:0; font-weight:400;">(Toteat no lo cambia)</span></label>
+        <input type="checkbox" id="ctPrecioFijo" ${d.precio_manual?'checked':''} style="width:auto;" ${dis}>
+      </div>
+      <div class="ev-dim" style="font-size:12px; margin-top:4px;">Se marca solo al cambiar el precio aquí. Desmarcalo para que el precio vuelva a venir de Toteat.</div>` : ''}
     </div>
     ${margen !== null ? `<div class="yield-stamp small"><span class="label">Margen</span><span class="value">${margen.toLocaleString('es-CO',{maximumFractionDigits:1})}%</span></div>` : ''}
 
@@ -2862,6 +2869,8 @@ function renderCosteoCartaForm(){
   document.getElementById('ctPrecio').addEventListener('change', e=>{ d.precio = toNum(e.target.value); renderCosteoCartaForm(); });
   document.getElementById('ctCosto').addEventListener('change', e=>{ d.costo = e.target.value; renderCosteoCartaForm(); });
   document.getElementById('ctActivo').addEventListener('change', e=>{ d.activo = e.target.checked; });
+  const fijoEl = document.getElementById('ctPrecioFijo');
+  if(fijoEl) fijoEl.addEventListener('change', e=>{ d.precio_manual = e.target.checked; d.fijoTocado = true; });
 
   const closeForm = async (reload)=>{
     costeoCartaDraft = null;
@@ -2885,6 +2894,7 @@ function renderCosteoCartaForm(){
       precio: d.precio || 0,
       costo: hasValue(d.costo) ? toNum(d.costo) : null,
       activo: d.activo,
+      precio_manual: d.toteat_id ? ((toNum(d.precio) !== toNum(d.precio_original) && !d.fijoTocado) ? true : !!d.precio_manual) : false,
       location_id: cartaVisibleId()
     };
     let error;
