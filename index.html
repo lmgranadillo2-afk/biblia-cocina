@@ -3183,7 +3183,7 @@ const PLANTILLAS_COTIZACION = {
 function pieHtml(pl){
   const p = pl && pl.pie;
   if(!p) return '';
-  return `<div style="position:absolute; left:${p.x}px; top:${p.y}px; width:${p.w}px; height:${p.h}px; background:${p.bg}; color:${p.color || '#fff'}; font-family:Arial,sans-serif; font-size:19px; letter-spacing:2px; line-height:30px; text-transform:uppercase; display:flex; flex-direction:column; justify-content:center;">${p.lineas.map(l => '<div>' + escapeHtml(l) + '</div>').join('')}</div>`;
+  return `<div style="position:absolute; left:${p.x}px; top:${p.y}px; width:${p.w}px; height:${p.h}px; background:${p.bg}; color:${p.color || '#fff'}; font-family:Arial,sans-serif; font-weight:400; font-size:18px; letter-spacing:2.2px; line-height:30px; padding-left:12px; box-sizing:border-box; text-transform:uppercase; display:flex; flex-direction:column; justify-content:center;">${p.lineas.map(l => '<div>' + escapeHtml(l) + '</div>').join('')}</div>`;
 }
 // Plantilla del restaurante donde se hace el evento.
 function plantillaCotizacion(d){
