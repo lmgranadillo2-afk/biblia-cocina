@@ -2058,8 +2058,11 @@ document.getElementById('costeoPuntoSelect').addEventListener('change', async e=
   cartaPuntoId = e.target.value;
   clearCosteoDrafts();
   document.getElementById('costeoDetailPane').classList.remove('open');
-  if(CARTA_POR_PUNTO[cartaPuntoId]) CARTA_ITEMS = CARTA_POR_PUNTO[cartaPuntoId];
-  else { document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; await loadCartaItems(cartaPuntoId); }
+  // La carta a mostrar puede ser la de otro restaurante (carta compartida).
+  const cartaId = cartaVisibleId();
+  if(CARTA_POR_PUNTO[cartaId]) CARTA_ITEMS = CARTA_POR_PUNTO[cartaId];
+  else { document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; await loadCartaItems(cartaId); }
+  renderCosteoPuntoSelect();
   renderCosteoList();
 });
 
