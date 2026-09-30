@@ -3576,6 +3576,11 @@ function renderCosteoEventoForm(){
   const editing = !!d.id;
   const nInput = (cls, idx, val, extra) => `<input type="number" class="${cls}" data-idx="${idx}" value="${val}" ${extra||''}>`;
 
+  // El precio de cada línea se puede editar solo para este evento; si difiere de la carta se avisa.
+  const precioCarta = it => { const c = cartaItemById(it.carta_item_id); return c ? toNum(c.precio) : null; };
+  const avisoPrecio = it => { const pc = precioCarta(it); return pc !== null && pc !== toNum(it.precio) ? `<span class="ev-dim" style="font-size:11px; font-weight:400; text-transform:none; letter-spacing:0;">carta: ${fmtMoney(pc)}</span>` : ''; };
+  const precioInput = (cls, it, attrs) => `<input type="number" class="${cls}" ${attrs} value="${hasValue(it.precio) ? it.precio : ''}" placeholder="0" style="width:110px;">`;
+
   const itemRows = d.items.map((i, idx) => `
     <div class="ev-line">
       <div class="ev-line-head">
@@ -3584,7 +3589,7 @@ function renderCosteoEventoForm(){
       </div>
       <div class="ev-line-fields">
         <label>Cantidad${nInput('ev-item-cant', idx, i.cantidad)}</label>
-        <label>Precio unit.<span class="ev-sub" style="padding:9px 0;">${fmtMoney(i.precio)}</span></label>
+        <label>Precio unit. ${avisoPrecio(i)}${precioInput('ev-item-precio', i, `data-idx="${idx}"`)}</label>
         <label style="margin-left:auto; align-items:flex-end;">Subtotal<span class="ev-sub" id="evItemSub${idx}" style="padding:9px 0;"></span></label>
       </div>
     </div>`).join('');
@@ -3611,13 +3616,13 @@ function renderCosteoEventoForm(){
           </div>
           <div class="ev-line-fields">
             <label>Cantidad<input type="number" class="ev-t-op-cant" data-t="${ti}" data-o="${oi}" value="${hasValue(o.cantidad) ? o.cantidad : ''}" placeholder="0"></label>
-            <label>Precio unit.<span class="ev-sub" style="padding:9px 0;">${fmtMoney(o.precio)}</span></label>
+            <label>Precio unit. ${avisoPrecio(o)}${precioInput('ev-t-op-precio', o, `data-t="${ti}" data-o="${oi}"`)}</label>
             <label style="margin-left:auto; align-items:flex-end;">Subtotal<span class="ev-sub" id="evTOpSub${ti}_${oi}" style="padding:9px 0;"></span></label>
           </div>
         </div>` : `
         <div class="ing-row">
           <div class="ing-name"><span class="ing-code">${escapeHtml(o.categoria || '')}</span>${escapeHtml(o.nombre)}</div>
-          <div class="ing-code" style="margin:0;">${fmtMoney(o.precio)}</div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">${precioInput('ev-t-op-precio', o, `data-t="${ti}" data-o="${oi}"`)}${avisoPrecio(o)}</div>
           <button class="btn btn-ghost btn-small ev-t-op-del" data-t="${ti}" data-o="${oi}">✕</button>
         </div>`).join('') || '<div class="ing-row"><div class="ing-name ev-dim">Sin opciones todavía.</div></div>'}
       <div class="ev-line">
@@ -3810,6 +3815,7 @@ function renderCosteoEventoForm(){
     el.addEventListener('input', ()=>{ d[arr][parseInt(el.dataset.idx,10)][key] = el.value; updateEventoPreview(); });
   });
   bindLine('ev-item-cant', 'items', 'cantidad');
+  bindLine('ev-item-precio', 'items', 'precio');
   bindLine('ev-per-personas', 'personal', 'personas');
   bindLine('ev-per-horas', 'personal', 'horas');
   bindLine('ev-per-valor', 'personal', 'valor_hora');
@@ -3877,6 +3883,9 @@ function renderCosteoEventoForm(){
   });
   document.querySelectorAll('.ev-t-modo').forEach(el=>{
     el.addEventListener('change', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].modo = el.checked ? 'max' : 'individual'; renderCosteoEventoForm(); });
+  });
+  document.querySelectorAll('.ev-t-op-precio').forEach(el=>{
+    el.addEventListener('input', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].opciones[parseInt(el.dataset.o,10)].precio = el.value; updateEventoPreview(); });
   });
   document.querySelectorAll('.ev-t-op-cant').forEach(el=>{
     el.addEventListener('input', ()=>{ d.tiempos[parseInt(el.dataset.t,10)].opciones[parseInt(el.dataset.o,10)].cantidad = el.value; updateEventoPreview(); });
