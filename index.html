@@ -2997,7 +2997,10 @@ function eventoCalcTotals(e){
   const baseServicio = eventoPropinaLegal(e) ? base - (cartaNeta - cartaNeta / (1 + toNum(e.impoconsumo_pct) / 100)) : base;
   const servicio = baseServicio * toNum(e.servicio_pct) / 100;
   const impoconsumo = cartaNeta - cartaNeta / (1 + toNum(e.impoconsumo_pct) / 100);
-  const total = base + servicio;
+  // IVA solo sobre personal y otros ítems (la carta lleva ICO). Se suma aparte; el descuento se reparte.
+  const extrasNetos = (cobroPersonal + otrosTotal) * (subtotal ? base / subtotal : 1);
+  const ivaExtras = extrasNetos * toNum(e.iva_extras_pct) / 100;
+  const total = base + servicio + ivaExtras;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
   // Comisión del encargado: % sobre el COSTO de la carta (no sobre el precio de venta). Interno.
   const comision = costoCarta * toNum(e.comision_pct) / 100;
@@ -3007,7 +3010,7 @@ function eventoCalcTotals(e){
   const ganancia = ventaNeta - costoTotal;
   return {
     tiemposCalc, carta, costoCarta, cartaSinCosto, comision, costoPersonal, cobroPersonal, otrosTotal, costoOtros,
-    subtotal, descuento, base, servicio, impoconsumo, totalSinIco: base - impoconsumo, ventaNeta, total, anticipo, saldo: total - anticipo,
+    subtotal, descuento, base, servicio, impoconsumo, totalSinIco: base - impoconsumo, ventaNeta, ivaExtras, total, anticipo, saldo: total - anticipo,
     porInvitado: invitados ? total / invitados : null,
     costoTotal, ganancia, margenPct: ventaNeta ? ganancia / ventaNeta * 100 : null
   };
@@ -3054,6 +3057,7 @@ function eventoCotizacionFilas(d, t){
     total('Total sin ICO', t.totalSinIco, 'ev-dim');
     total(`ICO ${toNum(d.impoconsumo_pct)}% (incluido)`, t.impoconsumo, 'ev-dim');
   }
+  if(t.ivaExtras) total(`IVA ${toNum(d.iva_extras_pct)}% (personal y extras)`, t.ivaExtras);
   if(t.servicio) total(etiquetaServicio(d), t.servicio);
   total('Total a pagar', t.total, 'ev-strong ev-total');
   if(t.servicio && eventoPropinaLegal(d)) filas.push({ tipo: 'nota', concepto: NOTA_PROPINA });
@@ -3334,6 +3338,7 @@ function cotizacionTotalesHtml(d, t){
     tot += fila('TOTAL SIN ICO', t.totalSinIco);
     tot += fila(`ICO ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
   }
+  if(t.ivaExtras) tot += fila(`IVA ${toNum(d.iva_extras_pct)}%`, t.ivaExtras);
   if(t.servicio) tot += fila(etiquetaServicio(d, true), t.servicio);
   tot += fila('TOTAL A PAGAR', t.total, 'pl-pagar');
   return `<table class="pl-totales-wrap"><tr>
@@ -3546,7 +3551,7 @@ function openCosteoEvento(id){
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
     servicio_pct: e.servicio_pct ?? 10, impoconsumo_pct: e.impoconsumo_pct ?? 8, anticipo_pct: e.anticipo_pct ?? 50,
-    version_calculo: e.version_calculo || 1,
+    version_calculo: e.version_calculo || 1, iva_extras_pct: e.iva_extras_pct || 0,
     encargado: e.encargado || '', comision_pct: e.comision_pct || 0,
     restaurante_id: e.restaurante_id || null
   } : {
@@ -3554,7 +3559,7 @@ function openCosteoEvento(id){
     tiempos: EVENTO_TIEMPOS_BASE.map(n => ({ nombre: n, cantidad: null, opciones: [] })),
     items: [], personal: [], otros: [],
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
-    version_calculo: 2,
+    version_calculo: 2, iva_extras_pct: 19,
     encargado: '', comision_pct: 0,
     // En un restaurante el evento es de ese restaurante; en Eventos se elige.
     restaurante_id: esHub() ? null : currentLocation.id
@@ -3771,6 +3776,7 @@ function renderCosteoEventoForm(){
       </div>
       ${pctRow(eventoPropinaLegal(d) ? 'Propina voluntaria sugerida (%, máx. 10 · 0 para quitarla)' : 'Servicio (%, 0 para quitarlo)', 'evServicio', d.servicio_pct)}
       ${pctRow('Impoconsumo incluido en los precios de carta (%)', 'evImpoconsumo', d.impoconsumo_pct)}
+      ${pctRow('IVA sobre personal y otros ítems (%, 0 para quitarlo)', 'evIvaExtras', d.iva_extras_pct)}
       ${pctRow('Anticipo (%)', 'evAnticipo', d.anticipo_pct).replace('justify-content:space-between;', 'justify-content:space-between; margin-bottom:0;')}
     </div>
 
@@ -3816,7 +3822,7 @@ function renderCosteoEventoForm(){
   });
   bindText('evNombre', 'nombre'); bindText('evCliente', 'cliente'); bindText('evFecha', 'fecha'); bindText('evNotas', 'notas'); bindText('evHorario', 'horario');
   bindNum('evInvitados', 'invitados'); bindNum('evMargenPersonal', 'margen_personal_pct');
-  bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evAnticipo', 'anticipo_pct');
+  bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evIvaExtras', 'iva_extras_pct'); bindNum('evAnticipo', 'anticipo_pct');
   document.getElementById('evDescTipo').addEventListener('change', e=>{ d.descuento_tipo = e.target.value; updateEventoPreview(); });
   document.getElementById('evExpPng').addEventListener('click', async e=>{
     const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Generando...';
@@ -3971,6 +3977,7 @@ function renderCosteoEventoForm(){
       descuento_valor: toNum(d.descuento_valor),
       servicio_pct: toNum(d.servicio_pct),
       version_calculo: d.version_calculo || 1,
+      iva_extras_pct: toNum(d.iva_extras_pct),
       impoconsumo_pct: toNum(d.impoconsumo_pct),
       anticipo_pct: toNum(d.anticipo_pct),
       encargado: d.encargado.trim() || null,
