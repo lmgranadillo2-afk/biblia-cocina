@@ -2461,7 +2461,13 @@ let cartaPuntoId = null;     // restaurante cuya carta se ve en Eventos → Cart
 // Centrales: "Eventos" (comercial) y "Admin" (gerencia) ven los datos de todos los restaurantes.
 function esHub(){ return !!currentLocation && (currentLocation.slug === 'eventos' || currentLocation.slug === 'admin'); }
 function esPuntoEventos(){ return !!currentLocation && currentLocation.slug === 'eventos'; }
-function cartaVisibleId(){ return esHub() ? cartaPuntoId : (currentLocation && currentLocation.id); }
+// Restaurante que se está viendo (en las centrales, el elegido en el selector).
+function restauranteVisibleId(){ return esHub() ? cartaPuntoId : (currentLocation && currentLocation.id); }
+// Algunos restaurantes usan la carta de otro (locations.carta_origen_id), ej. Dos Santos Cali usa
+// la de Cantina Dos Santos. La carta se edita y sincroniza con Toteat solo en el restaurante dueño.
+function cartaDeRestaurante(id){ const r = restauranteDe(id); return (r && r.carta_origen_id) || id; }
+function cartaVisibleId(){ const id = restauranteVisibleId(); return id ? cartaDeRestaurante(id) : null; }
+function cartaCompartida(){ const id = restauranteVisibleId(); return !!id && cartaDeRestaurante(id) !== id; }
 function restauranteDe(id){
   if(currentLocation && currentLocation.id === id) return currentLocation;
   return RESTAURANTES.find(r => r.id === id) || null;
@@ -2484,7 +2490,7 @@ async function loadCartaItems(locId){
   if(error) showToast('No se pudo cargar la carta: ' + error.message);
 }
 async function loadRestaurantes(){
-  const { data, error } = await supa.from('locations').select('id, name, slug').not('slug', 'in', '(eventos,admin)').eq('activo', true).order('name', {ascending:true});
+  const { data, error } = await supa.from('locations').select('id, name, slug, carta_origen_id').not('slug', 'in', '(eventos,admin)').eq('activo', true).order('name', {ascending:true});
   RESTAURANTES = error ? [] : (data || []);
 }
 async function loadEventoCargos(){
@@ -2502,7 +2508,7 @@ async function loadCosteoTodo(){
   }
   await Promise.all([loadCosteoPlatos(), loadCosteoCargos(), loadCosteoEventos(), loadCartaItems(), esHub() ? null : loadEventoCargos()]);
   // Cartas de los restaurantes de los eventos (para costos internos y descripciones).
-  const ids = [...new Set(COSTEO_EVENTOS.map(e => e.restaurante_id).filter(id => id && !CARTA_POR_PUNTO[id]))];
+  const ids = [...new Set(COSTEO_EVENTOS.map(e => e.restaurante_id && cartaDeRestaurante(e.restaurante_id)).filter(id => id && !CARTA_POR_PUNTO[id]))];
   await Promise.all(ids.map(id => loadCartaItems(id)));
   renderCosteoPuntoSelect();
 }
@@ -2633,7 +2639,7 @@ function semanaPasada(){
 let foodcostFechas = null;
 function renderFoodcostPanel(){
   if(!foodcostFechas) foodcostFechas = semanaPasada();
-  const rest = restauranteDe(cartaVisibleId());
+  const rest = restauranteDe(restauranteVisibleId());
   document.getElementById('costeoCount').textContent = rest ? 'Food cost · ' + rest.name : 'Food cost';
   const wrap = document.getElementById('costeoItems');
   wrap.innerHTML = `
@@ -2658,11 +2664,11 @@ async function generarFoodcost(){
   body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note">Consultando ventas e inventario en Toteat... puede tardar unos segundos.</div>`;
   const btn = document.getElementById('fcGenerar'); if(btn){ btn.disabled = true; btn.textContent = 'Generando...'; }
   try{
-    const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: cartaVisibleId(), accion: 'foodcost', ini: ini.replace(/-/g, ''), end: end.replace(/-/g, '') } });
+    const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: restauranteVisibleId(), accion: 'foodcost', ini: ini.replace(/-/g, ''), end: end.replace(/-/g, '') } });
     if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
     if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
-    const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', cartaVisibleId());
-    FC_ACTUAL = { r: data, locId: cartaVisibleId(), grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
+    const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', restauranteVisibleId());
+    FC_ACTUAL = { r: data, locId: restauranteVisibleId(), grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
     pintarFoodcost();
   } catch(err){
     body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
@@ -2754,7 +2760,7 @@ function renderFoodcostReporte(r){
 }
 
 function renderCosteoPuntoSelect(){
-  document.getElementById('costeoToteatBtn').style.display = (costeoSub === 'carta' && isAdminRole() && cartaVisibleId()) ? '' : 'none';
+  document.getElementById('costeoToteatBtn').style.display = (costeoSub === 'carta' && isAdminRole() && cartaVisibleId() && !cartaCompartida()) ? '' : 'none';
   const wrap = document.getElementById('costeoPuntoWrap');
   const visible = esHub() && (costeoSub === 'carta' || costeoSub === 'foodcost');
   wrap.style.display = visible ? '' : 'none';
@@ -2769,11 +2775,14 @@ function toNum(v){
 function hasValue(v){ return v !== null && v !== undefined && v !== ''; }
 
 function renderCosteoCartaList(){
+  document.getElementById('costeoNewBtn').style.display = (isAdminRole() && !cartaCompartida()) ? '' : 'none';
   const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
   const list = CARTA_ITEMS.filter(c => !q || c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q));
   const wrap = document.getElementById('costeoItems');
   const ultimaSync = CARTA_ITEMS.map(c => c.toteat_sync_at).filter(Boolean).sort().pop();
+  const origen = cartaCompartida() ? restauranteDe(cartaVisibleId()) : null;
   document.getElementById('costeoCount').textContent = list.length + ' ítem' + (list.length===1?'':'s')
+    + (cartaCompartida() ? ' · carta de ' + (origen ? origen.name : 'otro restaurante') + ' (se edita allá)' : '')
     + (ultimaSync ? ' · Toteat: ' + new Date(ultimaSync).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '');
   if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">' + (CARTA_ITEMS.length ? 'Sin resultados.' : 'Este punto todavía no tiene carta cargada.') + '</div>'; return; }
   let html = '', lastCat = null;
@@ -2806,7 +2815,7 @@ function openCosteoCarta(id){
 function renderCosteoCartaForm(){
   const d = costeoCartaDraft;
   const editing = !!d.id;
-  const canEdit = isAdminRole();
+  const canEdit = isAdminRole() && !cartaCompartida();
   const dis = canEdit ? '' : 'disabled';
   const categorias = [...new Set(CARTA_ITEMS.map(c => c.categoria))];
   const precio = toNum(d.precio), costo = toNum(d.costo);
@@ -3158,8 +3167,21 @@ const PLANTILLAS_COTIZACION = {
     portada: 'portada.jpg', tabla: 'tabla.jpg', fijas: ['politicas-1.jpg', 'politicas-2.jpg'],
     // Zona libre de la página de tabla: debajo del jaguar y encima del logo inferior.
     tablaTop: 520, tablaBottom: 1540, tablaLeft: 50, tablaWidth: 1320
+  },
+  'dos-santos-cali-mtg0p7fs': {
+    carpeta: 'plantillas/dos-santos/',
+    portada: 'portada-cali.jpg', tabla: 'tabla.jpg', fijas: ['politicas-1.jpg', 'politicas-2.jpg'],
+    tablaTop: 520, tablaBottom: 1540, tablaLeft: 50, tablaWidth: 1320,
+    // Tapa la dirección de Medellín del pie de página con la de Cali.
+    pie: { x: 790, y: 1846, w: 440, h: 70, bg: '#A37B58', color: '#FFFFFF', lineas: ['CL 16A #122-31', 'CALI - COLOMBIA'] }
   }
 };
+// Bloque de texto que tapa una parte del pie de página impreso en la imagen (ej. la dirección).
+function pieHtml(pl){
+  const p = pl && pl.pie;
+  if(!p) return '';
+  return `<div style="position:absolute; left:${p.x}px; top:${p.y}px; width:${p.w}px; height:${p.h}px; background:${p.bg}; color:${p.color || '#fff'}; font-family:Arial,sans-serif; font-size:19px; letter-spacing:2px; line-height:30px; text-transform:uppercase; display:flex; flex-direction:column; justify-content:center;">${p.lineas.map(l => '<div>' + escapeHtml(l) + '</div>').join('')}</div>`;
+}
 // Plantilla del restaurante donde se hace el evento.
 function plantillaCotizacion(d){
   const r = d && restauranteDe(d.restaurante_id);
@@ -3380,14 +3402,14 @@ function eventoDocumentoHtml(d, pl, imprimir){
     <style>${COTIZ_DOC_CSS}</style></head><body>
     ${portada}
     <div id="tablas"></div>
-    ${pl.fijas.map(f => pagina(f)).join('')}
+    ${pl.fijas.map(f => pagina(f, pieHtml(pl))).join('')}
     <script>
     (function(){
       var bloques = ${JSON.stringify(bloques)}, totales = ${JSON.stringify(totales)};
       var cont = document.getElementById('tablas');
       function nuevaPagina(){
         var p = document.createElement('div'); p.className = 'pl-page';
-        p.innerHTML = '<div class="pl-scale"><img class="pl-bg" src="${url(pl.tabla)}"><div class="pl-tabla-zona" style="${zona}"><table class="pl-tabla">${thead}</table></div></div>';
+        p.innerHTML = '<div class="pl-scale"><img class="pl-bg" src="${url(pl.tabla)}">${pieHtml(pl)}<div class="pl-tabla-zona" style="${zona}"><table class="pl-tabla">${thead}</table></div></div>';
         cont.appendChild(p);
         return p.querySelector('.pl-tabla-zona');
       }
@@ -3707,7 +3729,7 @@ function renderCosteoEventoForm(){
   if(restSel) restSel.addEventListener('change', async e=>{
     const tieneCarta = d.items.length || d.tiempos.some(tp => (tp.opciones||[]).length);
     d.restaurante_id = e.target.value || null;
-    if(d.restaurante_id && !CARTA_POR_PUNTO[d.restaurante_id]) await loadCartaItems(d.restaurante_id);
+    if(d.restaurante_id && !CARTA_POR_PUNTO[cartaDeRestaurante(d.restaurante_id)]) await loadCartaItems(cartaDeRestaurante(d.restaurante_id));
     if(tieneCarta) showToast('Ojo: los platos ya agregados son de la carta del restaurante anterior');
     renderCosteoEventoForm();
   });
@@ -3775,7 +3797,7 @@ function renderCosteoEventoForm(){
       const results = document.getElementById(resultsId);
       if(!q){ results.innerHTML = ''; return; }
       if(!d.restaurante_id){ results.innerHTML = '<div class="empty-note">Primero elegí el restaurante del evento.</div>'; return; }
-      const carta = CARTA_POR_PUNTO[d.restaurante_id] || [];
+      const carta = CARTA_POR_PUNTO[cartaDeRestaurante(d.restaurante_id)] || [];
       const candidates = carta.filter(c => c.activo && (c.nombre.toUpperCase().includes(q) || c.categoria.toUpperCase().includes(q))).slice(0, 25);
       if(candidates.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
       results.innerHTML = `<div class="ingredient-ticket" style="margin-top:10px;">` + candidates.map(c=>
