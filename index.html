@@ -2929,7 +2929,8 @@ async function loadCosteoEventos(){
   if(error) showToast('No se pudieron cargar los eventos: ' + error.message);
 }
 
-// Cotización: carta + personal (costo + margen) + otros − descuento + servicio (sobre todo) + impoconsumo (solo sobre la carta).
+// Cotización: carta + personal (costo + margen) + otros − descuento + servicio (sobre todo).
+// El impoconsumo (ICO) va INCLUIDO en los precios de carta (así se exhiben al cliente): solo se desglosa.
 // Costo interno de un ítem de carta: el costo ACTUAL de la carta (si se actualizan costos, los
 // eventos ya guardados lo reflejan); si el ítem ya no existe, el que se guardó en el evento.
 // El precio al cliente, en cambio, queda fijo al de la cotización.
@@ -2984,18 +2985,20 @@ function eventoCalcTotals(e){
   // Impoconsumo: solo sobre la carta; el descuento se reparte proporcionalmente.
   const cartaNeta = carta * (subtotal ? base / subtotal : 1);
   const servicio = base * toNum(e.servicio_pct) / 100;
-  const impoconsumo = cartaNeta * toNum(e.impoconsumo_pct) / 100;
-  const total = base + servicio + impoconsumo;
+  const impoconsumo = cartaNeta - cartaNeta / (1 + toNum(e.impoconsumo_pct) / 100);
+  const total = base + servicio;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
   // Comisión del encargado: % sobre el COSTO de la carta (no sobre el precio de venta). Interno.
   const comision = costoCarta * toNum(e.comision_pct) / 100;
   const costoTotal = costoCarta + costoPersonal + costoOtros + comision;
-  const ganancia = base - costoTotal;
+  // La ganancia se mide sobre la venta sin el ICO, que es de la DIAN.
+  const ventaNeta = base - impoconsumo;
+  const ganancia = ventaNeta - costoTotal;
   return {
     tiemposCalc, carta, costoCarta, cartaSinCosto, comision, costoPersonal, cobroPersonal, otrosTotal, costoOtros,
-    subtotal, descuento, base, servicio, impoconsumo, total, anticipo, saldo: total - anticipo,
+    subtotal, descuento, base, servicio, impoconsumo, totalSinIco: base - impoconsumo, ventaNeta, total, anticipo, saldo: total - anticipo,
     porInvitado: invitados ? total / invitados : null,
-    costoTotal, ganancia, margenPct: base ? ganancia / base * 100 : null
+    costoTotal, ganancia, margenPct: ventaNeta ? ganancia / ventaNeta * 100 : null
   };
 }
 
@@ -3031,11 +3034,17 @@ function eventoCotizacionFilas(d, t){
     d.otros.forEach(o => filas.push({ tipo: 'fila', concepto: o.descripcion || 'Ítem', cant: toNum(o.cantidad), unit: toNum(o.precio), sub: toNum(o.cantidad) * toNum(o.precio) }));
   }
   const total = (concepto, sub, estilo, menos) => filas.push({ tipo: 'total', concepto, sub, estilo, menos });
-  total('Subtotal', t.subtotal, 'ev-strong');
-  if(t.descuento) total('Descuento' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), t.descuento, '', true);
+  total('Total', t.subtotal, 'ev-strong');
+  if(t.descuento){
+    total('Descuento' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), t.descuento, '', true);
+    total('Total con descuento', t.base, 'ev-strong');
+  }
+  if(t.impoconsumo){
+    total('Total sin ICO', t.totalSinIco, 'ev-dim');
+    total(`ICO ${toNum(d.impoconsumo_pct)}% (incluido)`, t.impoconsumo, 'ev-dim');
+  }
   if(t.servicio) total(`Servicio ${toNum(d.servicio_pct)}%`, t.servicio);
-  if(t.impoconsumo) total(`Impoconsumo ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
-  total('Total', t.total, 'ev-strong ev-total');
+  total('Total a pagar', t.total, 'ev-strong ev-total');
   if(t.porInvitado !== null) total('Por invitado', t.porInvitado, 'ev-dim');
   if(toNum(d.anticipo_pct)){
     total(`Anticipo ${toNum(d.anticipo_pct)}%`, t.anticipo);
@@ -3303,9 +3312,15 @@ function cotizacionBloquesHtml(d, t){
 function cotizacionTotalesHtml(d, t){
   const fila = (label, v, cls) => `<tr class="${cls || ''}"><td class="pl-tot-label">${label}</td><td class="pl-money"><span>$</span><span>${Math.round(v).toLocaleString('es-CO')}</span></td></tr>`;
   let tot = fila('TOTAL', t.subtotal);
-  if(t.descuento) tot += fila('DESCUENTO' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), -t.descuento);
+  if(t.descuento){
+    tot += fila('DESCUENTO' + (d.descuento_tipo === 'pct' ? ` ${toNum(d.descuento_valor)}%` : ''), -t.descuento);
+    tot += fila('TOTAL CON DESCUENTO', t.base);
+  }
+  if(t.impoconsumo){
+    tot += fila('TOTAL SIN ICO', t.totalSinIco);
+    tot += fila(`ICO ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
+  }
   if(t.servicio) tot += fila(`SERVICIO ${toNum(d.servicio_pct)}%`, t.servicio);
-  if(t.impoconsumo) tot += fila(`ICO ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
   tot += fila('TOTAL A PAGAR', t.total, 'pl-pagar');
   return `<table class="pl-totales-wrap"><tr>
     <td class="pl-detalles"><div class="pl-detalles-bar">DETALLES DEL EVENTO</div><div class="pl-notas">${escapeHtml(d.notas || '').replace(/\n/g, '<br>')}</div></td>
@@ -3562,7 +3577,7 @@ function updateEventoPreview(){
     html += row('Costo otros ítems', fmtMoney(t.costoOtros));
     html += row(`Comisión ${escapeHtml(d.encargado.trim() || 'encargado')} (${toNum(d.comision_pct)}% del costo carta)`, fmtMoney(t.comision));
     html += row('Costo total', fmtMoney(t.costoTotal), 'total');
-    html += row('Venta sin servicio', fmtMoney(t.base));
+    html += row('Venta neta (sin servicio ni ICO)', fmtMoney(t.ventaNeta));
     const color = t.ganancia >= 0 ? '#2F7A4D' : '#B0281C';
     html += `<div class="ev-sum-row total"><span>Ganancia</span><span style="color:${color};">${fmtMoney(t.ganancia)}${t.margenPct !== null ? ' · ' + t.margenPct.toLocaleString('es-CO',{maximumFractionDigits:1}) + '%' : ''}</span></div>`;
     html += '</div>';
@@ -3739,7 +3754,7 @@ function renderCosteoEventoForm(){
         <input type="number" id="evDescValor" value="${d.descuento_valor}" style="width:110px;">
       </div>
       ${pctRow('Servicio (%, 0 para quitarlo)', 'evServicio', d.servicio_pct)}
-      ${pctRow('Impoconsumo (% sobre carta)', 'evImpoconsumo', d.impoconsumo_pct)}
+      ${pctRow('Impoconsumo incluido en los precios de carta (%)', 'evImpoconsumo', d.impoconsumo_pct)}
       ${pctRow('Anticipo (%)', 'evAnticipo', d.anticipo_pct).replace('justify-content:space-between;', 'justify-content:space-between; margin-bottom:0;')}
     </div>
 
