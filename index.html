@@ -2963,6 +2963,14 @@ function eventoTiempoCalc(t, invitados){
   return { cant, precio, costo, venta: precio * cant, costoTotal: costo * cant, sinCosto: costos.filter(c => c === null).length };
 }
 
+// Propina legal: eventos creados desde el cambio (version_calculo 2). Los anteriores no se tocan.
+function eventoPropinaLegal(e){ return toNum(e && e.version_calculo) >= 2; }
+function etiquetaServicio(d, mayus){
+  const txt = eventoPropinaLegal(d) ? `Propina voluntaria sugerida ${toNum(d.servicio_pct)}%` : `Servicio ${toNum(d.servicio_pct)}%`;
+  return mayus ? txt.toUpperCase() : txt;
+}
+const NOTA_PROPINA = 'La propina es voluntaria: el cliente puede aceptarla, modificarla o rechazarla (Ley 1935 de 2018).';
+
 function eventoCalcTotals(e){
   const items = e.items || [], personal = e.personal || [], otros = e.otros || [];
   const invitados = toNum(e.invitados);
@@ -2984,7 +2992,10 @@ function eventoCalcTotals(e){
   // Servicio: sobre todo el subtotal ya descontado (carta, personal, otros).
   // Impoconsumo: solo sobre la carta; el descuento se reparte proporcionalmente.
   const cartaNeta = carta * (subtotal ? base / subtotal : 1);
-  const servicio = base * toNum(e.servicio_pct) / 100;
+  // Versión 1 (cotizaciones anteriores): "Servicio" sobre el total con ICO.
+  // Versión 2 (Ley 1935 de 2018): propina voluntaria sugerida sobre el valor sin ICO.
+  const baseServicio = eventoPropinaLegal(e) ? base - (cartaNeta - cartaNeta / (1 + toNum(e.impoconsumo_pct) / 100)) : base;
+  const servicio = baseServicio * toNum(e.servicio_pct) / 100;
   const impoconsumo = cartaNeta - cartaNeta / (1 + toNum(e.impoconsumo_pct) / 100);
   const total = base + servicio;
   const anticipo = total * toNum(e.anticipo_pct) / 100;
@@ -3043,8 +3054,9 @@ function eventoCotizacionFilas(d, t){
     total('Total sin ICO', t.totalSinIco, 'ev-dim');
     total(`ICO ${toNum(d.impoconsumo_pct)}% (incluido)`, t.impoconsumo, 'ev-dim');
   }
-  if(t.servicio) total(`Servicio ${toNum(d.servicio_pct)}%`, t.servicio);
+  if(t.servicio) total(etiquetaServicio(d), t.servicio);
   total('Total a pagar', t.total, 'ev-strong ev-total');
+  if(t.servicio && eventoPropinaLegal(d)) filas.push({ tipo: 'nota', concepto: NOTA_PROPINA });
   if(t.porInvitado !== null) total('Por invitado', t.porInvitado, 'ev-dim');
   if(toNum(d.anticipo_pct)){
     total(`Anticipo ${toNum(d.anticipo_pct)}%`, t.anticipo);
@@ -3059,6 +3071,7 @@ function eventoCotizacionTabla(filas){
   let body = '', pie = '';
   filas.forEach(f => {
     if(f.tipo === 'sec') body += `<tr class="ev-sec"><td colspan="4">${escapeHtml(f.concepto)}</td></tr>`;
+    else if(f.tipo === 'nota') pie += `<tr class="ev-dim"><td colspan="4" style="font-size:12px; font-style:italic;">${escapeHtml(f.concepto)}</td></tr>`;
     else if(f.tipo === 'total') pie += `<tr class="${f.estilo || ''}"><td colspan="3">${escapeHtml(f.concepto)}</td><td class="num">${f.menos ? '− ' : ''}${cotizMoney(f.sub)}</td></tr>`;
     else body += `<tr class="${f.tipo === 'tiempo' ? 'ev-t-head' : f.tipo === 'opcion' ? 'ev-op' : ''}"><td>${escapeHtml(f.concepto)}${f.nota ? ` <span class="ev-dim">· ${escapeHtml(f.nota)}</span>` : ''}</td><td class="num">${cotizQty(f.cant)}</td><td class="num">${cotizMoney(f.unit)}</td><td class="num">${cotizMoney(f.sub)}</td></tr>`;
   });
@@ -3074,6 +3087,7 @@ function eventoCotizacionTexto(filas){
   const lineas = ['Concepto\tCant.\tValor unit.\tSubtotal'];
   filas.forEach(f => {
     if(f.tipo === 'sec') lineas.push(f.concepto.toUpperCase());
+    else if(f.tipo === 'nota') lineas.push(f.concepto);
     else if(f.tipo === 'total') lineas.push(`${f.concepto}\t\t\t${f.menos ? '− ' : ''}${cotizMoney(f.sub)}`);
     else lineas.push(`${f.tipo === 'opcion' ? '   · ' : ''}${f.concepto}${f.nota ? ' (' + f.nota + ')' : ''}\t${cotizQty(f.cant)}\t${cotizMoney(f.unit)}\t${cotizMoney(f.sub)}`);
   });
@@ -3320,10 +3334,10 @@ function cotizacionTotalesHtml(d, t){
     tot += fila('TOTAL SIN ICO', t.totalSinIco);
     tot += fila(`ICO ${toNum(d.impoconsumo_pct)}%`, t.impoconsumo);
   }
-  if(t.servicio) tot += fila(`SERVICIO ${toNum(d.servicio_pct)}%`, t.servicio);
+  if(t.servicio) tot += fila(etiquetaServicio(d, true), t.servicio);
   tot += fila('TOTAL A PAGAR', t.total, 'pl-pagar');
   return `<table class="pl-totales-wrap"><tr>
-    <td class="pl-detalles"><div class="pl-detalles-bar">DETALLES DEL EVENTO</div><div class="pl-notas">${escapeHtml(d.notas || '').replace(/\n/g, '<br>')}</div></td>
+    <td class="pl-detalles"><div class="pl-detalles-bar">DETALLES DEL EVENTO</div><div class="pl-notas">${escapeHtml(d.notas || '').replace(/\n/g, '<br>')}${t.servicio && eventoPropinaLegal(d) ? `<div style="margin-top:6px; font-style:italic;">${escapeHtml(NOTA_PROPINA)}</div>` : ''}</div></td>
     <td class="pl-tot-cell"><table class="pl-totales">${tot}</table></td>
   </tr></table>`;
 }
@@ -3532,6 +3546,7 @@ function openCosteoEvento(id){
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
     servicio_pct: e.servicio_pct ?? 10, impoconsumo_pct: e.impoconsumo_pct ?? 8, anticipo_pct: e.anticipo_pct ?? 50,
+    version_calculo: e.version_calculo || 1,
     encargado: e.encargado || '', comision_pct: e.comision_pct || 0,
     restaurante_id: e.restaurante_id || null
   } : {
@@ -3539,6 +3554,7 @@ function openCosteoEvento(id){
     tiempos: EVENTO_TIEMPOS_BASE.map(n => ({ nombre: n, cantidad: null, opciones: [] })),
     items: [], personal: [], otros: [],
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
+    version_calculo: 2,
     encargado: '', comision_pct: 0,
     // En un restaurante el evento es de ese restaurante; en Eventos se elige.
     restaurante_id: esHub() ? null : currentLocation.id
@@ -3753,7 +3769,7 @@ function renderCosteoEventoForm(){
         </select>
         <input type="number" id="evDescValor" value="${d.descuento_valor}" style="width:110px;">
       </div>
-      ${pctRow('Servicio (%, 0 para quitarlo)', 'evServicio', d.servicio_pct)}
+      ${pctRow(eventoPropinaLegal(d) ? 'Propina voluntaria sugerida (%, máx. 10 · 0 para quitarla)' : 'Servicio (%, 0 para quitarlo)', 'evServicio', d.servicio_pct)}
       ${pctRow('Impoconsumo incluido en los precios de carta (%)', 'evImpoconsumo', d.impoconsumo_pct)}
       ${pctRow('Anticipo (%)', 'evAnticipo', d.anticipo_pct).replace('justify-content:space-between;', 'justify-content:space-between; margin-bottom:0;')}
     </div>
@@ -3954,6 +3970,7 @@ function renderCosteoEventoForm(){
       descuento_tipo: d.descuento_tipo,
       descuento_valor: toNum(d.descuento_valor),
       servicio_pct: toNum(d.servicio_pct),
+      version_calculo: d.version_calculo || 1,
       impoconsumo_pct: toNum(d.impoconsumo_pct),
       anticipo_pct: toNum(d.anticipo_pct),
       encargado: d.encargado.trim() || null,
