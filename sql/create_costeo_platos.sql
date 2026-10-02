@@ -20,14 +20,14 @@ create table if not exists public.costeo_platos (
 
 alter table public.costeo_platos enable row level security;
 
-create policy "costeo_platos_select" on public.costeo_platos
+create policy costeo_platos_select on public.costeo_platos
   for select using (public.has_area_access(area_id));
 
-create policy "costeo_platos_insert" on public.costeo_platos
+create policy costeo_platos_insert on public.costeo_platos
   for insert with check (public.has_area_access(area_id));
 
-create policy "costeo_platos_update" on public.costeo_platos
+create policy costeo_platos_update on public.costeo_platos
   for update using (public.has_area_access(area_id));
 
-create policy "costeo_platos_delete" on public.costeo_platos
+create policy costeo_platos_delete on public.costeo_platos
   for delete using (public.has_area_access(area_id));
