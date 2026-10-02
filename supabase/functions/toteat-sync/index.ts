@@ -386,7 +386,7 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       const dias = [...(w.inventories ?? [])].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
       for (const d of dias) {
         if (Number(d.cost) > 0) ultimoCosto = Number(d.cost);
-        const fecha = String(d.date).replace(/D/g, "").slice(0, 8); // acepta 20260901, 2026-09-01 o con hora
+        const fecha = String(d.date).replace(/[^0-9]/g, "").slice(0, 8); // acepta 20260901, 2026-09-01 o con hora
         if (fecha < ini || fecha > end) continue;
         const bodega = String(w.warehouse_id);
         const acc = compras.get(bodega) ?? { valor: 0, entradas: 0, items: new Map() };
