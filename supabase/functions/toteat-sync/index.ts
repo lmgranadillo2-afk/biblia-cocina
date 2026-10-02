@@ -252,11 +252,23 @@ async function sincronizarCostos(svc: SupabaseClient, loc: { id: string; slug: s
 }
 
 // Consulta genérica a la API de Toteat (GET) con las credenciales del restaurante.
-async function toteatGet(cred: Record<string, string>, ruta: string, extra: Record<string, string>) {
+const llamadasToteat = new Map<string, number[]>();
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function esperarTurno(token: string) {
+  const ahora = Date.now();
+  const previas = (llamadasToteat.get(token) ?? []).filter((t) => ahora - t < 61000);
+  if (previas.length >= 3) await dormir(61000 - (ahora - previas[0]));
+  llamadasToteat.set(token, [...previas, Date.now()].slice(-3));
+}
+async function toteatGet(cred: Record<string, string>, ruta: string, extra: Record<string, string>, reintento = true): Promise<any> {
+  await esperarTurno(cred.token);
   const qs = new URLSearchParams({ xir: cred.xir, xil: cred.xil, xiu: cred.xiu, xapitoken: cred.token, ...extra });
   const r = await fetch(`https://api.toteat.com/mw/or/1.0/${ruta}?` + qs.toString());
   const body = await r.json().catch(() => null);
-  if (r.status === 429) throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
+  if (r.status === 429) {
+    if (reintento) { await dormir(61000); return toteatGet(cred, ruta, extra, false); }
+    throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
+  }
   if (!r.ok || !body || body.ok === false) {
     const detalle = typeof body?.msg === "string" ? body.msg : JSON.stringify(body?.msg ?? r.status);
     // La pista de permisos solo cuando el problema parece de acceso, no de fechas.
@@ -270,7 +282,18 @@ const sumarDia = (yyyymmdd: string, dias: number) => {
   return d.toISOString().slice(0, 10).replace(/-/g, "");
 };
 
-// Food cost de un período (máx. 15 días):
+// Tramos [ini, fin] de máximo `dias` días (Toteat limita el rango de cada consulta).
+function tramos(ini: string, end: string, dias: number): [string, string][] {
+  const out: [string, string][] = [];
+  for (let a = ini; a <= end; ) {
+    const b = sumarDia(a, dias - 1) < end ? sumarDia(a, dias - 1) : end;
+    out.push([a, b]);
+    a = sumarDia(b, 1);
+  }
+  return out;
+}
+
+// Food cost de un período (hasta un mes; se consulta por tramos):
 //  - Ventas netas y costo teórico (recetas de Toteat) desde las ventas.
 //  - Merma desde el inventario: entre la primera y la última toma física del período,
 //    lo esperado (inicial + compras + transformaciones + uso por ventas) contra lo contado.
@@ -279,8 +302,12 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
   if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
   if (!/^\d{8}$/.test(ini) || !/^\d{8}$/.test(end) || end < ini) throw new ErrorSync("Fechas inválidas.");
 
-  // ---- Ventas ----
-  const ventasBody = await toteatGet(cred, "sales", { ini, end });
+  if (sumarDia(ini, 31) <= end) throw new ErrorSync("El período máximo es un mes.");
+
+  // ---- Ventas (tramos de hasta 14 días) ----
+  const ventas: any[] = [];
+  for (const [a, b] of tramos(ini, end, 14)) ventas.push(...((await toteatGet(cred, "sales", { ini: a, end: b })).data ?? []));
+  const ventasBody = { data: ventas };
   let ventasNetas = 0, costoTeorico = 0, ventasSinCosto = 0, pagos = 0;
   const porCategoria = new Map<string, { ventas: number; costo: number }>();
   const porProducto = new Map<string, { nombre: string; categoria: string; cantidad: number; ventas: number; costo: number }>();
@@ -301,13 +328,26 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
     }
   }
 
-  // ---- Inventario (se pide un día más para tener la toma de cierre) ----
-  // Toteat exige menos de 15 días por consulta de inventario: si el período (más el día de cierre)
-  // se pasa, se toman los últimos 14 días, que es donde están las tomas que importan.
-  const finInv = sumarDia(end, 1);
-  let iniInv = ini;
-  if (sumarDia(iniInv, 13) < finInv) iniInv = sumarDia(finInv, -13);
-  const invBody = await toteatGet(cred, "inventorystate", { initial_date: iniInv, final_date: finInv });
+  // ---- Inventario (un día más para tener la toma de cierre; tramos de 14 días, Toteat exige < 15) ----
+  // Se unen los días de todos los tramos por ingrediente y bodega.
+  const porIngrediente = new Map<string, { product: string; unit: string; bodegas: Map<string, Map<string, any>> }>();
+  for (const [a, b] of tramos(ini, sumarDia(end, 1), 14)) {
+    const parte = await toteatGet(cred, "inventorystate", { initial_date: a, final_date: b });
+    for (const ing of parte.data ?? []) {
+      const key = String(ing.product_id ?? ing.product);
+      const acc = porIngrediente.get(key) ?? { product: String(ing.product ?? ""), unit: String(ing.unit ?? ""), bodegas: new Map() };
+      for (const w of ing.warehouses ?? []) {
+        const dias = acc.bodegas.get(String(w.warehouse_id)) ?? new Map();
+        for (const d of w.inventories ?? []) dias.set(String(d.date), d);
+        acc.bodegas.set(String(w.warehouse_id), dias);
+      }
+      porIngrediente.set(key, acc);
+    }
+  }
+  const invBody = { data: [...porIngrediente.values()].map((v) => ({
+    product: v.product, unit: v.unit,
+    warehouses: [...v.bodegas.entries()].map(([id, dias]) => ({ warehouse_id: id, inventories: [...dias.values()] })),
+  })) };
   let mermaValor = 0, ingredientesConTomas = 0, ingredientesSinTomas = 0;
   let primeraToma: string | null = null, ultimaToma: string | null = null;
   const mermas: { ingrediente: string; unidad: string; cantidad: number; valor: number }[] = [];
@@ -359,6 +399,32 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
   };
 }
 
+// Primer y último día de un mes 'YYYY-MM'; si el mes no terminó, hasta ayer (hora Colombia).
+function rangoMes(mes: string): [string, string] {
+  if (!/^\d{4}-\d{2}$/.test(mes)) throw new ErrorSync("Mes inválido.");
+  const ini = mes.replace("-", "") + "01";
+  const sig = new Date(Date.UTC(+mes.slice(0, 4), +mes.slice(5, 7), 1));
+  let end = sumarDia(sig.toISOString().slice(0, 10).replace(/-/g, ""), -1);
+  const ayer = fechaToteat(1);
+  if (end > ayer) end = ayer;
+  if (end < ini) throw new ErrorSync("Ese mes todavía no tiene días cerrados.");
+  return [ini, end];
+}
+async function informeMensual(svc: SupabaseClient, loc: { id: string; slug: string; name: string }, mes: string, origen: string) {
+  const [ini, end] = rangoMes(mes);
+  const datos = await foodCost(loc, ini, end);
+  const { error } = await svc.from("foodcost_informes").upsert(
+    { location_id: loc.id, mes: mes + "-01", datos, origen, generado: new Date().toISOString() },
+    { onConflict: "location_id,mes" });
+  if (error) throw new ErrorSync("No se pudo guardar el informe: " + error.message, 500);
+  return { ...datos, mes };
+}
+function mesAnterior() {
+  const d = new Date(Date.now() - 5 * 3600 * 1000);
+  const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+  return m.toISOString().slice(0, 7);
+}
+
 async function registrar(svc: SupabaseClient, locationId: string, origen: string, resumen: Record<string, unknown> | null, error: string | null) {
   await svc.from("toteat_sync_log").insert({
     location_id: locationId, origen,
@@ -386,6 +452,13 @@ Deno.serve(async (req) => {
     if (payload.cron_token) {
       const { data: cfg } = await svc.from("toteat_cron_config").select("token").eq("id", 1).maybeSingle();
       if (!cfg || cfg.token !== payload.cron_token) return json({ ok: false, error: "Token de cron inválido." }, 401);
+      // Informe mensual automático (día 1): una llamada por restaurante, en paralelo desde pg_cron.
+      if (payload.accion === "foodcost_mensual") {
+        const { data: loc } = await svc.from("locations").select("id, slug, name").eq("id", payload.location_id).maybeSingle();
+        if (!loc || credenciales(loc.slug).faltan.length === 4) return json({ ok: true, omitido: true });
+        try { const r = await informeMensual(svc, loc, mesAnterior(), "automatico"); return json({ ok: true, mes: r.mes }); }
+        catch (e) { return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500); }
+      }
       const { data: locs } = await svc.from("locations").select("id, slug, name").eq("activo", true);
       const resultados: Record<string, unknown>[] = [];
       for (const loc of locs ?? []) {
@@ -425,6 +498,9 @@ Deno.serve(async (req) => {
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
     try {
+      if (accion === "foodcost_mes") {
+        return json(await informeMensual(svc, loc, String(payload.mes ?? ""), "manual"));
+      }
       if (accion === "foodcost") {
         return json(await foodCost(loc, String(payload.ini ?? ""), String(payload.end ?? "")));
       }

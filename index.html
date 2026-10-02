@@ -2652,10 +2652,97 @@ function renderFoodcostPanel(){
       <div class="field"><label class="field-label">Hasta</label><input type="date" id="fcEnd" value="${foodcostFechas.end}"></div>
       <div class="ev-dim" style="font-size:12px; margin-bottom:10px;">Máximo 14 días por reporte (límite de Toteat). Por defecto: la semana pasada.</div>
       <button class="btn btn-accent btn-block" id="fcGenerar">Generar reporte</button>
-    </div>`;
+    </div>
+    <div class="section-label" style="margin:18px 16px 6px;">Informes mensuales</div>
+    <div class="obs-form" style="margin:0 14px;">
+      <div class="field"><label class="field-label">Mes</label><input type="month" id="fcMes" value="${mesAnteriorISO()}"></div>
+      <button class="btn btn-ghost btn-block" id="fcGenerarMes">Generar informe del mes</button>
+      <div class="ev-dim" style="font-size:12px; margin-top:6px;">Tarda 1 a 2 minutos (Toteat solo deja consultar de a 14 días). Queda guardado. El día 1 de cada mes se genera solo el del mes anterior.</div>
+    </div>
+    <div id="fcInformes" style="margin-top:8px;"><div class="empty-note" style="margin:0 14px;">Cargando informes...</div></div>`;
   document.getElementById('fcIni').addEventListener('change', e=>{ foodcostFechas.ini = e.target.value; });
   document.getElementById('fcEnd').addEventListener('change', e=>{ foodcostFechas.end = e.target.value; });
   document.getElementById('fcGenerar').addEventListener('click', generarFoodcost);
+  document.getElementById('fcGenerarMes').addEventListener('click', generarInformeMes);
+  cargarInformesMensuales();
+}
+
+/* Informes mensuales guardados (tabla foodcost_informes). */
+const MESES_NOMBRE = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function mesAnteriorISO(){
+  const d = new Date(Date.now() - 5 * 3600 * 1000);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+}
+function nombreMes(iso){ return MESES_NOMBRE[+iso.slice(5, 7) - 1] + ' ' + iso.slice(0, 4); }
+
+async function cargarInformesMensuales(){
+  const box = document.getElementById('fcInformes');
+  if(!box) return;
+  const { data, error } = await supa.from('foodcost_informes')
+    .select('id, mes, generado, origen, ventas:datos->ventas_netas, fc:datos->foodcost_teorico, fcr:datos->foodcost_real')
+    .eq('location_id', restauranteVisibleId()).order('mes', { ascending: false });
+  if(error){ box.innerHTML = `<div class="empty-note" style="margin:0 14px;">No se pudieron cargar los informes: ${escapeHtml(error.message)}</div>`; return; }
+  if(!data.length){ box.innerHTML = '<div class="empty-note" style="margin:0 14px;">Todavía no hay informes mensuales.</div>'; return; }
+  box.innerHTML = data.map(i => `<div class="rec-card" data-id="${i.id}">
+      <div class="rec-card-main"><div class="rec-card-name">${nombreMes(i.mes)}</div>
+        <div class="rec-card-code">${fmtMoney(i.ventas)} en ventas · ${i.origen === 'automatico' ? 'automático' : 'manual'}</div></div>
+      <div class="rec-card-yield">${i.fcr !== null && i.fcr !== undefined ? i.fcr + '% real' : (i.fc !== null && i.fc !== undefined ? i.fc + '% teórico' : '—')}</div>
+    </div>`).join('');
+  box.querySelectorAll('.rec-card').forEach(el => el.addEventListener('click', () => abrirInformeMensual(el.dataset.id)));
+}
+
+async function mostrarFoodcost(datos, locId, titulo){
+  const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', locId);
+  FC_ACTUAL = { r: datos, locId, titulo, grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
+  pintarFoodcost();
+}
+
+async function abrirInformeMensual(id){
+  const pane = document.getElementById('costeoDetailPane'), body = document.getElementById('costeoDetailBody');
+  pane.classList.add('open');
+  body.innerHTML = '<div class="detail-title">Food cost</div><div class="empty-note">Cargando informe...</div>';
+  const { data, error } = await supa.from('foodcost_informes').select('*').eq('id', id).single();
+  if(error){ body.innerHTML = `<div class="empty-note" style="color:#B0281C;">${escapeHtml(error.message)}</div>`; return; }
+  await mostrarFoodcost(data.datos, data.location_id, 'Informe de ' + nombreMes(data.mes));
+}
+
+async function generarInformeMes(){
+  const mes = document.getElementById('fcMes').value;
+  if(!mes){ showToast('Elegí un mes'); return; }
+  const btn = document.getElementById('fcGenerarMes');
+  const pane = document.getElementById('costeoDetailPane'), body = document.getElementById('costeoDetailBody');
+  pane.classList.add('open');
+  body.innerHTML = `<div class="detail-title">Informe de ${nombreMes(mes)}</div><div class="empty-note">Consultando un mes de ventas e inventario en Toteat. Tarda 1 a 2 minutos, no cierres esta pantalla...</div>`;
+  btn.disabled = true; btn.textContent = 'Generando... (1 a 2 minutos)';
+  try{
+    const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: restauranteVisibleId(), accion: 'foodcost_mes', mes } });
+    if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
+    if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
+    await mostrarFoodcost(data, restauranteVisibleId(), 'Informe de ' + nombreMes(mes));
+    cargarInformesMensuales();
+    showToast('Informe guardado');
+  } catch(err){
+    body.innerHTML = `<div class="detail-title">Informe de ${nombreMes(mes)}</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generar informe del mes';
+  }
+}
+
+// PDF del informe: abre el informe en una ventana con los estilos de la app y lanza la impresión.
+function descargarInformeFoodcost(){
+  const w = window.open('', '_blank');
+  if(!w){ showToast('El navegador bloqueó la ventana: permití ventanas emergentes'); return; }
+  const estilos = [...document.querySelectorAll('style')].map(st => st.outerHTML).join('');
+  const contenido = renderFoodcostReporte(FC_ACTUAL.r);
+  const rest = restauranteDe(FC_ACTUAL.locId);
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml((FC_ACTUAL.titulo || 'Food cost') + (rest ? ' - ' + rest.name : ''))}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    ${estilos}<style>body{background:#fff; padding:24px; max-width:900px; margin:0 auto;} @page{margin:12mm;} .ev-table-wrap{overflow:visible;}</style></head>
+    <body>${FC_ACTUAL.titulo ? `<div class="ev-dim" style="font-size:13px; margin-bottom:4px;">${escapeHtml(FC_ACTUAL.titulo)}</div>` : ''}${contenido}</body></html>`);
+  w.document.close();
+  // Las listas de grupo se imprimen como texto.
+  w.document.querySelectorAll('select').forEach(sel => { const sp = w.document.createElement('span'); sp.textContent = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : ''; sel.replaceWith(sp); });
+  setTimeout(() => w.print(), 600);
 }
 
 async function generarFoodcost(){
@@ -2671,9 +2758,7 @@ async function generarFoodcost(){
     const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: restauranteVisibleId(), accion: 'foodcost', ini: ini.replace(/-/g, ''), end: end.replace(/-/g, '') } });
     if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
     if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
-    const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', restauranteVisibleId());
-    FC_ACTUAL = { r: data, locId: restauranteVisibleId(), grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
-    pintarFoodcost();
+    await mostrarFoodcost(data, restauranteVisibleId(), null);
   } catch(err){
     body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note" style="color:#B0281C;">${escapeHtml(err.message)}</div>`;
   } finally {
@@ -2698,7 +2783,10 @@ function grupoDe(cat){ return (FC_ACTUAL && FC_ACTUAL.grupos[cat]) || grupoSuger
 
 function pintarFoodcost(){
   const body = document.getElementById('costeoDetailBody');
-  body.innerHTML = renderFoodcostReporte(FC_ACTUAL.r);
+  body.innerHTML = (FC_ACTUAL.titulo ? `<div class="ev-dim" style="font-size:13px; margin-bottom:2px;">${escapeHtml(FC_ACTUAL.titulo)}</div>` : '')
+    + renderFoodcostReporte(FC_ACTUAL.r)
+    + '<button class="btn btn-accent btn-block" id="fcPdf" style="margin-top:16px;">Descargar informe (PDF)</button>';
+  document.getElementById('fcPdf').addEventListener('click', descargarInformeFoodcost);
   body.querySelectorAll('.fc-grupo').forEach(sel => sel.addEventListener('change', async ()=>{
     const categoria = sel.dataset.cat, grupo = sel.value;
     FC_ACTUAL.grupos[categoria] = grupo;
