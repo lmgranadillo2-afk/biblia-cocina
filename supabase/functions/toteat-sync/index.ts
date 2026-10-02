@@ -378,6 +378,31 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
   }
   mermas.sort((x, y) => y.valor - x.valor);
 
+  // ---- Compras del período por bodega (solo días ini..end; el día extra es solo para la toma de cierre) ----
+  const compras = new Map<string, { valor: number; entradas: number; items: Map<string, number> }>();
+  for (const ing of invBody.data ?? []) {
+    for (const w of ing.warehouses ?? []) {
+      let ultimoCosto = 0;
+      const dias = [...(w.inventories ?? [])].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+      for (const d of dias) {
+        if (Number(d.cost) > 0) ultimoCosto = Number(d.cost);
+        const fecha = String(d.date);
+        if (fecha < ini || fecha > end) continue;
+        const bodega = String(w.warehouse_id);
+        const acc = compras.get(bodega) ?? { valor: 0, entradas: 0, items: new Map() };
+        const comprado = (Number(d.purchase) || 0) * (Number(d.cost) || ultimoCosto);
+        const entrada = Math.max(0, Number(d.transformed) || 0) * (Number(d.cost) || ultimoCosto);
+        acc.valor += comprado; acc.entradas += entrada;
+        if (comprado) acc.items.set(String(ing.product ?? ""), (acc.items.get(String(ing.product ?? "")) ?? 0) + comprado);
+        compras.set(bodega, acc);
+      }
+    }
+  }
+  const comprasPorBodega = [...compras.entries()].map(([bodega, v]) => ({
+    bodega, valor: Math.round(v.valor), entradas_transformacion: Math.round(v.entradas),
+    top: [...v.items.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([nombre, valor]) => ({ nombre, valor: Math.round(valor) })),
+  })).sort((a, b) => b.valor - a.valor);
+
   const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
   const productos = [...porProducto.values()].filter((p) => p.ventas > 0 && p.costo > 0)
     .map((p) => ({ ...p, ventas: Math.round(p.ventas), costo: Math.round(p.costo), foodcost: pct(p.costo, p.ventas) }));
@@ -390,6 +415,7 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
     costo_real: Math.round(costoTeorico + mermaValor),
     foodcost_real: ingredientesConTomas ? pct(costoTeorico + mermaValor, ventasNetas) : null,
     tomas: { primera: primeraToma, ultima: ultimaToma, ingredientes_con_tomas: ingredientesConTomas, ingredientes_sin_tomas: ingredientesSinTomas },
+    compras_por_bodega: comprasPorBodega,
     categorias: [...porCategoria.entries()].map(([categoria, v]) => ({ categoria, ventas: Math.round(v.ventas), costo: Math.round(v.costo), foodcost: pct(v.costo, v.ventas) }))
       .sort((a, b) => b.ventas - a.ventas),
     peores_productos: productos.filter((p) => p.cantidad >= 3).sort((a, b) => (b.foodcost ?? 0) - (a.foodcost ?? 0)).slice(0, 12),
