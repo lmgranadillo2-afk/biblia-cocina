@@ -337,12 +337,12 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
     const prods = t.products ?? [];
     const pagadoProductos = pagadoDe(t);
     const netoPago = netoDe(t);
-    if (!pagadoProductos) {
+    if (!prods.length) {
       const refId = t.referencedPayment && typeof t.referencedPayment === "object" ? t.referencedPayment.paymentId : t.referencedPayment;
       const ref = refId ? porPago.get(String(refId)) : null;
       sinProductos.pagos++; sinProductos.neto += netoPago;
-      if (sinProductos.ejemplos.length < 15) sinProductos.ejemplos.push({ total: Number(t.total) || 0, taxes: Number(t.taxes) || 0, subtotal: Number(t.subtotal) || 0, discounts: Number(t.discounts) || 0, lineas: prods.length, referencia: !!refId, referencia_encontrada: !!ref, fecha: String(t.dateClosed ?? "").slice(0, 10) });
-      if (ref && pagadoDe(ref)) {
+      sinProductos.ejemplos.push({ total: Number(t.total) || 0, taxes: Number(t.taxes) || 0, subtotal: Number(t.subtotal) || 0, discounts: Number(t.discounts) || 0, lineas: prods.length, referencia: !!refId, referencia_encontrada: !!ref, fecha: String(t.dateClosed ?? "").slice(0, 10) });
+      if (ref && pagadoDe(ref) && (ref.products ?? []).length) {
         sinProductos.con_referencia++; sinProductos.neto_con_referencia += netoPago;
         const pagadoRef = pagadoDe(ref), netoRef = netoDe(ref);
         const fraccion = netoRef ? Math.max(-1, Math.min(1, netoPago / netoRef)) : 0;
@@ -352,12 +352,13 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       }
       continue;
     }
+    if (!pagadoProductos && netoPago) sumarLinea("AJUSTES SIN DETALLE", { id: "ajustes", name: "Ajustes sin detalle de productos" }, netoPago, 0, 0);
     for (const p of prods) {
       const linea = p.lineId != null ? `${t.orderId}:${p.lineId}` : null;
       const repetida = linea !== null && lineasVistas.has(linea);
       if (linea !== null) lineasVistas.add(linea);
       const cat = String(p.hierarchyName ?? "Sin categoría");
-      sumarLinea(cat, p, netoPago * (Number(p.payed) || 0) / pagadoProductos, repetida ? 0 : Number(p.quantity) || 0, repetida ? 0 : costoLinea(p));
+      sumarLinea(cat, p, pagadoProductos ? netoPago * (Number(p.payed) || 0) / pagadoProductos : 0, repetida ? 0 : Number(p.quantity) || 0, repetida ? 0 : costoLinea(p));
       const ic = impuestosCat.get(cat) ?? { impuestos: 0, pagado: 0 };
       ic.impuestos += Number(p.taxes) || 0; ic.pagado += Number(p.payed) || 0; impuestosCat.set(cat, ic);
     }
@@ -477,7 +478,7 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       fechas.sort();
       return { registros: ventas.length, ordenes_distintas: ordenes.size, fecha_min: fechas[0] ?? null, fecha_max: fechas[fechas.length - 1] ?? null,
         fuera_de_rango: fechas.filter((f) => f < ini || f > end).length,
-        pagos_sin_productos: { ...sinProductos, neto: Math.round(sinProductos.neto), neto_con_referencia: Math.round(sinProductos.neto_con_referencia) },
+        pagos_sin_productos: { ...sinProductos, ejemplos: sinProductos.ejemplos.sort((x: any, y: any) => Math.abs(y.total) - Math.abs(x.total)).slice(0, 15), neto: Math.round(sinProductos.neto), neto_con_referencia: Math.round(sinProductos.neto_con_referencia) },
         lineas_repetidas: [...ventas].reduce((a: number, t: any) => a + (t.products ?? []).length, 0) - lineasVistas.size,
         impuestos_por_categoria: [...impuestosCat.entries()].map(([categoria, v]) => ({ categoria, impuestos: Math.round(v.impuestos), pagado: Math.round(v.pagado) })).sort((a, b) => b.impuestos - a.impuestos),
         campos_venta: Object.keys(ventas[0] ?? {}), suma_venta: venta, suma_producto: producto };
