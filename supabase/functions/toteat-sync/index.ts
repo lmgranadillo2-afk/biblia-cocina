@@ -311,33 +311,55 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
   let ventasNetas = 0, costoTeorico = 0, ventasSinCosto = 0, pagos = 0;
   const porCategoria = new Map<string, { ventas: number; costo: number }>();
   const porProducto = new Map<string, { nombre: string; categoria: string; cantidad: number; ventas: number; costo: number }>();
-  // Cuando una cuenta se paga en partes, cada pago repite las líneas de la orden: la cantidad y el costo
-  // se cuentan una sola vez por línea (lineId). La venta de cada pago (venta bruta con descuentos − impuestos)
-  // se reparte entre sus productos en proporción a lo pagado, así el descuento queda aplicado y no se duplica.
+  // La venta de cada pago (venta bruta con descuentos − impuestos) se reparte entre sus productos en proporción
+  // a lo pagado, así el descuento queda aplicado. Los pagos sin productos (anulaciones/devoluciones) se reparten
+  // entre los productos del pago al que hacen referencia, y restan también la cantidad y el costo en esa proporción.
+  // Si una línea (lineId) aparece en más de un pago de la misma orden, su cantidad y costo se cuentan una vez.
   const lineasVistas = new Set<string>();
   const impuestosCat = new Map<string, { impuestos: number; pagado: number }>();
-  for (const t of ventasBody.data ?? []) {
+  const porPago = new Map<string, any>();
+  for (const t of ventas) if (t.paymentId != null) porPago.set(String(t.paymentId), t);
+  const netoDe = (t: any) => (Number(t.total) || 0) - (Number(t.taxes) || 0);
+  const pagadoDe = (t: any) => (t.products ?? []).reduce((a: number, p: any) => a + (Number(p.payed) || 0), 0);
+  const sinProductos = { pagos: 0, neto: 0, con_referencia: 0, neto_con_referencia: 0, ejemplos: [] as any[] };
+  const sumarLinea = (cat: string, p: any, neto: number, cant: number, costo: number) => {
+    ventasNetas += neto; costoTeorico += costo;
+    if (!costo && neto > 0) ventasSinCosto += neto;
+    const c = porCategoria.get(cat) ?? { ventas: 0, costo: 0 };
+    c.ventas += neto; c.costo += costo; porCategoria.set(cat, c);
+    const key = String(p.id ?? p.name);
+    const pr = porProducto.get(key) ?? { nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0, costo: 0 };
+    pr.cantidad += cant; pr.ventas += neto; pr.costo += costo; porProducto.set(key, pr);
+  };
+  const costoLinea = (p: any) => Number(p.totalCost ?? p["totalCost*"]) || (Number(p.unitCost ?? p["unitCost*"]) || 0) * (Number(p.quantity) || 0);
+  for (const t of ventas) {
     pagos++;
     const prods = t.products ?? [];
-    const pagadoProductos = prods.reduce((a: number, p: any) => a + (Number(p.payed) || 0), 0);
-    const netoPago = (Number(t.total) || 0) - (Number(t.taxes) || 0);
+    const pagadoProductos = pagadoDe(t);
+    const netoPago = netoDe(t);
+    if (!pagadoProductos) {
+      const refId = t.referencedPayment && typeof t.referencedPayment === "object" ? t.referencedPayment.paymentId : t.referencedPayment;
+      const ref = refId ? porPago.get(String(refId)) : null;
+      sinProductos.pagos++; sinProductos.neto += netoPago;
+      if (sinProductos.ejemplos.length < 15) sinProductos.ejemplos.push({ total: Number(t.total) || 0, taxes: Number(t.taxes) || 0, subtotal: Number(t.subtotal) || 0, discounts: Number(t.discounts) || 0, lineas: prods.length, referencia: !!refId, referencia_encontrada: !!ref, fecha: String(t.dateClosed ?? "").slice(0, 10) });
+      if (ref && pagadoDe(ref)) {
+        sinProductos.con_referencia++; sinProductos.neto_con_referencia += netoPago;
+        const pagadoRef = pagadoDe(ref), netoRef = netoDe(ref);
+        const fraccion = netoRef ? Math.max(-1, Math.min(1, netoPago / netoRef)) : 0;
+        for (const p of ref.products) sumarLinea(String(p.hierarchyName ?? "Sin categoría"), p, netoPago * (Number(p.payed) || 0) / pagadoRef, (Number(p.quantity) || 0) * fraccion, costoLinea(p) * fraccion);
+      } else if (netoPago) {
+        sumarLinea("AJUSTES SIN DETALLE", { id: "ajustes", name: "Ajustes sin detalle de productos" }, netoPago, 0, 0);
+      }
+      continue;
+    }
     for (const p of prods) {
       const linea = p.lineId != null ? `${t.orderId}:${p.lineId}` : null;
       const repetida = linea !== null && lineasVistas.has(linea);
       if (linea !== null) lineasVistas.add(linea);
-      const cant = repetida ? 0 : Number(p.quantity) || 0;
-      const neto = pagadoProductos ? netoPago * (Number(p.payed) || 0) / pagadoProductos : 0;
-      const costo = repetida ? 0 : Number(p.totalCost ?? p["totalCost*"]) || (Number(p.unitCost ?? p["unitCost*"]) || 0) * cant;
-      ventasNetas += neto; costoTeorico += costo;
-      if (!costo && neto > 0) ventasSinCosto += neto;
       const cat = String(p.hierarchyName ?? "Sin categoría");
-      const c = porCategoria.get(cat) ?? { ventas: 0, costo: 0 };
-      c.ventas += neto; c.costo += costo; porCategoria.set(cat, c);
+      sumarLinea(cat, p, netoPago * (Number(p.payed) || 0) / pagadoProductos, repetida ? 0 : Number(p.quantity) || 0, repetida ? 0 : costoLinea(p));
       const ic = impuestosCat.get(cat) ?? { impuestos: 0, pagado: 0 };
       ic.impuestos += Number(p.taxes) || 0; ic.pagado += Number(p.payed) || 0; impuestosCat.set(cat, ic);
-      const key = String(p.id ?? p.name);
-      const pr = porProducto.get(key) ?? { nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0, costo: 0 };
-      pr.cantidad += cant; pr.ventas += neto; pr.costo += costo; porProducto.set(key, pr);
     }
   }
 
@@ -455,6 +477,7 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       fechas.sort();
       return { registros: ventas.length, ordenes_distintas: ordenes.size, fecha_min: fechas[0] ?? null, fecha_max: fechas[fechas.length - 1] ?? null,
         fuera_de_rango: fechas.filter((f) => f < ini || f > end).length,
+        pagos_sin_productos: { ...sinProductos, neto: Math.round(sinProductos.neto), neto_con_referencia: Math.round(sinProductos.neto_con_referencia) },
         lineas_repetidas: [...ventas].reduce((a: number, t: any) => a + (t.products ?? []).length, 0) - lineasVistas.size,
         impuestos_por_categoria: [...impuestosCat.entries()].map(([categoria, v]) => ({ categoria, impuestos: Math.round(v.impuestos), pagado: Math.round(v.pagado) })).sort((a, b) => b.impuestos - a.impuestos),
         campos_venta: Object.keys(ventas[0] ?? {}), suma_venta: venta, suma_producto: producto };
