@@ -426,6 +426,24 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
     productos: [...porProducto.values()].filter((p) => p.cantidad > 0)
       .map((p) => ({ nombre: p.nombre, categoria: p.categoria, cantidad: p.cantidad, ventas: Math.round(p.ventas), costo: Math.round(p.costo) }))
       .sort((a, b) => b.ventas - a.ventas),
+    // Diagnóstico: suma de cada campo numérico de las ventas y de sus productos (sin datos de clientes),
+    // para cuadrar contra el total de ventas que muestra Toteat.
+    diagnostico_ventas: (() => {
+      const sumar = (acc: Record<string, number>, o: any) => { for (const [k, v] of Object.entries(o ?? {})) if (typeof v === "number" || (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v))) acc[k] = Math.round((acc[k] ?? 0) + Number(v)); };
+      const venta: Record<string, number> = {}, producto: Record<string, number> = {};
+      const ordenes = new Set<string>(), fechas: string[] = [];
+      for (const t of ventas) {
+        sumar(venta, t);
+        for (const p of t.products ?? []) sumar(producto, p);
+        if (t.orderId ?? t.order_id) ordenes.add(String(t.orderId ?? t.order_id));
+        const f = String(t.date ?? t.dateClosed ?? "").replace(/[^0-9]/g, "").slice(0, 8);
+        if (f) fechas.push(f);
+      }
+      fechas.sort();
+      return { registros: ventas.length, ordenes_distintas: ordenes.size, fecha_min: fechas[0] ?? null, fecha_max: fechas[fechas.length - 1] ?? null,
+        fuera_de_rango: fechas.filter((f) => f < ini || f > end).length,
+        campos_venta: Object.keys(ventas[0] ?? {}), suma_venta: venta, suma_producto: producto };
+    })(),
     top_mermas: mermas.slice(0, 15),
     top_sobrantes: mermas.filter((m) => m.valor < 0).sort((a, b) => a.valor - b.valor).slice(0, 5),
   };
