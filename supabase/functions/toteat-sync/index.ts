@@ -386,7 +386,7 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       const dias = [...(w.inventories ?? [])].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
       for (const d of dias) {
         if (Number(d.cost) > 0) ultimoCosto = Number(d.cost);
-        const fecha = String(d.date);
+        const fecha = String(d.date).replace(/D/g, "").slice(0, 8); // acepta 20260901, 2026-09-01 o con hora
         if (fecha < ini || fecha > end) continue;
         const bodega = String(w.warehouse_id);
         const acc = compras.get(bodega) ?? { valor: 0, entradas: 0, items: new Map() };
@@ -416,6 +416,8 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
     foodcost_real: ingredientesConTomas ? pct(costoTeorico + mermaValor, ventasNetas) : null,
     tomas: { primera: primeraToma, ultima: ultimaToma, ingredientes_con_tomas: ingredientesConTomas, ingredientes_sin_tomas: ingredientesSinTomas },
     compras_por_bodega: comprasPorBodega,
+    // Diagnóstico: forma de los registros de inventario de Toteat (primer ingrediente con datos).
+    muestra_inventario: (() => { const i = (invBody.data ?? []).find((x: any) => (x.warehouses ?? []).some((w: any) => (w.inventories ?? []).length)); const w = i && i.warehouses.find((x: any) => (x.inventories ?? []).length); return i ? { producto: i.product, bodega: w.warehouse_id, dias: w.inventories.slice(0, 2) } : null; })(),
     categorias: [...porCategoria.entries()].map(([categoria, v]) => ({ categoria, ventas: Math.round(v.ventas), costo: Math.round(v.costo), foodcost: pct(v.costo, v.ventas) }))
       .sort((a, b) => b.ventas - a.ventas),
     peores_productos: productos.filter((p) => p.cantidad >= 3).sort((a, b) => (b.foodcost ?? 0) - (a.foodcost ?? 0)).slice(0, 12),
