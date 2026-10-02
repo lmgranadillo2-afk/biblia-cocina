@@ -568,6 +568,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
     <div id="view-recetario" class="view active">
       <div class="rec-list-pane">
         <div class="rec-search"><input type="text" id="searchInput" placeholder="Buscar receta o código..."></div>
+        <button class="btn btn-ghost btn-block" id="calcProdBtn" style="margin:0 14px 10px; width:calc(100% - 28px);">Calcular producción</button>
         <div class="rec-count" id="recCount"></div>
         <div class="rec-items" id="recItems"></div>
       </div>
@@ -4230,6 +4231,11 @@ async function renderDetail(r){
     <div class="detail-title">${escapeHtml(r.name)}</div>
     <div class="detail-code">${r.code}</div>
     ${yieldHtml}
+    ${hasYield ? `<div style="display:flex; gap:8px; align-items:center; margin:10px 0 4px;">
+      <input type="number" id="calcDesdeQty" min="0" step="any" placeholder="Cantidad" style="width:120px;">
+      <span class="ev-dim">${normalizeUnitLabel(r.yield_unit)}</span>
+      <button class="btn btn-ghost" id="calcDesdeBtn">Calcular lo que necesito</button>
+    </div>` : ''}
     <div class="section-label">Insumos</div>
     ${ingHtml}
     <div class="section-label">Observaciones de rendimiento</div>
@@ -4239,6 +4245,12 @@ async function renderDetail(r){
       <button class="btn btn-accent btn-block" id="obsSubmit">Guardar observación</button>
     </div>
   `;
+
+  const calcBtn = document.getElementById('calcDesdeBtn');
+  if(calcBtn) calcBtn.addEventListener('click', ()=>{
+    const q = parseFloat(document.getElementById('calcDesdeQty').value);
+    abrirCalculadora([{ code: r.code, qty: q > 0 ? q : '' }]);
+  });
 
   const { data: obsList, error } = await supa.from('observations').select('*').eq('recipe_code', r.code).eq('area_id', currentArea.id).order('created_at', {ascending:false});
   const box = document.getElementById('obsListBox');
@@ -4262,6 +4274,111 @@ async function renderDetail(r){
     showToast('Observación guardada');
     renderDetail(r);
   });
+}
+
+/* ---------- CALCULADORA DE PRODUCCIÓN ----------
+   Para una o varias recetas del punto/área actual y la cantidad deseada (en la unidad de rendimiento),
+   escala cada receta, entra en las subrecetas (todos los niveles) y suma los insumos crudos a pedir. */
+let CALC_LINES = [];
+function abrirCalculadora(lineas){
+  CALC_LINES = lineas && lineas.length ? lineas : [{ code: '', qty: '' }];
+  currentCode = null;
+  renderRecipeList();
+  document.getElementById('recDetailPane').classList.add('open');
+  renderCalculadora();
+}
+document.getElementById('calcProdBtn').addEventListener('click', ()=>abrirCalculadora());
+
+function calcExplotar(lineas){
+  const subrecetas = new Map(), insumos = new Map(), avisos = [];
+  const qtyNum = v => parseFloat(String(v).replace(',', '.')) || 0;
+  function explotar(r, cantidad, unidad, camino){
+    if(camino.has(r.code)){ avisos.push(r.name + ': la receta se usa a sí misma'); return; }
+    const rinde = toBaseQty(qtyNum(r.yield_qty), r.yield_unit);
+    const pedido = toBaseQty(cantidad, unidad);
+    if(!rinde || pedido === null || unitGroup(unidad) !== unitGroup(r.yield_unit)){ avisos.push(r.name + ': sin rendimiento o unidad incompatible'); return; }
+    const factor = pedido / rinde;
+    const sig = new Set(camino); sig.add(r.code);
+    (r.ingredients || []).forEach(ing => {
+      if(ing.code === 'AGUA') return;
+      const q = qtyNum(ing.qty) * factor;
+      const sub = ing.code && RECIPES.find(x => x.code === ing.code);
+      if(sub && sub.yield_qty && unitGroup(ing.unit) === unitGroup(sub.yield_unit)){
+        const acc = subrecetas.get(sub.code) || { nombre: sub.name, code: sub.code, cantidad: 0, unidad: unitGroup(sub.yield_unit) };
+        acc.cantidad += toBaseQty(q, ing.unit);
+        subrecetas.set(sub.code, acc);
+        explotar(sub, q, ing.unit, sig);
+        return;
+      }
+      if(sub) avisos.push(sub.name + ': sin rendimiento o unidad incompatible, se lista como insumo');
+      const grupo = unitGroup(ing.unit);
+      const key = (ing.code || ing.name) + '|' + (grupo || ing.unit);
+      const acc = insumos.get(key) || { nombre: ing.name, code: ing.code, cantidad: 0, unidad: grupo || (ing.unit || '') };
+      acc.cantidad += grupo ? toBaseQty(q, ing.unit) : q;
+      insumos.set(key, acc);
+    });
+  }
+  lineas.forEach(l => {
+    const r = RECIPES.find(x => x.code === l.code);
+    const q = qtyNum(l.qty);
+    if(r && q > 0) explotar(r, q, r.yield_unit, new Set());
+  });
+  const orden = (a, b) => a.nombre.localeCompare(b.nombre);
+  return { subrecetas: [...subrecetas.values()].sort(orden), insumos: [...insumos.values()].sort(orden), avisos: [...new Set(avisos)] };
+}
+// Cantidad en unidad base (KG, L, UND) a texto legible: g/ml si es menos de 1, unidades redondeadas hacia arriba.
+function calcFmt(cantidad, unidad){
+  const n = v => v.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+  if(unidad === 'MASA') return cantidad < 1 ? n(Math.round(cantidad * 1000)) + ' g' : n(cantidad) + ' kg';
+  if(unidad === 'VOLUMEN') return cantidad < 1 ? n(Math.round(cantidad * 1000)) + ' ml' : n(cantidad) + ' L';
+  if(unidad === 'CONTEO') return n(Math.ceil(cantidad - 1e-9)) + ' und';
+  return n(cantidad) + ' ' + unidad;
+}
+function renderCalculadora(){
+  const body = document.getElementById('detailBody');
+  const filas = CALC_LINES.map((l, i) => {
+    const r = RECIPES.find(x => x.code === l.code);
+    return `<div class="calc-fila" data-i="${i}" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+      <input type="text" class="calc-receta" list="recetaList" placeholder="Receta..." value="${r ? escapeHtml(r.name) : ''}" style="flex:1; min-width:180px;">
+      <input type="number" class="calc-qty" min="0" step="any" placeholder="Cantidad" value="${l.qty}" style="width:110px;">
+      <span class="ev-dim" style="width:46px;">${r ? normalizeUnitLabel(r.yield_unit) : ''}</span>
+      <button class="btn btn-ghost calc-quitar" title="Quitar">✕</button>
+    </div>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="detail-title">Calcular producción</div>
+    <div class="ev-dim" style="font-size:13px; margin-bottom:10px;">Escribe la receta y cuánto necesitas (en la unidad en que rinde la receta). Se usan las recetas de ${escapeHtml(currentLocation.name)}.</div>
+    ${filas}
+    <button class="btn btn-ghost" id="calcAgregar">+ Agregar receta</button>
+    <div id="calcResultado"></div>`;
+  body.querySelectorAll('.calc-fila').forEach(div => {
+    const i = +div.dataset.i;
+    div.querySelector('.calc-receta').addEventListener('change', e => {
+      const r = findRecetaByName(e.target.value);
+      CALC_LINES[i].code = r ? r.code : '';
+      if(!r && e.target.value.trim()) showToast('No encontré esa receta en este punto');
+      renderCalculadora();
+    });
+    div.querySelector('.calc-qty').addEventListener('input', e => { CALC_LINES[i].qty = e.target.value; pintarCalcResultado(); });
+    div.querySelector('.calc-quitar').addEventListener('click', () => {
+      CALC_LINES.splice(i, 1);
+      if(!CALC_LINES.length) CALC_LINES.push({ code: '', qty: '' });
+      renderCalculadora();
+    });
+  });
+  document.getElementById('calcAgregar').addEventListener('click', () => { CALC_LINES.push({ code: '', qty: '' }); renderCalculadora(); });
+  pintarCalcResultado();
+}
+function pintarCalcResultado(){
+  const box = document.getElementById('calcResultado');
+  if(!box) return;
+  const res = calcExplotar(CALC_LINES);
+  if(!res.insumos.length && !res.subrecetas.length){ box.innerHTML = '<div class="empty-note" style="margin-top:14px;">Elige una receta y escribe la cantidad.</div>'; return; }
+  const lista = items => `<div class="ingredient-ticket">` + items.map(x =>
+    `<div class="ing-row"><div class="ing-name">${x.code ? `<span class="ing-code">${escapeHtml(x.code)}</span>` : ''}${escapeHtml(x.nombre)}</div><div class="ing-qty">${calcFmt(x.cantidad, x.unidad)}</div></div>`).join('') + `</div>`;
+  box.innerHTML = (res.subrecetas.length ? `<div class="section-label">Subrecetas a preparar</div>${lista(res.subrecetas)}` : '')
+    + `<div class="section-label">Insumos a pedir (en crudo)</div>${lista(res.insumos)}`
+    + (res.avisos.length ? `<div class="ev-dim" style="font-size:12px; margin-top:8px;">⚠ ${res.avisos.map(escapeHtml).join('<br>⚠ ')}</div>` : '');
 }
 
 /* ---------- PRODUCCION ---------- */
