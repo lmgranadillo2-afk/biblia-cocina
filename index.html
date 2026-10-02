@@ -2783,7 +2783,7 @@ const FC_GRUPOS = { cocina: 'Cocina', barra: 'Barra', excluir: 'Excluir' };
 function grupoSugerido(cat){
   const c = (cat || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
   if(/^(OTROS|MERCH|SIN CATEGORIA)$|^(COVER|EVENTO|BONO)/.test(c)) return 'excluir';
-  if(/COMPARTIR|ENTRADA|TACO|POSTRE|ASADOR|ENSALADA|BOWL|ESPECIAL|FUERTE|PLATO|COCINA|BOTANA|QUESADILLA|BIRRIA|NACHO|SOPA|ACOMPA/.test(c)) return 'cocina';
+  if(/COMPARTIR|ENTRADA|TACO|POSTRE|ASADOR|ENSALADA|BOWL|ESPECIAL|FUERTE|PLATO|COCINA|BOTANA|QUESADILLA|BIRRIA|NACHO|SOPA|ACOMPA|ADICION/.test(c)) return 'cocina';
   return 'barra';
 }
 function grupoDe(cat){ return (FC_ACTUAL && FC_ACTUAL.grupos[cat]) || grupoSugerido(cat); }
