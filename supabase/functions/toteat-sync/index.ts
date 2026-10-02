@@ -258,7 +258,10 @@ async function toteatGet(cred: Record<string, string>, ruta: string, extra: Reco
   const body = await r.json().catch(() => null);
   if (r.status === 429) throw new ErrorSync("Toteat permite 3 consultas por minuto. Esperá un minuto y probá de nuevo.", 429);
   if (!r.ok || !body || body.ok === false) {
-    throw new ErrorSync(`Toteat rechazó la consulta '${ruta}': ` + (typeof body?.msg === "string" ? body.msg : JSON.stringify(body?.msg ?? r.status)) + `. Revisá que la ruta '${ruta}' esté habilitada en Seguridad.`, 502);
+    const detalle = typeof body?.msg === "string" ? body.msg : JSON.stringify(body?.msg ?? r.status);
+    // La pista de permisos solo cuando el problema parece de acceso, no de fechas.
+    const pista = (r.status === 401 || r.status === 403 || /token|auth|permis|credencial/i.test(detalle)) ? `. Revisá que la ruta '${ruta}' esté habilitada en Seguridad.` : "";
+    throw new ErrorSync(`Toteat rechazó la consulta '${ruta}': ` + detalle + pista, 502);
   }
   return body;
 }
@@ -299,7 +302,12 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
   }
 
   // ---- Inventario (se pide un día más para tener la toma de cierre) ----
-  const invBody = await toteatGet(cred, "inventorystate", { initial_date: ini, final_date: sumarDia(end, 1) });
+  // Toteat exige menos de 15 días por consulta de inventario: si el período (más el día de cierre)
+  // se pasa, se toman los últimos 14 días, que es donde están las tomas que importan.
+  const finInv = sumarDia(end, 1);
+  let iniInv = ini;
+  if (sumarDia(iniInv, 13) < finInv) iniInv = sumarDia(finInv, -13);
+  const invBody = await toteatGet(cred, "inventorystate", { initial_date: iniInv, final_date: finInv });
   let mermaValor = 0, ingredientesConTomas = 0, ingredientesSinTomas = 0;
   let primeraToma: string | null = null, ultimaToma: string | null = null;
   const mermas: { ingrediente: string; unidad: string; cantidad: number; valor: number }[] = [];

@@ -2650,7 +2650,7 @@ function renderFoodcostPanel(){
     <div class="obs-form" style="margin:0 14px;">
       <div class="field"><label class="field-label">Desde</label><input type="date" id="fcIni" value="${foodcostFechas.ini}"></div>
       <div class="field"><label class="field-label">Hasta</label><input type="date" id="fcEnd" value="${foodcostFechas.end}"></div>
-      <div class="ev-dim" style="font-size:12px; margin-bottom:10px;">Máximo 15 días por reporte (límite de Toteat). Por defecto: la semana pasada.</div>
+      <div class="ev-dim" style="font-size:12px; margin-bottom:10px;">Máximo 14 días por reporte (límite de Toteat). Por defecto: la semana pasada.</div>
       <button class="btn btn-accent btn-block" id="fcGenerar">Generar reporte</button>
     </div>`;
   document.getElementById('fcIni').addEventListener('change', e=>{ foodcostFechas.ini = e.target.value; });
@@ -2662,7 +2662,7 @@ async function generarFoodcost(){
   const { ini, end } = foodcostFechas;
   const dias = (new Date(end) - new Date(ini)) / 86400000 + 1;
   if(!ini || !end || dias < 1){ showToast('Revisá las fechas'); return; }
-  if(dias > 15){ showToast('Toteat permite máximo 15 días por consulta'); return; }
+  if(dias > 14){ showToast('Toteat permite máximo 14 días por reporte'); return; }
   const pane = document.getElementById('costeoDetailPane'), body = document.getElementById('costeoDetailBody');
   pane.classList.add('open');
   body.innerHTML = `<div class="detail-title">Food cost</div><div class="empty-note">Consultando ventas e inventario en Toteat... puede tardar unos segundos.</div>`;
