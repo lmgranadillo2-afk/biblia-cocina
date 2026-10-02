@@ -2800,7 +2800,9 @@ function cocinaConsumo(){
   const final = hasValue(c.actual.inventario_final) ? toNum(c.actual.inventario_final) : null;
   const completo = inicial !== null && compras !== null && final !== null;
   const costo = completo ? inicial + compras - final : null;
-  return { ventas, productos, inicial, inicialAnterior, compras, final, costo, completo,
+  const mermas = hasValue(c.actual.mermas) ? toNum(c.actual.mermas) : null;
+  const teorico = productos.reduce((a, p) => a + (p.costo || 0), 0);
+  return { ventas, productos, inicial, inicialAnterior, compras, final, costo, completo, mermas, teorico,
     platos: productos.reduce((a, p) => a + p.cantidad, 0) };
 }
 function renderCocinaConsumo(){
@@ -2820,8 +2822,12 @@ function renderCocinaConsumo(){
       ${fila('(=) Costo de venta', k.completo ? fmtMoney(k.costo) : '—', 'total')}
       ${fila('Utilidad bruta', k.completo ? fmtMoney(k.ventas - k.costo) + (k.ventas ? ' · margen ' + (Math.round((k.ventas - k.costo) / k.ventas * 1000) / 10) + '%' : '') : '—')}
       ${fila('Food cost cocina (real)', fcPct(fc), 'total')}
+      <div class="ev-sum-row"><span>Mermas del mes (transferido a bodega de bajas)</span><span>${campo('fcMermas', k.mermas, 'ya incluidas en el costo de venta')}</span></div>
+      ${k.mermas !== null && k.ventas ? fila('Mermas sobre venta', (Math.round(k.mermas / k.ventas * 1000) / 10) + '%' + (k.completo && k.costo ? ' · ' + (Math.round(k.mermas / k.costo * 1000) / 10) + '% del costo' : '')) : ''}
+      ${k.teorico ? fila('Costo teórico (recetas de Toteat)', fmtMoney(k.teorico) + (k.ventas ? ' · ' + (Math.round(k.teorico / k.ventas * 1000) / 10) + '%' : '')) : ''}
+      ${k.teorico && k.completo ? fila('Diferencia real − teórico', fmtMoney(k.costo - k.teorico)) : ''}
     </div>
-    ${puede ? '<button class="btn btn-accent btn-block" id="fcCocinaGuardar" style="margin-top:8px;">Guardar inventarios y compras</button>' : ''}
+    ${puede ? '<button class="btn btn-accent btn-block" id="fcCocinaGuardar" style="margin-top:8px;">Guardar inventarios, compras y mermas</button>' : ''}
     ${prods.length ? `<div class="section-label">Ventas por producto — cocina</div>
     <div class="ev-table-wrap"><table class="ev-table"><thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Venta neta</th><th class="num">% venta</th><th class="num">Precio prom.</th></tr></thead><tbody>
       ${prods.map(p => `<tr><td>${escapeHtml(p.nombre)}</td><td class="num">${fmtQty(p.cantidad)}</td><td class="num">${fmtMoney(p.ventas)}</td><td class="num">${k.ventas ? (Math.round(p.ventas / k.ventas * 1000) / 10) + '%' : ''}</td><td class="num">${fmtMoney(p.cantidad ? p.ventas / p.cantidad : 0)}</td></tr>`).join('')}
@@ -2835,7 +2841,7 @@ async function guardarCocinaConsumo(){
     location_id: FC_ACTUAL.locId, mes: FC_ACTUAL.mes + '-01',
     // Solo se guarda el inicial si difiere del final del mes anterior (si no, se sigue tomando de allá).
     inventario_inicial: iniEscrito !== null && iniEscrito !== k.inicialAnterior ? iniEscrito : null,
-    compras: val('fcCompras'), inventario_final: val('fcInvFin'),
+    compras: val('fcCompras'), inventario_final: val('fcInvFin'), mermas: val('fcMermas'),
     updated_by: session.user.id, updated_at: new Date().toISOString()
   };
   const { error } = await supa.from('foodcost_cocina').upsert(fila);
