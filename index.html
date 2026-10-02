@@ -2691,9 +2691,14 @@ async function cargarInformesMensuales(){
   box.querySelectorAll('.rec-card').forEach(el => el.addEventListener('click', () => abrirInformeMensual(el.dataset.id)));
 }
 
-async function mostrarFoodcost(datos, locId, titulo){
+function mesPrevio(mes){ const d = new Date(Date.UTC(+mes.slice(0, 4), +mes.slice(5, 7) - 2, 1)); return d.toISOString().slice(0, 7); }
+async function mostrarFoodcost(datos, locId, titulo, mes){
   const { data: gs } = await supa.from('foodcost_grupos').select('categoria, grupo').eq('location_id', locId);
-  FC_ACTUAL = { r: datos, locId, titulo, grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
+  FC_ACTUAL = { r: datos, locId, titulo, mes: mes || null, grupos: Object.fromEntries((gs || []).map(g => [g.categoria, g.grupo])) };
+  if(mes){
+    const { data: filas } = await supa.from('foodcost_cocina').select('*').eq('location_id', locId).in('mes', [mes + '-01', mesPrevio(mes) + '-01']);
+    FC_ACTUAL.cocina = { actual: (filas || []).find(x => x.mes === mes + '-01') || {}, anterior: (filas || []).find(x => x.mes === mesPrevio(mes) + '-01') || null };
+  }
   pintarFoodcost();
 }
 
@@ -2703,7 +2708,7 @@ async function abrirInformeMensual(id){
   body.innerHTML = '<div class="detail-title">Food cost</div><div class="empty-note">Cargando informe...</div>';
   const { data, error } = await supa.from('foodcost_informes').select('*').eq('id', id).single();
   if(error){ body.innerHTML = `<div class="empty-note" style="color:#B0281C;">${escapeHtml(error.message)}</div>`; return; }
-  await mostrarFoodcost(data.datos, data.location_id, 'Informe de ' + nombreMes(data.mes));
+  await mostrarFoodcost(data.datos, data.location_id, 'Informe de ' + nombreMes(data.mes), data.mes.slice(0, 7));
 }
 
 async function generarInformeMes(){
@@ -2718,7 +2723,7 @@ async function generarInformeMes(){
     const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: restauranteVisibleId(), accion: 'foodcost_mes', mes } });
     if(error){ let msg = error.message; try{ const b = await error.context.json(); if(b && b.error) msg = b.error; } catch(e){} throw new Error(msg); }
     if(!data || !data.ok) throw new Error((data && data.error) || 'Respuesta inválida');
-    await mostrarFoodcost(data, restauranteVisibleId(), 'Informe de ' + nombreMes(mes));
+    await mostrarFoodcost(data, restauranteVisibleId(), 'Informe de ' + nombreMes(mes), mes);
     cargarInformesMensuales();
     showToast('Informe guardado');
   } catch(err){
@@ -2733,7 +2738,7 @@ function descargarInformeFoodcost(){
   const w = window.open('', '_blank');
   if(!w){ showToast('El navegador bloqueó la ventana: permití ventanas emergentes'); return; }
   const estilos = [...document.querySelectorAll('style')].map(st => st.outerHTML).join('');
-  const contenido = renderFoodcostReporte(FC_ACTUAL.r);
+  const contenido = (FC_ACTUAL.mes ? renderCocinaConsumo() : '') + renderFoodcostReporte(FC_ACTUAL.r);
   const rest = restauranteDe(FC_ACTUAL.locId);
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml((FC_ACTUAL.titulo || 'Food cost') + (rest ? ' - ' + rest.name : ''))}</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -2742,6 +2747,8 @@ function descargarInformeFoodcost(){
   w.document.close();
   // Las listas de grupo se imprimen como texto.
   w.document.querySelectorAll('select').forEach(sel => { const sp = w.document.createElement('span'); sp.textContent = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : ''; sel.replaceWith(sp); });
+  w.document.querySelectorAll('input').forEach(inp => { const sp = w.document.createElement('span'); sp.textContent = inp.value === '' ? '—' : fmtMoney(toNum(inp.value)); inp.replaceWith(sp); });
+  w.document.querySelectorAll('button').forEach(b => b.remove());
   setTimeout(() => w.print(), 600);
 }
 
@@ -2781,12 +2788,72 @@ function grupoSugerido(cat){
 }
 function grupoDe(cat){ return (FC_ACTUAL && FC_ACTUAL.grupos[cat]) || grupoSugerido(cat); }
 
+// Food cost real de cocina: (inventario inicial + compras − inventario final) ÷ ventas netas de cocina.
+// El inventario inicial es el final del mes anterior, salvo que se haya escrito a mano.
+function cocinaConsumo(){
+  const r = FC_ACTUAL.r, c = FC_ACTUAL.cocina || { actual: {} };
+  const ventas = (r.categorias || []).filter(x => grupoDe(x.categoria) === 'cocina').reduce((a, x) => a + x.ventas, 0);
+  const productos = (r.productos || []).filter(p => grupoDe(p.categoria) === 'cocina').sort((a, b) => b.ventas - a.ventas);
+  const inicialAnterior = c.anterior && hasValue(c.anterior.inventario_final) ? toNum(c.anterior.inventario_final) : null;
+  const inicial = hasValue(c.actual.inventario_inicial) ? toNum(c.actual.inventario_inicial) : inicialAnterior;
+  const compras = hasValue(c.actual.compras) ? toNum(c.actual.compras) : null;
+  const final = hasValue(c.actual.inventario_final) ? toNum(c.actual.inventario_final) : null;
+  const completo = inicial !== null && compras !== null && final !== null;
+  const costo = completo ? inicial + compras - final : null;
+  return { ventas, productos, inicial, inicialAnterior, compras, final, costo, completo,
+    platos: productos.reduce((a, p) => a + p.cantidad, 0) };
+}
+function renderCocinaConsumo(){
+  const k = cocinaConsumo(), puede = isAdminRole();
+  const campo = (id, valor, nota) => `<input type="number" id="${id}" value="${valor === null ? '' : Math.round(valor)}" placeholder="0" style="width:150px; text-align:right;" ${puede ? '' : 'disabled'}>${nota ? `<div class="ev-dim" style="font-size:11px;">${nota}</div>` : ''}`;
+  const fc = k.completo && k.ventas ? Math.round(k.costo / k.ventas * 1000) / 10 : null;
+  const fila = (label, v, cls) => `<div class="ev-sum-row ${cls || ''}"><span>${label}</span><span>${v}</span></div>`;
+  const prods = k.productos;
+  return `
+    <div class="section-label">Cocina — consumo real</div>
+    <div class="ev-sum">
+      ${fila('Ventas netas cocina', fmtMoney(k.ventas), 'total')}
+      ${fila('Platos vendidos', fmtQty(k.platos) + (k.platos ? ' · ticket promedio por plato ' + fmtMoney(k.ventas / k.platos) : ''))}
+      <div class="ev-sum-row"><span>Inventario inicial</span><span>${campo('fcInvIni', k.inicial, k.inicialAnterior !== null && !hasValue((FC_ACTUAL.cocina.actual || {}).inventario_inicial) ? 'final del mes anterior' : 'escribilo solo el primer mes')}</span></div>
+      <div class="ev-sum-row"><span>(+) Compras del mes</span><span>${campo('fcCompras', k.compras)}</span></div>
+      <div class="ev-sum-row"><span>(−) Inventario final</span><span>${campo('fcInvFin', k.final)}</span></div>
+      ${fila('(=) Costo de venta', k.completo ? fmtMoney(k.costo) : '—', 'total')}
+      ${fila('Utilidad bruta', k.completo ? fmtMoney(k.ventas - k.costo) + (k.ventas ? ' · margen ' + (Math.round((k.ventas - k.costo) / k.ventas * 1000) / 10) + '%' : '') : '—')}
+      ${fila('Food cost cocina (real)', fcPct(fc), 'total')}
+    </div>
+    ${puede ? '<button class="btn btn-accent btn-block" id="fcCocinaGuardar" style="margin-top:8px;">Guardar inventarios y compras</button>' : ''}
+    ${prods.length ? `<div class="section-label">Ventas por producto — cocina</div>
+    <div class="ev-table-wrap"><table class="ev-table"><thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Venta neta</th><th class="num">% venta</th><th class="num">Precio prom.</th></tr></thead><tbody>
+      ${prods.map(p => `<tr><td>${escapeHtml(p.nombre)}</td><td class="num">${fmtQty(p.cantidad)}</td><td class="num">${fmtMoney(p.ventas)}</td><td class="num">${k.ventas ? (Math.round(p.ventas / k.ventas * 1000) / 10) + '%' : ''}</td><td class="num">${fmtMoney(p.cantidad ? p.ventas / p.cantidad : 0)}</td></tr>`).join('')}
+    </tbody><tfoot><tr class="ev-strong"><td>Total</td><td class="num">${fmtQty(k.platos)}</td><td class="num">${fmtMoney(k.ventas)}</td><td class="num">100%</td><td class="num">${fmtMoney(k.platos ? k.ventas / k.platos : 0)}</td></tr></tfoot></table></div>` : (FC_ACTUAL.r.productos ? '' : '<div class="ev-dim" style="font-size:12px; margin-top:6px;">Para ver la tabla de ventas por producto, generá de nuevo el informe de este mes.</div>')}`;
+}
+async function guardarCocinaConsumo(){
+  const val = id => { const v = document.getElementById(id).value; return v === '' ? null : toNum(v); };
+  const k = cocinaConsumo();
+  const iniEscrito = val('fcInvIni');
+  const fila = {
+    location_id: FC_ACTUAL.locId, mes: FC_ACTUAL.mes + '-01',
+    // Solo se guarda el inicial si difiere del final del mes anterior (si no, se sigue tomando de allá).
+    inventario_inicial: iniEscrito !== null && iniEscrito !== k.inicialAnterior ? iniEscrito : null,
+    compras: val('fcCompras'), inventario_final: val('fcInvFin'),
+    updated_by: session.user.id, updated_at: new Date().toISOString()
+  };
+  const { error } = await supa.from('foodcost_cocina').upsert(fila);
+  if(error){ showToast('No se guardó: ' + error.message); return; }
+  FC_ACTUAL.cocina.actual = fila;
+  pintarFoodcost();
+  showToast('Inventarios y compras guardados');
+}
+
 function pintarFoodcost(){
   const body = document.getElementById('costeoDetailBody');
   body.innerHTML = (FC_ACTUAL.titulo ? `<div class="ev-dim" style="font-size:13px; margin-bottom:2px;">${escapeHtml(FC_ACTUAL.titulo)}</div>` : '')
+    + (FC_ACTUAL.mes ? renderCocinaConsumo() : '')
     + renderFoodcostReporte(FC_ACTUAL.r)
     + '<button class="btn btn-accent btn-block" id="fcPdf" style="margin-top:16px;">Descargar informe (PDF)</button>';
   document.getElementById('fcPdf').addEventListener('click', descargarInformeFoodcost);
+  const gc = document.getElementById('fcCocinaGuardar');
+  if(gc) gc.addEventListener('click', guardarCocinaConsumo);
   body.querySelectorAll('.fc-grupo').forEach(sel => sel.addEventListener('change', async ()=>{
     const categoria = sel.dataset.cat, grupo = sel.value;
     FC_ACTUAL.grupos[categoria] = grupo;

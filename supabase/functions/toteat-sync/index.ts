@@ -422,6 +422,10 @@ async function foodCost(loc: { id: string; slug: string; name: string }, ini: st
       .sort((a, b) => b.ventas - a.ventas),
     peores_productos: productos.filter((p) => p.cantidad >= 3).sort((a, b) => (b.foodcost ?? 0) - (a.foodcost ?? 0)).slice(0, 12),
     mas_vendidos: productos.sort((a, b) => b.ventas - a.ventas).slice(0, 12),
+    // Todos los productos vendidos (también los sin costo), para el detalle por grupo (ej. cocina).
+    productos: [...porProducto.values()].filter((p) => p.cantidad > 0)
+      .map((p) => ({ nombre: p.nombre, categoria: p.categoria, cantidad: p.cantidad, ventas: Math.round(p.ventas), costo: Math.round(p.costo) }))
+      .sort((a, b) => b.ventas - a.ventas),
     top_mermas: mermas.slice(0, 15),
     top_sobrantes: mermas.filter((m) => m.valor < 0).sort((a, b) => a.valor - b.valor).slice(0, 5),
   };
