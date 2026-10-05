@@ -625,6 +625,11 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
           </select>
         </div>
         <div id="expectedYieldBox"></div>
+        <div class="field" id="prodPorcionesField" style="display:none">
+          <label class="field-label" id="prodPorcionesLabel">Porciones empacadas para ingresar</label>
+          <input type="number" id="prodPorciones" min="0" step="1" placeholder="Ej: 40">
+          <div class="field-help" id="prodPorcionesHelp"></div>
+        </div>
         <div class="field"><label class="field-label">Responsable</label><input type="text" id="prodResponsable" placeholder="Nombre de quien produce"></div>
         <div class="field">
           <label class="field-label">Rendimiento real obtenido (opcional)</label>
@@ -1032,6 +1037,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div><span>Rinde esperado</span><b id="cmEsperado"></b></div>
       <div><span>Responsable</span><b id="cmResponsable"></b></div>
       <div id="cmRealRow" style="display:none"><span>Rinde real</span><b id="cmReal"></b></div>
+      <div id="cmPorcionesRow" style="display:none"><span>Porciones empacadas</span><b id="cmPorciones"></b></div>
       <div id="cmObsRow" style="display:none"><span>Observación</span><b id="cmObs"></b></div>
     </div>
     <div id="dupWarningBox"></div>
@@ -1847,7 +1853,8 @@ async function loadRecipes(){
     ingredients: r.ingredients || [],
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
     yield_unit: r.yield_unit || '',
-    activo_inventario: r.activo_inventario !== false
+    activo_inventario: r.activo_inventario !== false,
+    porcion_gr: r.porcion_gr === null || r.porcion_gr === undefined ? null : Number(r.porcion_gr)
   }));
 }
 
@@ -4236,6 +4243,13 @@ async function renderDetail(r){
       <span class="ev-dim">${normalizeUnitLabel(r.yield_unit)}</span>
       <button class="btn btn-ghost" id="calcDesdeBtn">Calcular lo que necesito</button>
     </div>` : ''}
+    ${r.porcion_gr ? `<div class="ev-dim" style="margin:6px 0;">Se porciona en <b>${fmtQty(r.porcion_gr)} g</b></div>` : ''}
+    ${isAdminRole() ? `<div style="display:flex; gap:8px; align-items:center; margin:6px 0 4px;">
+      <span class="ev-dim">Porción para empacar</span>
+      <input type="number" id="recPorcionGr" min="0" step="any" placeholder="g" value="${r.porcion_gr || ''}" style="width:90px;">
+      <span class="ev-dim">g</span>
+      <button class="btn btn-ghost" id="recPorcionBtn">Guardar</button>
+    </div>` : ''}
     <div class="section-label">Insumos</div>
     ${ingHtml}
     <div class="section-label">Observaciones de rendimiento</div>
@@ -4246,6 +4260,17 @@ async function renderDetail(r){
     </div>
   `;
 
+  const porBtn = document.getElementById('recPorcionBtn');
+  if(porBtn) porBtn.addEventListener('click', async ()=>{
+    const v = document.getElementById('recPorcionGr').value.trim();
+    const gr = v === '' ? null : parseFloat(v);
+    if(gr !== null && !(gr > 0)){ showToast('Escribe los gramos de la porción'); return; }
+    const { error } = await supa.from('recipes').update({ porcion_gr: gr }).eq('id', r.id);
+    if(error){ showToast('No se guardó: ' + error.message); return; }
+    r.porcion_gr = gr;
+    showToast(gr ? 'Porción de ' + fmtQty(gr) + ' g guardada' : 'Porción quitada');
+    renderDetail(r);
+  });
   const calcBtn = document.getElementById('calcDesdeBtn');
   if(calcBtn) calcBtn.addEventListener('click', ()=>{
     const q = parseFloat(document.getElementById('calcDesdeQty').value);
@@ -4388,13 +4413,24 @@ function populateRecetaDatalist(){
 function findRecetaByName(name){
   return RECIPES.find(r => r.name.toUpperCase() === name.trim().toUpperCase());
 }
+// Recetas que se porcionan (ej. tinga en porciones de 110 g): se registra cuántas porciones se empacan e ingresan.
+function pintarCampoPorciones(receta, esperado){
+  const campo = document.getElementById('prodPorcionesField');
+  if(!receta || !receta.porcion_gr){ campo.style.display = 'none'; document.getElementById('prodPorciones').value = ''; return; }
+  campo.style.display = '';
+  document.getElementById('prodPorcionesLabel').textContent = 'Porciones de ' + fmtQty(receta.porcion_gr) + ' g empacadas para ingresar';
+  const base = esperado !== null ? toBaseQty(esperado, receta.yield_unit) : null;
+  document.getElementById('prodPorcionesHelp').textContent = base && unitGroup(receta.yield_unit) === 'MASA'
+    ? 'Con el rinde esperado salen unas ' + Math.floor(base * 1000 / receta.porcion_gr) + ' porciones.' : '';
+}
 function updateExpectedYield(){
   const name = document.getElementById('prodReceta').value;
   const mult = parseFloat(document.getElementById('prodCantidad').value);
   const box = document.getElementById('expectedYieldBox');
   const match = findRecetaByName(name);
-  if(!match || !match.yield_qty){ box.innerHTML=''; return; }
+  if(!match || !match.yield_qty){ box.innerHTML=''; pintarCampoPorciones(match, null); return; }
   const expected = parseFloat(match.yield_qty) * mult;
+  pintarCampoPorciones(match, expected);
   box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${normalizeUnitLabel(match.yield_unit)}</span></div>`;
 }
 document.getElementById('prodReceta').addEventListener('input', updateExpectedYield);
@@ -4417,7 +4453,12 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   const expectedYield = match.yield_qty ? (parseFloat(match.yield_qty) * parseFloat(cantidadMult)) : null;
   const expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + normalizeUnitLabel(match.yield_unit)) : '';
 
+  const porcionesTxt = document.getElementById('prodPorciones').value.trim();
+  const porciones = match.porcion_gr && porcionesTxt !== '' ? parseInt(porcionesTxt, 10) : null;
+  if(porciones !== null && (isNaN(porciones) || porciones < 0)){ showToast('Revisa el número de porciones'); return; }
   pendingEntry = {
+    // Solo se envían si hay porciones, así el registro normal no depende de las columnas nuevas.
+    ...(porciones !== null ? { porciones, porcion_gr: match.porcion_gr } : {}),
     fecha, recipe_code: match.code, recipe_name: match.name,
     cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
     rendimiento_esperado: expectedYieldStr, responsable,
@@ -4432,6 +4473,8 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   document.getElementById('cmResponsable').textContent = responsable;
   const realRow = document.getElementById('cmRealRow');
   if(realYield){ document.getElementById('cmReal').textContent = realYield; realRow.style.display='flex'; } else { realRow.style.display='none'; }
+  const porRow = document.getElementById('cmPorcionesRow');
+  if(porciones !== null){ document.getElementById('cmPorciones').textContent = porciones + ' de ' + fmtQty(match.porcion_gr) + ' g'; porRow.style.display='flex'; } else { porRow.style.display='none'; }
   const obsRow = document.getElementById('cmObsRow');
   if(obs){ document.getElementById('cmObs').textContent = obs; obsRow.style.display='flex'; } else { obsRow.style.display='none'; }
 
@@ -4474,6 +4517,7 @@ document.getElementById('cmConfirm').addEventListener('click', async ()=>{
   document.getElementById('prodReceta').value = '';
   document.getElementById('prodResponsable').value = '';
   document.getElementById('prodRealYield').value = '';
+  document.getElementById('prodPorciones').value = '';
   document.getElementById('prodObs').value = '';
   document.getElementById('prodCantidad').value = '1';
   updateExpectedYield();
@@ -4585,6 +4629,7 @@ function prodEntryHtml(p, isAdmin){
       <div class="p-meta">
         Fecha: <b>${p.fecha}</b> &nbsp;·&nbsp; Cantidad: <b>${p.cantidad_label}</b><br>
         Rinde esperado: <b>${p.rendimiento_esperado || 'sin dato'}</b><br>
+        ${p.porciones !== null && p.porciones !== undefined ? `Porciones empacadas: <b>${p.porciones}</b> de ${fmtQty(p.porcion_gr)} g<br>` : ''}
         Responsable: <b>${escapeHtml(p.responsable)}</b> &nbsp;·&nbsp; Registrado a las <b>${hora}</b>
       </div>
       ${obsBlock}${voidBlock}${ingresadoBlock}${actions}
