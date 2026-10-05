@@ -624,6 +624,11 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
             <option value="5">Cinco recetas (x5)</option>
           </select>
         </div>
+        <div class="field" id="prodTipoField" style="display:none">
+          <label class="field-label">¿Qué vas a registrar?</label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="radio" name="prodTipo" value="produccion" checked style="width:auto;"> Producción (kg, desde la receta)</label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="radio" name="prodTipo" value="porcionado" style="width:auto;"> <span id="prodTipoPorcLabel">Porcionado (unidades)</span></label>
+        </div>
         <div id="expectedYieldBox"></div>
         <div class="field" id="prodPorcionesField" style="display:none">
           <label class="field-label" id="prodPorcionesLabel">Porciones empacadas para ingresar</label>
@@ -4414,8 +4419,15 @@ function findRecetaByName(name){
 }
 // Recetas que se porcionan (ej. tinga en porciones de 110 g): se registra cuántas porciones se empacan e ingresan.
 function esPorcionada(receta){ return !!(receta && receta.porcion_gr); }
+// Opción elegida: 'porcionado' solo si la receta tiene peso de porción y se marcó esa opción.
+function tipoProduccion(receta){
+  const marcado = document.querySelector('input[name="prodTipo"]:checked');
+  return esPorcionada(receta) && marcado && marcado.value === 'porcionado' ? 'porcionado' : 'produccion';
+}
 function pintarCampoPorciones(receta){
-  const porcion = esPorcionada(receta);
+  document.getElementById('prodTipoField').style.display = esPorcionada(receta) ? '' : 'none';
+  if(esPorcionada(receta)) document.getElementById('prodTipoPorcLabel').textContent = 'Porcionado (unidades de ' + fmtQty(receta.porcion_gr) + ' g)';
+  const porcion = tipoProduccion(receta) === 'porcionado';
   document.getElementById('prodPorcionesField').style.display = porcion ? '' : 'none';
   document.getElementById('prodCantidad').closest('.field').style.display = porcion ? 'none' : '';
   document.getElementById('prodRealYield').closest('.field').style.display = porcion ? 'none' : '';
@@ -4431,13 +4443,14 @@ function updateExpectedYield(){
   const box = document.getElementById('expectedYieldBox');
   const match = findRecetaByName(name);
   pintarCampoPorciones(match);
-  if(esPorcionada(match) || !match || !match.yield_qty){ box.innerHTML=''; return; }
+  if(tipoProduccion(match) === 'porcionado' || !match || !match.yield_qty){ box.innerHTML=''; return; }
   const expected = parseFloat(match.yield_qty) * mult;
   box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${normalizeUnitLabel(match.yield_unit)}</span></div>`;
 }
 document.getElementById('prodReceta').addEventListener('input', updateExpectedYield);
 document.getElementById('prodCantidad').addEventListener('change', updateExpectedYield);
 document.getElementById('prodPorciones').addEventListener('input', updateExpectedYield);
+document.querySelectorAll('input[name="prodTipo"]').forEach(r => r.addEventListener('change', updateExpectedYield));
 
 let pendingEntry = null;
 
@@ -4454,7 +4467,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
 
   // Receta porcionada: solo se registran las porciones; la cantidad equivale a los kg porcionados.
-  const porcionada = esPorcionada(match);
+  const porcionada = tipoProduccion(match) === 'porcionado';
   const porciones = porcionada ? parseInt(document.getElementById('prodPorciones').value, 10) : null;
   if(porcionada && !(porciones > 0)){ showToast('Escribe cuántas porciones vas a ingresar'); return; }
   let cantidadLabel = CANTIDAD_LABELS[cantidadMult], mult = parseFloat(cantidadMult), expectedYieldStr;
@@ -4494,8 +4507,10 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   dupBox.innerHTML = '';
   confirmBtn.disabled = false;
 
-  const { data: dups, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_area_id: currentArea.id });
-  if(!dupErr && dups && dups.length > 0){
+  const { data: dupsTodos, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_area_id: currentArea.id });
+  const esRegPorcionado = d => (d.porciones !== null && d.porciones !== undefined) || /porciones de/i.test(d.cantidad_label || '');
+  const dups = (dupsTodos || []).filter(d => esRegPorcionado(d) === porcionada);
+  if(!dupErr && dups.length > 0){
     const items = dups.map(d => {
       const hora = new Date(d.created_at).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
       return `<li>${escapeHtml(d.responsable)} · ${escapeHtml(d.cantidad_label)} · ${hora}</li>`;
@@ -4531,6 +4546,7 @@ document.getElementById('cmConfirm').addEventListener('click', async ()=>{
   document.getElementById('prodPorciones').value = '';
   document.getElementById('prodObs').value = '';
   document.getElementById('prodCantidad').value = '1';
+  document.querySelector('input[name="prodTipo"][value="produccion"]').checked = true;
   updateExpectedYield();
   pendingEntry = null;
   loadMyProductions();
@@ -4636,7 +4652,7 @@ function prodEntryHtml(p, isAdmin){
   }
   return `<div class="prod-entry ${hasVariance?'variance':''} ${anulado?'anulado':''}">
       <span class="locked ${anulado?'anulado-tag':''}">${anulado?'&#9888; anulado':'&#128274; bloqueado'}</span>
-      <div class="p-name">${escapeHtml(p.recipe_name)}</div>
+      <div class="p-name">${escapeHtml(p.recipe_name)}${p.porciones !== null && p.porciones !== undefined ? ' <span class="ev-dim" style="font-size:12px;">· Porcionado</span>' : ''}</div>
       <div class="p-meta">
         Fecha: <b>${p.fecha}</b> &nbsp;·&nbsp; Cantidad: <b>${p.cantidad_label}</b><br>
         ${p.porciones !== null && p.porciones !== undefined ? 'Total porcionado' : 'Rinde esperado'}: <b>${p.rendimiento_esperado || 'sin dato'}</b><br>
@@ -5014,7 +5030,7 @@ async function loadCalendarMonth(){
   calScheduleItems = schedErr ? [] : (schedData || []);
 
   const { data: prodData, error: prodErr } = await supa.from('productions')
-    .select('fecha, recipe_code').eq('area_id', currentArea.id).eq('status', 'activo')
+    .select('fecha, recipe_code').eq('area_id', currentArea.id).eq('status', 'activo').is('porciones', null)
     .gte('fecha', startIso).lte('fecha', endIso);
   calProducedSet = new Set((prodErr ? [] : (prodData || [])).map(p => p.fecha + '::' + p.recipe_code));
 
