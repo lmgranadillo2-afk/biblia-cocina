@@ -4420,12 +4420,15 @@ function findRecetaByName(name){
 // Recetas que se porcionan (ej. tinga en porciones de 110 g): se registra cuántas porciones se empacan e ingresan.
 function esPorcionada(receta){ return !!(receta && receta.porcion_gr); }
 // Opción elegida: 'porcionado' solo si la receta tiene peso de porción y se marcó esa opción.
+// Recetas que solo se porcionan (rinden en unidades, ej. PORCION CHATA X 100 GR): no hay producción en kg, solo porcionado.
+function soloPorcionado(receta){ return esPorcionada(receta) && unitGroup(receta.yield_unit) === 'CONTEO'; }
 function tipoProduccion(receta){
+  if(soloPorcionado(receta)) return 'porcionado';
   const marcado = document.querySelector('input[name="prodTipo"]:checked');
   return esPorcionada(receta) && marcado && marcado.value === 'porcionado' ? 'porcionado' : 'produccion';
 }
 function pintarCampoPorciones(receta){
-  document.getElementById('prodTipoField').style.display = esPorcionada(receta) ? '' : 'none';
+  document.getElementById('prodTipoField').style.display = esPorcionada(receta) && !soloPorcionado(receta) ? '' : 'none';
   if(esPorcionada(receta)) document.getElementById('prodTipoPorcLabel').textContent = 'Porcionado (unidades de ' + fmtQty(receta.porcion_gr) + ' g)';
   const porcion = tipoProduccion(receta) === 'porcionado';
   document.getElementById('prodPorcionesField').style.display = porcion ? '' : 'none';
@@ -4476,7 +4479,8 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
     cantidadLabel = porciones + ' porciones de ' + fmtQty(match.porcion_gr) + ' g';
     expectedYieldStr = kgDePorciones(porciones, match.porcion_gr) + ' KG';
     const rinde = match.yield_qty ? toBaseQty(parseFloat(match.yield_qty), match.yield_unit) : null;
-    mult = rinde && unitGroup(match.yield_unit) === 'MASA' ? Math.round(kg / rinde * 1000) / 1000 : 0;
+    mult = !rinde ? 0 : unitGroup(match.yield_unit) === 'MASA' ? Math.round(kg / rinde * 1000) / 1000
+      : unitGroup(match.yield_unit) === 'CONTEO' ? Math.round(porciones / rinde * 1000) / 1000 : 0;
   } else {
     const expectedYield = match.yield_qty ? (parseFloat(match.yield_qty) * parseFloat(cantidadMult)) : null;
     expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + normalizeUnitLabel(match.yield_unit)) : '';
