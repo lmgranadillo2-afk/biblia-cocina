@@ -1037,7 +1037,6 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div><span>Rinde esperado</span><b id="cmEsperado"></b></div>
       <div><span>Responsable</span><b id="cmResponsable"></b></div>
       <div id="cmRealRow" style="display:none"><span>Rinde real</span><b id="cmReal"></b></div>
-      <div id="cmPorcionesRow" style="display:none"><span>Porciones empacadas</span><b id="cmPorciones"></b></div>
       <div id="cmObsRow" style="display:none"><span>Observación</span><b id="cmObs"></b></div>
     </div>
     <div id="dupWarningBox"></div>
@@ -4414,27 +4413,31 @@ function findRecetaByName(name){
   return RECIPES.find(r => r.name.toUpperCase() === name.trim().toUpperCase());
 }
 // Recetas que se porcionan (ej. tinga en porciones de 110 g): se registra cuántas porciones se empacan e ingresan.
-function pintarCampoPorciones(receta, esperado){
-  const campo = document.getElementById('prodPorcionesField');
-  if(!receta || !receta.porcion_gr){ campo.style.display = 'none'; document.getElementById('prodPorciones').value = ''; return; }
-  campo.style.display = '';
-  document.getElementById('prodPorcionesLabel').textContent = 'Porciones de ' + fmtQty(receta.porcion_gr) + ' g empacadas para ingresar';
-  const base = esperado !== null ? toBaseQty(esperado, receta.yield_unit) : null;
-  document.getElementById('prodPorcionesHelp').textContent = base && unitGroup(receta.yield_unit) === 'MASA'
-    ? 'Con el rinde esperado salen unas ' + Math.floor(base * 1000 / receta.porcion_gr) + ' porciones.' : '';
+function esPorcionada(receta){ return !!(receta && receta.porcion_gr); }
+function pintarCampoPorciones(receta){
+  const porcion = esPorcionada(receta);
+  document.getElementById('prodPorcionesField').style.display = porcion ? '' : 'none';
+  document.getElementById('prodCantidad').closest('.field').style.display = porcion ? 'none' : '';
+  document.getElementById('prodRealYield').closest('.field').style.display = porcion ? 'none' : '';
+  if(!porcion){ document.getElementById('prodPorciones').value = ''; return; }
+  document.getElementById('prodPorcionesLabel').textContent = 'Porciones de ' + fmtQty(receta.porcion_gr) + ' g a ingresar';
+  const n = parseInt(document.getElementById('prodPorciones').value, 10);
+  document.getElementById('prodPorcionesHelp').textContent = n > 0 ? 'Total: ' + kgDePorciones(n, receta.porcion_gr) + ' kg' : '';
 }
+function kgDePorciones(n, gr){ return (n * gr / 1000).toLocaleString('es-CO', { maximumFractionDigits: 3 }); }
 function updateExpectedYield(){
   const name = document.getElementById('prodReceta').value;
   const mult = parseFloat(document.getElementById('prodCantidad').value);
   const box = document.getElementById('expectedYieldBox');
   const match = findRecetaByName(name);
-  if(!match || !match.yield_qty){ box.innerHTML=''; pintarCampoPorciones(match, null); return; }
+  pintarCampoPorciones(match);
+  if(esPorcionada(match) || !match || !match.yield_qty){ box.innerHTML=''; return; }
   const expected = parseFloat(match.yield_qty) * mult;
-  pintarCampoPorciones(match, expected);
   box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${normalizeUnitLabel(match.yield_unit)}</span></div>`;
 }
 document.getElementById('prodReceta').addEventListener('input', updateExpectedYield);
 document.getElementById('prodCantidad').addEventListener('change', updateExpectedYield);
+document.getElementById('prodPorciones').addEventListener('input', updateExpectedYield);
 
 let pendingEntry = null;
 
@@ -4450,31 +4453,39 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   const match = findRecetaByName(recetaName);
   if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
 
-  const expectedYield = match.yield_qty ? (parseFloat(match.yield_qty) * parseFloat(cantidadMult)) : null;
-  const expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + normalizeUnitLabel(match.yield_unit)) : '';
-
-  const porcionesTxt = document.getElementById('prodPorciones').value.trim();
-  const porciones = match.porcion_gr && porcionesTxt !== '' ? parseInt(porcionesTxt, 10) : null;
-  if(porciones !== null && (isNaN(porciones) || porciones < 0)){ showToast('Revisa el número de porciones'); return; }
+  // Receta porcionada: solo se registran las porciones; la cantidad equivale a los kg porcionados.
+  const porcionada = esPorcionada(match);
+  const porciones = porcionada ? parseInt(document.getElementById('prodPorciones').value, 10) : null;
+  if(porcionada && !(porciones > 0)){ showToast('Escribe cuántas porciones vas a ingresar'); return; }
+  let cantidadLabel = CANTIDAD_LABELS[cantidadMult], mult = parseFloat(cantidadMult), expectedYieldStr;
+  if(porcionada){
+    const kg = porciones * match.porcion_gr / 1000;
+    cantidadLabel = porciones + ' porciones de ' + fmtQty(match.porcion_gr) + ' g';
+    expectedYieldStr = kgDePorciones(porciones, match.porcion_gr) + ' KG';
+    const rinde = match.yield_qty ? toBaseQty(parseFloat(match.yield_qty), match.yield_unit) : null;
+    mult = rinde && unitGroup(match.yield_unit) === 'MASA' ? Math.round(kg / rinde * 1000) / 1000 : 0;
+  } else {
+    const expectedYield = match.yield_qty ? (parseFloat(match.yield_qty) * parseFloat(cantidadMult)) : null;
+    expectedYieldStr = expectedYield !== null ? (fmtQty(expectedYield) + ' ' + normalizeUnitLabel(match.yield_unit)) : '';
+  }
   pendingEntry = {
     // Solo se envían si hay porciones, así el registro normal no depende de las columnas nuevas.
-    ...(porciones !== null ? { porciones, porcion_gr: match.porcion_gr } : {}),
+    ...(porcionada ? { porciones, porcion_gr: match.porcion_gr } : {}),
     fecha, recipe_code: match.code, recipe_name: match.name,
-    cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
+    cantidad_mult: mult, cantidad_label: cantidadLabel,
     rendimiento_esperado: expectedYieldStr, responsable,
-    rendimiento_real: realYield, observacion: obs,
+    rendimiento_real: porcionada ? '' : realYield, observacion: obs,
     created_by: session.user.id, location_id: currentLocation.id, area_id: currentArea.id
   };
 
   document.getElementById('cmFecha').textContent = fecha;
   document.getElementById('cmReceta').textContent = match.name;
-  document.getElementById('cmCantidad').textContent = CANTIDAD_LABELS[cantidadMult];
+  document.getElementById('cmCantidad').textContent = cantidadLabel;
   document.getElementById('cmEsperado').textContent = expectedYieldStr || 'sin dato';
+  document.getElementById('cmEsperado').previousElementSibling.textContent = porcionada ? 'Total porcionado' : 'Rinde esperado';
   document.getElementById('cmResponsable').textContent = responsable;
   const realRow = document.getElementById('cmRealRow');
-  if(realYield){ document.getElementById('cmReal').textContent = realYield; realRow.style.display='flex'; } else { realRow.style.display='none'; }
-  const porRow = document.getElementById('cmPorcionesRow');
-  if(porciones !== null){ document.getElementById('cmPorciones').textContent = porciones + ' de ' + fmtQty(match.porcion_gr) + ' g'; porRow.style.display='flex'; } else { porRow.style.display='none'; }
+  if(realYield && !porcionada){ document.getElementById('cmReal').textContent = realYield; realRow.style.display='flex'; } else { realRow.style.display='none'; }
   const obsRow = document.getElementById('cmObsRow');
   if(obs){ document.getElementById('cmObs').textContent = obs; obsRow.style.display='flex'; } else { obsRow.style.display='none'; }
 
@@ -4628,8 +4639,7 @@ function prodEntryHtml(p, isAdmin){
       <div class="p-name">${escapeHtml(p.recipe_name)}</div>
       <div class="p-meta">
         Fecha: <b>${p.fecha}</b> &nbsp;·&nbsp; Cantidad: <b>${p.cantidad_label}</b><br>
-        Rinde esperado: <b>${p.rendimiento_esperado || 'sin dato'}</b><br>
-        ${p.porciones !== null && p.porciones !== undefined ? `Porciones empacadas: <b>${p.porciones}</b> de ${fmtQty(p.porcion_gr)} g<br>` : ''}
+        ${p.porciones !== null && p.porciones !== undefined ? 'Total porcionado' : 'Rinde esperado'}: <b>${p.rendimiento_esperado || 'sin dato'}</b><br>
         Responsable: <b>${escapeHtml(p.responsable)}</b> &nbsp;·&nbsp; Registrado a las <b>${hora}</b>
       </div>
       ${obsBlock}${voidBlock}${ingresadoBlock}${actions}
