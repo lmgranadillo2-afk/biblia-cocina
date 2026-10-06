@@ -236,6 +236,15 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
 
 /* ===== PRODUCCION ===== */
 #view-produccion{padding:18px 20px 60px; overflow-y:auto; display:none;}
+#view-calculadora{padding:18px 20px 60px; overflow-y:auto;}
+.cp-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start;}
+@media (max-width:760px){ .cp-grid{grid-template-columns:1fr;} }
+.cp-card{border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:18px;}
+.cp-item{display:grid; grid-template-columns:1fr 110px 74px 34px; gap:8px; align-items:center; margin-bottom:8px;}
+.cp-tipo{display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+.cp-tipo button{flex:1; border:0; background:transparent; color:var(--text-dim); padding:8px 0; cursor:pointer; font-family:'IBM Plex Mono',monospace;}
+.cp-tipo button.on{background:var(--accent); color:#fff;}
+.cp-guardado{display:grid; grid-template-columns:1fr auto auto auto; gap:8px; align-items:center; border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:8px;}
 #view-produccion.active{display:flex; flex-direction:column;}
 .prod-form{border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:18px; margin-bottom:24px;}
 .prod-form h2{font-family:'Playfair Display',serif; font-size:24px; letter-spacing:0.5px; margin:0 0 14px; color:var(--text);}
@@ -560,6 +569,7 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <button id="tab-bajas">Bajas</button>
       <button id="tab-inventario">Inventario</button>
       <button id="tab-costeo">Costeo</button>
+      <button id="tab-calculadora" style="display:none">Calculadora</button>
       <button id="tab-admin" style="display:none">Admin</button>
     </nav>
   </header>
@@ -575,6 +585,39 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
       <div class="rec-detail-pane" id="recDetailPane">
         <div class="detail-back" id="detailBack">&larr; Volver al recetario</div>
         <div class="detail-body" id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="view-calculadora" class="view">
+      <div class="detail-title" style="margin-bottom:4px;">Calculadora de precios</div>
+      <div class="ev-dim" style="font-size:13px; margin-bottom:14px;">Precio de venta a partir del costo del plato, otros costos y el margen deseado. Solo la ve el super admin.</div>
+      <div class="cp-card" style="margin-bottom:18px;">
+        <label class="field-label">Nombre del plato</label>
+        <input type="text" id="cpNombre" placeholder="Ej. Bandeja paisa">
+      </div>
+      <div class="cp-grid">
+        <div class="cp-card">
+          <div class="section-label" style="margin-top:0;">Costo base del plato</div>
+          <input type="number" id="cpBase" min="0" step="any" placeholder="Costo de ingredientes">
+          <div class="section-label">Otros costos</div>
+          <div id="cpItems"></div>
+          <button class="btn btn-ghost btn-block" id="cpAgregar">+ Agregar costo (empaque, servicio...)</button>
+          <div class="section-label">Margen sobre el precio de venta</div>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <input type="range" id="cpMargenRango" min="0" max="90" step="1" value="30" style="flex:1;">
+            <input type="number" id="cpMargen" min="0" max="99" step="0.1" value="30" style="width:90px;"> <span>%</span>
+          </div>
+        </div>
+        <div class="cp-card">
+          <div class="section-label" style="margin-top:0;">Resumen</div>
+          <div class="ev-sum" id="cpResumen"></div>
+          <button class="btn btn-accent btn-block" id="cpGuardar" style="margin-top:12px;">Guardar plato</button>
+          <button class="btn btn-ghost btn-block" id="cpNuevo" style="margin-top:8px;">Nuevo plato</button>
+        </div>
+      </div>
+      <div class="cp-card" style="margin-top:18px;">
+        <div class="section-label" style="margin-top:0;">Platos guardados</div>
+        <div id="cpGuardados"><div class="empty-note">Cargando...</div></div>
       </div>
     </div>
 
@@ -1604,6 +1647,7 @@ function enterArea(loc, area){
   roleBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? 'block' : 'none';
+  document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   applyAreaModuleVisibility(area.modules || MODULE_TABS);
@@ -1663,12 +1707,14 @@ document.getElementById('tab-bajas').addEventListener('click', ()=>switchTab('ba
 document.getElementById('tab-inventario').addEventListener('click', ()=>switchTab('inventario'));
 document.getElementById('tab-costeo').addEventListener('click', ()=>switchTab('costeo'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
+document.getElementById('tab-calculadora').addEventListener('click', ()=>switchTab('calculadora'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
   if(name==='admin') loadAdminHistory();
+  if(name==='calculadora') abrirCalculadoraPrecios();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
@@ -4196,6 +4242,105 @@ function renderCosteoEventoForm(){
   }
 
   updateEventoPreview();
+}
+
+/* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
+   Precio = costo total ÷ (1 − margen). Costo total = costo base + otros costos ($ fijos o % del costo base).
+   Se guarda en la tabla calculadora_platos (RLS: solo super admin). */
+let CP = { id: null, items: [] }, CP_GUARDADOS = [];
+function cpCalcular(){
+  const base = toNum(document.getElementById('cpBase').value) || 0;
+  const filas = CP.items.map(i => ({ ...i, monto: i.tipo === 'pct' ? base * (toNum(i.valor) || 0) / 100 : (toNum(i.valor) || 0) }));
+  const costo = base + filas.reduce((a, i) => a + i.monto, 0);
+  const margen = Math.min(99, Math.max(0, toNum(document.getElementById('cpMargen').value) || 0));
+  const precio = costo / (1 - margen / 100);
+  return { base, filas, costo, margen, precio, ganancia: precio - costo };
+}
+function cpPintarResumen(){
+  const k = cpCalcular();
+  const fila = (a, b, cls) => `<div class="ev-sum-row ${cls || ''}"><span>${a}</span><span>${b}</span></div>`;
+  document.getElementById('cpResumen').innerHTML = fila('Costo del plato', fmtMoney(k.base))
+    + k.filas.filter(i => i.nombre || i.monto).map(i => fila(escapeHtml(i.nombre || 'Sin nombre') + (i.tipo === 'pct' ? ' (' + (toNum(i.valor) || 0) + '%)' : ''), fmtMoney(i.monto))).join('')
+    + fila('Costo total', fmtMoney(k.costo), 'total')
+    + fila('Ganancia (margen ' + k.margen + '%)', fmtMoney(k.ganancia), 'dim')
+    + fila('Precio de venta', fmtMoney(k.precio), 'total')
+    + fila('Costo sobre precio (food cost)', k.precio ? (Math.round(k.costo / k.precio * 1000) / 10) + '%' : '—', 'dim');
+}
+function cpPintarItems(){
+  const wrap = document.getElementById('cpItems');
+  wrap.innerHTML = CP.items.map((i, n) => `<div class="cp-item" data-n="${n}">
+      <input type="text" class="cp-nom" placeholder="Nombre (ej. empaque)" value="${escapeHtml(i.nombre || '')}">
+      <input type="number" class="cp-val" min="0" step="any" placeholder="${i.tipo === 'pct' ? '%' : '$'}" value="${i.valor === '' ? '' : i.valor}">
+      <div class="cp-tipo"><button class="${i.tipo === 'fijo' ? 'on' : ''}" data-tipo="fijo">$</button><button class="${i.tipo === 'pct' ? 'on' : ''}" data-tipo="pct">%</button></div>
+      <button class="btn btn-ghost btn-small cp-quitar" title="Quitar">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.cp-item').forEach(div => {
+    const it = CP.items[+div.dataset.n];
+    div.querySelector('.cp-nom').addEventListener('input', e => { it.nombre = e.target.value; cpPintarResumen(); });
+    div.querySelector('.cp-val').addEventListener('input', e => { it.valor = e.target.value; cpPintarResumen(); });
+    div.querySelectorAll('.cp-tipo button').forEach(b => b.addEventListener('click', () => { it.tipo = b.dataset.tipo; cpPintarItems(); }));
+    div.querySelector('.cp-quitar').addEventListener('click', () => { CP.items.splice(+div.dataset.n, 1); cpPintarItems(); });
+  });
+  cpPintarResumen();
+}
+function cpCargar(p){
+  CP = { id: p ? p.id : null, items: p ? (p.items || []).map(i => ({ ...i })) : [] };
+  document.getElementById('cpNombre').value = p ? p.nombre : '';
+  document.getElementById('cpBase').value = p ? p.costo_base : '';
+  document.getElementById('cpMargen').value = p ? p.margen_pct : 30;
+  document.getElementById('cpMargenRango').value = p ? p.margen_pct : 30;
+  document.getElementById('cpGuardar').textContent = p ? 'Guardar cambios' : 'Guardar plato';
+  cpPintarItems();
+}
+async function cpCargarGuardados(){
+  const box = document.getElementById('cpGuardados');
+  const { data, error } = await supa.from('calculadora_platos').select('*').order('nombre');
+  if(error){ box.innerHTML = '<div class="empty-note">No se pudieron cargar: ' + escapeHtml(error.message) + '</div>'; return; }
+  CP_GUARDADOS = data || [];
+  if(!CP_GUARDADOS.length){ box.innerHTML = '<div class="empty-note">Aún no hay platos guardados.</div>'; return; }
+  box.innerHTML = CP_GUARDADOS.map(p => `<div class="cp-guardado">
+      <span><b>${escapeHtml(p.nombre)}</b> <span class="ev-dim" style="font-size:12px;">· costo ${fmtMoney(p.costo_total)} · margen ${toNum(p.margen_pct)}%</span></span>
+      <span style="font-family:'IBM Plex Mono',monospace;">${fmtMoney(p.precio)}</span>
+      <button class="btn btn-ghost btn-small" data-cargar="${p.id}">Abrir</button>
+      <button class="btn btn-danger btn-small" data-borrar="${p.id}">Eliminar</button>
+    </div>`).join('');
+  box.querySelectorAll('[data-cargar]').forEach(b => b.addEventListener('click', () => { cpCargar(CP_GUARDADOS.find(p => p.id === b.dataset.cargar)); document.getElementById('view-calculadora').scrollTop = 0; }));
+  box.querySelectorAll('[data-borrar]').forEach(b => b.addEventListener('click', async () => {
+    if(b.dataset.seguro !== '1'){ b.dataset.seguro = '1'; b.textContent = '¿Seguro?'; return; }
+    const { error } = await supa.from('calculadora_platos').delete().eq('id', b.dataset.borrar);
+    if(error){ showToast('No se eliminó: ' + error.message); return; }
+    if(CP.id === b.dataset.borrar) cpCargar(null);
+    showToast('Plato eliminado');
+    cpCargarGuardados();
+  }));
+}
+let CP_LISTO = false;
+function abrirCalculadoraPrecios(){
+  if(!profile.is_super_admin) return;
+  if(!CP_LISTO){
+    CP_LISTO = true;
+    document.getElementById('cpBase').addEventListener('input', cpPintarResumen);
+    document.getElementById('cpMargen').addEventListener('input', e => { document.getElementById('cpMargenRango').value = e.target.value; cpPintarResumen(); });
+    document.getElementById('cpMargenRango').addEventListener('input', e => { document.getElementById('cpMargen').value = e.target.value; cpPintarResumen(); });
+    document.getElementById('cpAgregar').addEventListener('click', () => { CP.items.push({ nombre: '', valor: '', tipo: 'fijo' }); cpPintarItems(); });
+    document.getElementById('cpNuevo').addEventListener('click', () => cpCargar(null));
+    document.getElementById('cpGuardar').addEventListener('click', async () => {
+      const nombre = document.getElementById('cpNombre').value.trim();
+      if(!nombre){ showToast('Escribe el nombre del plato'); return; }
+      const k = cpCalcular();
+      const fila = { nombre, costo_base: k.base, items: CP.items.map(i => ({ nombre: i.nombre || '', valor: toNum(i.valor) || 0, tipo: i.tipo })),
+        margen_pct: k.margen, costo_total: Math.round(k.costo * 100) / 100, precio: Math.round(k.precio * 100) / 100, updated_at: new Date().toISOString() };
+      const res = CP.id ? await supa.from('calculadora_platos').update(fila).eq('id', CP.id).select().single()
+        : await supa.from('calculadora_platos').insert({ ...fila, created_by: session.user.id }).select().single();
+      if(res.error){ showToast('No se guardó: ' + res.error.message); return; }
+      CP.id = res.data.id;
+      document.getElementById('cpGuardar').textContent = 'Guardar cambios';
+      showToast('Plato guardado');
+      cpCargarGuardados();
+    });
+    cpCargar(null);
+  }
+  cpCargarGuardados();
 }
 
 /* ---------- RECETARIO ---------- */
