@@ -607,6 +607,11 @@ textarea{resize:vertical; min-height:64px; font-family:'Inter',sans-serif;}
             <input type="range" id="cpMargenRango" min="0" max="90" step="1" value="30" style="flex:1;">
             <input type="number" id="cpMargen" min="0" max="99" step="0.1" value="30" style="width:90px;"> <span>%</span>
           </div>
+          <div class="section-label">Impoconsumo (ICO)</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="number" id="cpIco" min="0" max="50" step="0.1" value="8" style="width:90px;"> <span>%</span>
+            <span class="ev-dim" style="font-size:12px;">se suma al precio de venta (0 = sin ICO)</span>
+          </div>
         </div>
         <div class="cp-card">
           <div class="section-label" style="margin-top:0;">Resumen</div>
@@ -4245,7 +4250,8 @@ function renderCosteoEventoForm(){
 }
 
 /* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
-   Precio = costo total ÷ (1 − margen). Costo total = costo base + otros costos ($ fijos o % del costo base).
+   Precio sin ICO = costo total ÷ (1 − margen); precio de carta = precio sin ICO × (1 + ICO). El margen y el food cost
+   se calculan sobre la venta sin ICO (el ICO es del Estado, no del restaurante). Costo total = costo base + otros costos ($ fijos o % del costo base).
    Se guarda en la tabla calculadora_platos (RLS: solo super admin). */
 let CP = { id: null, items: [] }, CP_GUARDADOS = [];
 function cpCalcular(){
@@ -4253,8 +4259,10 @@ function cpCalcular(){
   const filas = CP.items.map(i => ({ ...i, monto: i.tipo === 'pct' ? base * (toNum(i.valor) || 0) / 100 : (toNum(i.valor) || 0) }));
   const costo = base + filas.reduce((a, i) => a + i.monto, 0);
   const margen = Math.min(99, Math.max(0, toNum(document.getElementById('cpMargen').value) || 0));
-  const precio = costo / (1 - margen / 100);
-  return { base, filas, costo, margen, precio, ganancia: precio - costo };
+  const neto = costo / (1 - margen / 100);
+  const icoPct = Math.max(0, toNum(document.getElementById('cpIco').value) || 0);
+  const ico = neto * icoPct / 100;
+  return { base, filas, costo, margen, neto, icoPct, ico, precio: neto + ico, ganancia: neto - costo };
 }
 function cpPintarResumen(){
   const k = cpCalcular();
@@ -4263,8 +4271,10 @@ function cpPintarResumen(){
     + k.filas.filter(i => i.nombre || i.monto).map(i => fila(escapeHtml(i.nombre || 'Sin nombre') + (i.tipo === 'pct' ? ' (' + (toNum(i.valor) || 0) + '%)' : ''), fmtMoney(i.monto))).join('')
     + fila('Costo total', fmtMoney(k.costo), 'total')
     + fila('Ganancia (margen ' + k.margen + '%)', fmtMoney(k.ganancia), 'dim')
-    + fila('Precio de venta', fmtMoney(k.precio), 'total')
-    + fila('Costo sobre precio (food cost)', k.precio ? (Math.round(k.costo / k.precio * 1000) / 10) + '%' : '—', 'dim');
+    + fila('Precio sin ICO (venta neta)', fmtMoney(k.neto))
+    + (k.icoPct ? fila('ICO ' + k.icoPct + '%', fmtMoney(k.ico), 'dim') : '')
+    + fila('Precio de venta' + (k.icoPct ? ' (carta, con ICO)' : ''), fmtMoney(k.precio), 'total')
+    + fila('Food cost (costo ÷ venta neta)', k.neto ? (Math.round(k.costo / k.neto * 1000) / 10) + '%' : '—', 'dim');
 }
 function cpPintarItems(){
   const wrap = document.getElementById('cpItems');
@@ -4289,6 +4299,7 @@ function cpCargar(p){
   document.getElementById('cpBase').value = p ? p.costo_base : '';
   document.getElementById('cpMargen').value = p ? p.margen_pct : 30;
   document.getElementById('cpMargenRango').value = p ? p.margen_pct : 30;
+  document.getElementById('cpIco').value = p && p.ico_pct !== null && p.ico_pct !== undefined ? p.ico_pct : 8;
   document.getElementById('cpGuardar').textContent = p ? 'Guardar cambios' : 'Guardar plato';
   cpPintarItems();
 }
@@ -4320,6 +4331,7 @@ function abrirCalculadoraPrecios(){
   if(!CP_LISTO){
     CP_LISTO = true;
     document.getElementById('cpBase').addEventListener('input', cpPintarResumen);
+    document.getElementById('cpIco').addEventListener('input', cpPintarResumen);
     document.getElementById('cpMargen').addEventListener('input', e => { document.getElementById('cpMargenRango').value = e.target.value; cpPintarResumen(); });
     document.getElementById('cpMargenRango').addEventListener('input', e => { document.getElementById('cpMargen').value = e.target.value; cpPintarResumen(); });
     document.getElementById('cpAgregar').addEventListener('click', () => { CP.items.push({ nombre: '', valor: '', tipo: 'fijo' }); cpPintarItems(); });
@@ -4329,7 +4341,7 @@ function abrirCalculadoraPrecios(){
       if(!nombre){ showToast('Escribe el nombre del plato'); return; }
       const k = cpCalcular();
       const fila = { nombre, costo_base: k.base, items: CP.items.map(i => ({ nombre: i.nombre || '', valor: toNum(i.valor) || 0, tipo: i.tipo })),
-        margen_pct: k.margen, costo_total: Math.round(k.costo * 100) / 100, precio: Math.round(k.precio * 100) / 100, updated_at: new Date().toISOString() };
+        margen_pct: k.margen, ico_pct: k.icoPct, costo_total: Math.round(k.costo * 100) / 100, precio: Math.round(k.precio * 100) / 100, updated_at: new Date().toISOString() };
       const res = CP.id ? await supa.from('calculadora_platos').update(fila).eq('id', CP.id).select().single()
         : await supa.from('calculadora_platos').insert({ ...fila, created_by: session.user.id }).select().single();
       if(res.error){ showToast('No se guardó: ' + res.error.message); return; }

@@ -1,3 +1,4 @@
+-- Se puede correr más de una vez (si ya lo corriste, solo agrega lo que falte).
 -- 1) Módulo "Calculadora de precios": tabla nueva, solo el super admin puede ver y modificar.
 create table if not exists public.calculadora_platos (
   id uuid primary key default gen_random_uuid(),
@@ -11,6 +12,9 @@ create table if not exists public.calculadora_platos (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- ICO (% sobre la venta sin ICO); se agrega aparte por si la tabla ya existía.
+alter table public.calculadora_platos add column if not exists ico_pct numeric not null default 8;
 
 alter table public.calculadora_platos enable row level security;
 drop policy if exists calculadora_platos_super on public.calculadora_platos;
