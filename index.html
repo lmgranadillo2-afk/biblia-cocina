@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Biblia de Cocina</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -3313,12 +3313,15 @@ function cotizNombreArchivo(d, ext){
   return `cotizacion-${slug || 'evento'}.${ext}`;
 }
 
+// Huella (SRI) de las librerías externas: si el archivo del CDN cambia, el navegador no lo ejecuta.
+const HUELLA_HTML2CANVAS = 'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';
 let html2canvasPromise = null;
 function cargarHtml2Canvas(){
   if(window.html2canvas) return Promise.resolve();
   if(!html2canvasPromise) html2canvasPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.integrity = HUELLA_HTML2CANVAS; s.crossOrigin = 'anonymous';
     s.onload = resolve;
     s.onerror = () => { html2canvasPromise = null; reject(new Error('No se pudo cargar el generador de imágenes')); };
     document.head.appendChild(s);
@@ -3596,6 +3599,7 @@ function cargarJsPdf(){
   if(!jspdfPromise) jspdfPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk'; s.crossOrigin = 'anonymous';
     s.onload = resolve;
     s.onerror = () => { jspdfPromise = null; reject(new Error('No se pudo cargar el generador de PDF')); };
     document.head.appendChild(s);
@@ -3617,6 +3621,7 @@ async function eventoDescargarPdf(d){
     await new Promise((resolve, reject) => {
       const s = doc.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.integrity = HUELLA_HTML2CANVAS; s.crossOrigin = 'anonymous';
       s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar el generador de imágenes'));
       doc.head.appendChild(s);
     });
