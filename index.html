@@ -743,6 +743,36 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 @media (max-width:799px){
   .aud-det{grid-template-columns:1fr;}
 }
+/* Estado de eventos */
+.ev-estados{margin:0 0 var(--space-3);}
+.ev-estado-badge{margin-top:5px;}
+.rec-card.ev-cancelado{opacity:.6;}
+.estado-seg{display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--surface-2); border-radius:var(--radius-md);}
+.estado-op{flex:1 1 0; min-height:44px; padding:8px 10px; font:inherit; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:1px solid transparent; border-radius:var(--radius-sm); cursor:pointer;}
+.estado-op:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.estado-op.pendiente.active{background:var(--warn-bg); border-color:var(--warn); color:var(--warn);}
+.estado-op.confirmado.active{background:var(--ok-bg); border-color:var(--ok); color:var(--ok);}
+.estado-op.cancelado.active{background:var(--surface); border-color:var(--border-strong); color:var(--text);}
+.ev-estado-list{max-height:50vh; overflow-y:auto; margin-bottom:var(--space-3);}
+.ev-estado-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);}
+.ev-estado-row:last-child{border-bottom:none;}
+.ev-estado-row div{min-width:0;}
+.ev-estado-row b{display:block; font-size:14px;}
+.ev-estado-row span{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.ev-estado-row select{width:auto; flex:0 0 190px; margin:0;}
+@media (max-width:799px){
+  .ev-estado-row{flex-direction:column; align-items:stretch; gap:6px;}
+  .ev-estado-row select{flex-basis:auto; width:100%;}
+}
+/* Recordatorio de eventos próximos */
+.ev-prox-list{max-height:55vh; overflow-y:auto; margin-bottom:var(--space-3);}
+.ev-prox{padding:12px 14px; margin-bottom:var(--space-2); background:var(--surface-2); border-radius:var(--radius-md);}
+.ev-prox-head{display:flex; justify-content:space-between; align-items:center; gap:10px;}
+.ev-prox-head b{font-size:15px;}
+.ev-prox-meta{margin:3px 0 8px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.ev-prox-menu{font-size:13px; line-height:1.45; margin-bottom:4px;}
+.ev-prox-menu b{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-right:4px;}
+.ev-prox .btn{margin-top:8px; width:100%;}
 /* Sugeridos del nuevo pedido */
 .sugeridos{margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2);}
 .sug-head{display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); flex-wrap:wrap;}
@@ -1680,6 +1710,29 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
   </div>
 </div>
 
+<div class="modal-overlay" id="evEstadoModal">
+  <div class="modal-box">
+    <h3 id="evEstadoTitle">Define el estado de tus eventos</h3>
+    <div class="modal-sub">Ahora los eventos tienen estado. Estos los creaste tú y todavía no lo tienen: elige cómo está cada uno.</div>
+    <div id="evEstadoList" class="ev-estado-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="evEstadoLater">Después</button>
+      <button class="btn btn-accent" id="evEstadoSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="evProxModal">
+  <div class="modal-box">
+    <h3 id="evProxTitle">Eventos próximos</h3>
+    <div class="modal-sub">Eventos confirmados en este punto. Revisa el menú y los invitados para preparar compras y producción.</div>
+    <div id="evProxList" class="ev-prox-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-accent" id="evProxOk">Entendido</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="schedAddModal">
   <div class="modal-box">
     <h3>Agregar al cronograma</h3>
@@ -2221,7 +2274,138 @@ function enterArea(loc, area){
   initApp();
   setupRealtime();
   avisarPedidosAtrasados();
+  avisarEventosSinEstado();
+  avisarEventosProximos();
 }
+
+// Avisos al abrir la app (pedidos atrasados, eventos sin estado, eventos próximos):
+// se muestran de a uno; al cerrar uno sale el siguiente.
+const colaAvisos = [];
+function abrirAviso(id){
+  if(document.querySelector('.modal-overlay.aviso.open')){ if(!colaAvisos.includes(id)) colaAvisos.push(id); return; }
+  const m = document.getElementById(id);
+  m.classList.add('aviso', 'open');
+}
+function cerrarAviso(id){
+  document.getElementById(id).classList.remove('open');
+  const sig = colaAvisos.shift();
+  if(sig) abrirAviso(sig);
+}
+
+// Recordatorio de eventos confirmados del punto: 7 días antes y otra vez 1 día antes (y el mismo día).
+// Cada usuario lo ve una vez por etapa en su dispositivo (se recuerda en localStorage).
+function etapaRecordatorio(dias){ return dias === null || dias < 0 ? null : dias <= 1 ? 'dia' : dias <= 7 ? 'semana' : null; }
+const claveRecordatorio = (e, etapa) => 'evRecordatorio:' + e.id + ':' + e.fecha + ':' + etapa;
+function recordatorioVisto(e, etapa){ try { return localStorage.getItem(claveRecordatorio(e, etapa)) === '1'; } catch(_){ return false; } }
+function marcarRecordatorioVisto(e, etapa){ try { localStorage.setItem(claveRecordatorio(e, etapa), '1'); } catch(_){} }
+
+function cuandoEvento(dias){ return dias === 0 ? 'Hoy' : dias === 1 ? 'Mañana' : 'En ' + dias + ' días'; }
+
+// Menú del evento para cocina/barra (sin precios): grupos con sus opciones y otros de carta.
+function eventoMenuLineas(e){
+  const lineas = [];
+  (e.tiempos || []).forEach(t => {
+    const ops = (t.opciones || []).filter(o => o.nombre);
+    if(!ops.length) return;
+    const porciones = t.modo === 'individual' ? '' : (hasValue(t.cantidad) ? ' (' + fmtQty(t.cantidad) + ' porciones)' : '');
+    lineas.push([t.nombre || 'Tiempo', ops.map(o => o.nombre + (t.modo === 'individual' && toNum(o.cantidad) ? ' ×' + fmtQty(o.cantidad) : '')).join(' / ') + porciones]);
+  });
+  const otros = (e.items || []).filter(i => i.nombre);
+  if(otros.length) lineas.push(['Otros', otros.map(i => i.nombre + (toNum(i.cantidad) ? ' ×' + fmtQty(i.cantidad) : '')).join(', ')]);
+  return lineas;
+}
+
+function mensajeRecordatorioEvento(e){
+  const fecha = e.fecha ? new Date(e.fecha + 'T00:00:00').toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'}) : '';
+  const l = [`Recordatorio de evento — ${currentLocation ? currentLocation.name : ''}`, '', e.nombre];
+  l.push([fecha.charAt(0).toUpperCase() + fecha.slice(1), e.horario].filter(Boolean).join(' · '));
+  if(e.invitados) l.push(e.invitados + ' invitados');
+  const menu = eventoMenuLineas(e);
+  if(menu.length){ l.push('', 'MENÚ'); menu.forEach(([t, txt]) => l.push(`- ${t}: ${txt}`)); }
+  if(e.notas) l.push('', 'Notas: ' + e.notas);
+  return l.join('\n');
+}
+
+let eventosProximos = [];
+async function avisarEventosProximos(){
+  if(!currentLocation || esHub()) return;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const en7 = new Date(hoy.getTime() + 7 * 86400000);
+  const { data, error } = await supa.from('costeo_eventos').select('id, nombre, cliente, fecha, horario, invitados, notas, tiempos, items, estado')
+    .eq('restaurante_id', currentLocation.id).eq('estado', 'confirmado')
+    .gte('fecha', toISODate(hoy)).lte('fecha', toISODate(en7)).order('fecha', {ascending:true});
+  if(error || !data) return;
+  eventosProximos = data.map(e => ({ ...e, _dias: diasParaEvento(e.fecha) }))
+    .map(e => ({ ...e, _etapa: etapaRecordatorio(e._dias) }))
+    .filter(e => e._etapa && !recordatorioVisto(e, e._etapa));
+  if(eventosProximos.length === 0) return;
+  document.getElementById('evProxTitle').textContent = eventosProximos.length === 1 ? 'Evento próximo' : eventosProximos.length + ' eventos próximos';
+  document.getElementById('evProxList').innerHTML = eventosProximos.map(e => `
+    <div class="ev-prox">
+      <div class="ev-prox-head"><b>${escapeHtml(e.nombre)}</b><span class="badge ${e._dias <= 1 ? 'danger' : 'info'}">${cuandoEvento(e._dias)}</span></div>
+      <div class="ev-prox-meta">${escapeHtml([fmtDia(e.fecha), e.horario, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).join(' · '))}</div>
+      ${eventoMenuLineas(e).map(([t, txt]) => `<div class="ev-prox-menu"><b>${escapeHtml(t)}</b> ${escapeHtml(txt)}</div>`).join('')}
+      ${e.notas ? `<div class="ev-prox-menu"><b>Notas</b> ${escapeHtml(e.notas)}</div>` : ''}
+      <button type="button" class="btn btn-secondary btn-small" data-ev-wa="${e.id}">Enviar recordatorio por WhatsApp</button>
+    </div>`).join('');
+  document.querySelectorAll('[data-ev-wa]').forEach(b => b.addEventListener('click', ()=>{
+    const e = eventosProximos.find(x => x.id === b.dataset.evWa);
+    if(e) window.open('https://wa.me/?text=' + encodeURIComponent(mensajeRecordatorioEvento(e)), '_blank');
+  }));
+  abrirAviso('evProxModal');
+}
+
+document.getElementById('evProxOk').addEventListener('click', ()=>{
+  eventosProximos.forEach(e => marcarRecordatorioVisto(e, e._etapa));
+  cerrarAviso('evProxModal');
+});
+
+// Al abrir la app (una vez por sesión): eventos sin estado que creó este usuario
+// (el super admin también ve los que no tienen creador). Se definen ahí mismo.
+let avisoEventosMostrado = false;
+let eventosSinEstado = [];
+async function avisarEventosSinEstado(){
+  if(avisoEventosMostrado || !session) return;
+  avisoEventosMostrado = true;
+  let q = supa.from('costeo_eventos').select('id, nombre, cliente, fecha').is('estado', null);
+  q = profile.is_super_admin ? q.or(`created_by.eq.${session.user.id},created_by.is.null`) : q.eq('created_by', session.user.id);
+  const { data, error } = await q.order('fecha', {ascending:true, nullsFirst:false});
+  if(error || !data || data.length === 0) return;
+  eventosSinEstado = data;
+  document.getElementById('evEstadoTitle').textContent = data.length === 1 ? 'Define el estado de tu evento' : `Define el estado de tus ${data.length} eventos`;
+  document.getElementById('evEstadoList').innerHTML = data.map(e => {
+    const dias = diasParaEvento(e.fecha);
+    const sugerido = dias !== null && dias < 0 ? ' (ya pasó)' : '';
+    return `<div class="ev-estado-row">
+      <div><b>${escapeHtml(e.nombre)}</b><span>${escapeHtml([fmtFecha(e.fecha) + sugerido, e.cliente].filter(Boolean).join(' · ') || 'sin fecha')}</span></div>
+      <select data-ev-id="${e.id}" aria-label="Estado de ${escapeHtml(e.nombre)}">
+        <option value="">Elegir...</option>
+        ${EVENTO_ESTADOS.map(s => `<option value="${s.key}">${s.label}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+  abrirAviso('evEstadoModal');
+}
+
+document.getElementById('evEstadoLater').addEventListener('click', ()=> cerrarAviso('evEstadoModal'));
+document.getElementById('evEstadoSave').addEventListener('click', async ()=>{
+  const elegidos = [...document.querySelectorAll('#evEstadoList select')].filter(s => s.value);
+  if(elegidos.length === 0){ showToast('Elige el estado de al menos un evento', 'warn'); return; }
+  const btn = document.getElementById('evEstadoSave');
+  btn.disabled = true;
+  const por = profile.name || session.user.email, at = new Date().toISOString();
+  const res = await Promise.all(elegidos.map(s => supa.from('costeo_eventos').update({ estado: s.value, estado_por: por, estado_at: at }).eq('id', s.dataset.evId)));
+  btn.disabled = false;
+  const fallos = res.filter(r => r.error);
+  if(fallos.length){ showToast('No se pudieron guardar ' + fallos.length + ': ' + fallos[0].error.message, 'danger'); return; }
+  const faltan = eventosSinEstado.length - elegidos.length;
+  showToast(faltan ? `Guardado. Te ${faltan === 1 ? 'falta 1 evento' : 'faltan ' + faltan + ' eventos'} por definir` : 'Estados guardados', 'ok');
+  cerrarAviso('evEstadoModal');
+  if(typeof COSTEO_EVENTOS !== 'undefined' && COSTEO_EVENTOS.length){
+    await loadCosteoEventos();
+    if(costeoSub === 'eventos') renderCosteoEventosList();
+  }
+});
 
 /* ---------- TIEMPO REAL: pedidos y bajas ---------- */
 let realtimeChannel = null;
@@ -4569,22 +4753,58 @@ function fmtFecha(f){
   return `${d}/${m}/${y}`;
 }
 
+/* ---------- Estado de eventos: Pendiente por confirmar / Confirmado / Cancelado ---------- */
+// null = evento anterior a los estados, sin definir (a quien lo creó le sale una alerta al abrir la app).
+const EVENTO_ESTADOS = [
+  { key:'pendiente',  label:'Pendiente por confirmar', corto:'Pendientes' },
+  { key:'confirmado', label:'Confirmado',              corto:'Confirmados' },
+  { key:'cancelado',  label:'Cancelado',               corto:'Cancelados' },
+];
+let eventosFiltroEstado = '';
+
+function diasParaEvento(fecha){
+  if(!fecha) return null;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  return Math.round((new Date(fecha + 'T00:00:00') - hoy) / 86400000);
+}
+
+// Semáforo: confirmado verde; pendiente azul (> 7 días), amarillo (≤ 7), rojo con pulso (≤ 3 o ya pasó).
+function eventoEstadoBadge(e){
+  if(e.estado === 'confirmado') return '<span class="badge ok">Confirmado</span>';
+  if(e.estado === 'cancelado') return '<span class="badge neutral">Cancelado</span>';
+  if(e.estado !== 'pendiente') return '<span class="badge warn">Sin estado</span>';
+  const dias = diasParaEvento(e.fecha);
+  if(dias === null) return '<span class="badge info">Pendiente</span>';
+  const cuando = dias < 0 ? 'ya pasó' : dias === 0 ? 'es hoy' : dias === 1 ? 'mañana' : 'faltan ' + dias + ' d';
+  const nivel = dias <= 3 ? 'danger' : dias <= 7 ? 'warn' : 'info';
+  return `<span class="badge ${nivel}${nivel === 'danger' ? ' pulse' : ''}" title="Pendiente por confirmar">Pendiente · ${cuando}</span>`;
+}
+
 function renderCosteoEventosList(){
   const q = document.getElementById('costeoSearchInput').value.trim().toUpperCase();
-  const list = COSTEO_EVENTOS.filter(e => !q || e.nombre.toUpperCase().includes(q) || (e.cliente || '').toUpperCase().includes(q));
+  const porTexto = COSTEO_EVENTOS.filter(e => !q || e.nombre.toUpperCase().includes(q) || (e.cliente || '').toUpperCase().includes(q));
+  const deEstado = k => k === 'sin' ? porTexto.filter(e => !e.estado) : porTexto.filter(e => e.estado === k);
+  const list = eventosFiltroEstado ? deEstado(eventosFiltroEstado) : porTexto;
   const wrap = document.getElementById('costeoItems');
   document.getElementById('costeoCount').textContent = list.length + ' evento' + (list.length===1?'':'s');
-  if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">Todavía no hay eventos. Tocá "+ Nuevo evento".</div>'; return; }
-  wrap.innerHTML = list.map(e => {
-    const t = eventoCalcTotals(e);
-    const rest = esHub() ? restauranteDe(e.restaurante_id) : null;
-    const sub = [rest && rest.name, fmtFecha(e.fecha), e.cliente, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).map(escapeHtml).join(' · ');
-    return `<div class="rec-card ${e.id===currentCosteoEventoId?'selected':''}" data-id="${e.id}">
-      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(e.nombre)}</div><div class="rec-card-code">${sub || 'sin fecha'}</div></div>
-      <div class="rec-card-yield">${fmtMoney(t.total)}</div>
-    </div>`;
-  }).join('');
+  const filtros = [{ key:'', corto:'Todos' }, ...EVENTO_ESTADOS, ...(porTexto.some(e => !e.estado) ? [{ key:'sin', corto:'Sin estado' }] : [])];
+  const chips = COSTEO_EVENTOS.length === 0 ? '' : `<div class="aud-estados ev-estados">${filtros.map(f =>
+    `<button type="button" class="aud-chip${eventosFiltroEstado === f.key ? ' active' : ''}" data-ev-estado="${f.key}" aria-pressed="${eventosFiltroEstado === f.key}">${f.corto}<span>${f.key ? deEstado(f.key).length : porTexto.length}</span></button>`).join('')}</div>`;
+  if(list.length === 0){
+    wrap.innerHTML = chips + `<div class="empty-list">${COSTEO_EVENTOS.length ? 'No hay eventos con este filtro.' : 'Todavía no hay eventos. Tocá "+ Nuevo evento".'}</div>`;
+  } else {
+    wrap.innerHTML = chips + list.map(e => {
+      const t = eventoCalcTotals(e);
+      const rest = esHub() ? restauranteDe(e.restaurante_id) : null;
+      const sub = [rest && rest.name, fmtFecha(e.fecha), e.cliente, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div class="rec-card ${e.id===currentCosteoEventoId?'selected':''}${e.estado === 'cancelado' ? ' ev-cancelado' : ''}" data-id="${e.id}">
+        <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(e.nombre)}</div><div class="rec-card-code">${sub || 'sin fecha'}</div><div class="ev-estado-badge">${eventoEstadoBadge(e)}</div></div>
+        <div class="rec-card-yield">${fmtMoney(t.total)}</div>
+      </div>`;
+    }).join('');
+  }
   wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoEvento(el.dataset.id)));
+  wrap.querySelectorAll('[data-ev-estado]').forEach(b => b.addEventListener('click', ()=>{ eventosFiltroEstado = b.dataset.evEstado; renderCosteoEventosList(); }));
 }
 
 function openCosteoEvento(id){
@@ -4592,6 +4812,7 @@ function openCosteoEvento(id){
   const e = id ? COSTEO_EVENTOS.find(x=>x.id===id) : null;
   costeoEventoDraft = e ? {
     id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '', horario: e.horario || '',
+    estado: e.estado || null, estadoOriginal: e.estado || null,
     tiempos: (e.tiempos||[]).map(t=>({ ...t, opciones: (t.opciones||[]).map(o=>({...o})) })),
     items: (e.items||[]).map(i=>({...i})), personal: (e.personal||[]).map(p=>({...p})), otros: (e.otros||[]).map(o=>({...o})),
     margen_personal_pct: e.margen_personal_pct ?? 40, descuento_tipo: e.descuento_tipo || 'pct', descuento_valor: e.descuento_valor || 0,
@@ -4601,6 +4822,7 @@ function openCosteoEvento(id){
     restaurante_id: e.restaurante_id || null
   } : {
     id: null, nombre: '', cliente: '', fecha: '', invitados: 0, notas: '', horario: '',
+    estado: 'pendiente', estadoOriginal: null,
     tiempos: EVENTO_TIEMPOS_BASE.map(n => ({ nombre: n, cantidad: null, opciones: [] })),
     items: [], personal: [], otros: [],
     margen_personal_pct: 40, descuento_tipo: 'pct', descuento_valor: 0, servicio_pct: 10, impoconsumo_pct: 8, anticipo_pct: 50,
@@ -4757,6 +4979,13 @@ function renderCosteoEventoForm(){
   document.getElementById('costeoDetailBody').innerHTML = `
     <div class="detail-title">${editing ? 'Editar evento' : 'Nuevo evento'}</div>
     <div class="obs-form">
+      <div class="field"><label class="field-label">Estado</label>
+        <div class="estado-seg" role="radiogroup" aria-label="Estado del evento">
+          ${EVENTO_ESTADOS.map(s => `<button type="button" role="radio" class="estado-op ${s.key}${d.estado === s.key ? ' active' : ''}" data-estado="${s.key}" aria-checked="${d.estado === s.key}">${s.label}</button>`).join('')}
+        </div>
+        ${d.estado ? (() => { const g = d.id && COSTEO_EVENTOS.find(x => x.id === d.id); return g && g.estado_por ? `<div class="field-help">${escapeHtml((EVENTO_ESTADOS.find(s => s.key === g.estado) || {}).label || '')} · ${escapeHtml(g.estado_por)} · ${fmtFechaHora(g.estado_at)}</div>` : ''; })()
+          : '<div class="field-help" style="color:var(--warn);">Este evento todavía no tiene estado: elige uno y guarda.</div>'}
+      </div>
       ${esHub() ? `
       <div class="field"><label class="field-label">Restaurante del evento</label>
         <select id="evRestaurante">
@@ -4865,6 +5094,10 @@ function renderCosteoEventoForm(){
     if(tieneCarta) showToast('Ojo: los platos ya agregados son de la carta del restaurante anterior');
     renderCosteoEventoForm();
   });
+  document.querySelectorAll('.estado-seg .estado-op').forEach(b => b.addEventListener('click', ()=>{
+    d.estado = b.dataset.estado;
+    document.querySelectorAll('.estado-seg .estado-op').forEach(x => { const on = x === b; x.classList.toggle('active', on); x.setAttribute('aria-checked', on); });
+  }));
   bindText('evNombre', 'nombre'); bindText('evCliente', 'cliente'); bindText('evFecha', 'fecha'); bindText('evNotas', 'notas'); bindText('evHorario', 'horario');
   bindNum('evInvitados', 'invitados'); bindNum('evMargenPersonal', 'margen_personal_pct');
   bindNum('evDescValor', 'descuento_valor'); bindNum('evServicio', 'servicio_pct'); bindNum('evImpoconsumo', 'impoconsumo_pct'); bindNum('evIvaExtras', 'iva_extras_pct'); bindNum('evAnticipo', 'anticipo_pct');
@@ -5027,8 +5260,14 @@ function renderCosteoEventoForm(){
       anticipo_pct: toNum(d.anticipo_pct),
       encargado: d.encargado.trim() || null,
       comision_pct: toNum(d.comision_pct),
-      restaurante_id: d.restaurante_id
+      restaurante_id: d.restaurante_id,
+      estado: d.estado
     };
+    // Quién y cuándo cambió el estado (también al crear el evento).
+    if(d.estado !== d.estadoOriginal){
+      payload.estado_por = profile.name || session.user.email;
+      payload.estado_at = new Date().toISOString();
+    }
     let error;
     if(d.id){
       ({ error } = await supa.from('costeo_eventos').update(payload).eq('id', d.id));
@@ -6710,12 +6949,12 @@ async function avisarPedidosAtrasados(){
     const cuando = o.entrega_esperada ? 'esperado ' + fmtDia(o.entrega_esperada) : 'enviado hace ' + e.tiempo;
     return `<div><span>${escapeHtml([o.codigo, o.proveedor].filter(Boolean).join(' · '))}</span><b>${cuando}</b></div>`;
   }).join('');
-  document.getElementById('lateModal').classList.add('open');
+  abrirAviso('lateModal');
 }
 
-document.getElementById('lateClose').addEventListener('click', ()=> document.getElementById('lateModal').classList.remove('open'));
+document.getElementById('lateClose').addEventListener('click', ()=> cerrarAviso('lateModal'));
 document.getElementById('lateGo').addEventListener('click', ()=>{
-  document.getElementById('lateModal').classList.remove('open');
+  cerrarAviso('lateModal');
   document.getElementById('orderKanban').dataset.col = 'aprobado';
   switchTab('pedidos');
 });
