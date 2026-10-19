@@ -696,6 +696,16 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .kanban-card .kc-note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--danger); margin-bottom:2px;}
 .kanban-card .kc-actions{display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3);}
 .kanban-card .kc-actions .btn{flex:1 1 0;}
+.kanban-card .kc-actions .badge{white-space:normal; max-width:100%;}
+.kanban-card .kc-note.recepcion{border-left-color:var(--warn); background:var(--warn-bg);}
+.kanban-card .kc-note.recepcion b{color:var(--warn);}
+#followHist .kc-note{margin-top:var(--space-2); padding:8px 10px; border-radius:var(--radius-sm); border-left:3px solid var(--warn); background:var(--warn-bg); font-size:13px; line-height:1.4;}
+#followHist .kc-note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--warn); margin-bottom:2px;}
+#followHist{margin-bottom:var(--space-3);}
+/* Aviso sobre el tablero: pedidos atrasados sin llegar */
+.aviso-atrasados{display:flex; flex-direction:column; gap:2px; width:100%; text-align:left; margin-bottom:var(--space-3); padding:12px 14px; border:1px solid var(--danger); border-left-width:4px; border-radius:var(--radius-md); background:var(--danger-bg); color:var(--text); font:inherit; font-size:13px; cursor:pointer;}
+.aviso-atrasados b{color:var(--danger); font-size:14px;}
+.aviso-atrasados:focus-visible{outline:none; box-shadow:var(--focus-ring);}
 .kanban-card .kc-qty{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-weight:600; color:var(--text);}
 .kanban-card .kc-label{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-right:4px;}
 .kanban-card .kc-resuelto{margin-top:var(--space-2); font-size:12px; color:var(--text-dim);}
@@ -1551,6 +1561,45 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
   </div>
 </div>
 
+<div class="modal-overlay" id="receiveModal">
+  <div class="modal-box">
+    <h3>Marcar como recibido</h3>
+    <div class="modal-sub" id="receiveMeta"></div>
+    <div class="field"><label class="field-label">Nota (opcional)</label><textarea id="receiveNota" placeholder="Ej: llegó incompleto, faltó la crema de leche..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="receiveCancel">Cancelar</button>
+      <button class="btn btn-ok" id="receiveConfirm">Confirmar recibido</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="followModal">
+  <div class="modal-box">
+    <h3>Seguimiento del pedido</h3>
+    <div class="modal-sub" id="followMeta"></div>
+    <div class="field"><label class="field-label">¿Qué pasó con el pedido?</label><textarea id="followNota" placeholder="Ej: llamé al proveedor, dice que llega el jueves en la mañana..."></textarea></div>
+    <div class="field"><label class="field-label">Nueva fecha esperada (opcional)</label><input type="date" id="followFecha">
+      <div class="field-help">Hasta esa fecha el pedido no sale como atrasado.</div></div>
+    <div id="followHist"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="followCancel">Cancelar</button>
+      <button class="btn btn-accent" id="followSave">Guardar seguimiento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="lateModal">
+  <div class="modal-box">
+    <h3 id="lateTitle">Pedidos sin llegar</h3>
+    <div class="modal-sub">Pasaron el plazo de entrega y nadie los ha marcado como recibidos. Márcalos al llegar o registra el seguimiento.</div>
+    <div class="modal-summary" id="lateList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="lateClose">Cerrar</button>
+      <button class="btn btn-accent" id="lateGo">Ver pedidos</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="schedAddModal">
   <div class="modal-box">
     <h3>Agregar al cronograma</h3>
@@ -2090,6 +2139,7 @@ function enterArea(loc, area){
   applyAreaModuleVisibility(area.modules || MODULE_TABS);
   initApp();
   setupRealtime();
+  avisarPedidosAtrasados();
 }
 
 /* ---------- TIEMPO REAL: pedidos y bajas ---------- */
@@ -6439,14 +6489,75 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   loadMyOrders();
 });
 
-async function loadMyOrders(){
+// Pedidos del tablero: los de esta semana + los de semanas anteriores que siguen por recibir.
+async function cargarPedidosArea(){
   const { monday, sunday } = getWeekRange(new Date());
-  const { data, error } = await supa.from('orders').select('*, order_items(*)')
-    .eq('area_id', currentArea.id)
-    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
-    .order('created_at', {ascending:false});
-  const list = error ? [] : (data || []);
-  renderOrderKanban(list, document.getElementById('orderKanban'), 'own');
+  const [semana, porRecibir] = await Promise.all([
+    supa.from('orders').select('*, order_items(*), order_seguimientos(*)')
+      .eq('area_id', currentArea.id)
+      .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
+      .order('created_at', {ascending:false}),
+    supa.from('orders').select('*, order_items(*), order_seguimientos(*)')
+      .eq('area_id', currentArea.id)
+      .eq('status', 'aprobado').eq('enviado', true).eq('recibido', false)
+      .lt('fecha', toISODate(monday))
+      .order('created_at', {ascending:false})
+  ]);
+  return [...(semana.error ? [] : (semana.data || [])), ...(porRecibir.error ? [] : (porRecibir.data || []))];
+}
+
+// Aviso al abrir la app (una vez por área en cada sesión): pedidos que pasaron el plazo sin llegar.
+const AVISO_ATRASADOS_MOSTRADO = new Set();
+async function avisarPedidosAtrasados(){
+  if(!currentArea || AVISO_ATRASADOS_MOSTRADO.has(currentArea.id)) return;
+  if(!(currentArea.modules || MODULE_TABS).includes('pedidos')) return;
+  AVISO_ATRASADOS_MOSTRADO.add(currentArea.id);
+  const { data, error } = await supa.from('orders').select('id, codigo, proveedor, enviado_at, entrega_esperada, status, enviado, recibido')
+    .eq('area_id', currentArea.id).eq('status', 'aprobado').eq('enviado', true).eq('recibido', false);
+  if(error) return;
+  const atrasados = (data || []).filter(o => (entregaPedido(o) || {}).atrasado);
+  if(atrasados.length === 0) return;
+  document.getElementById('lateTitle').textContent = atrasados.length === 1 ? '1 pedido no ha llegado' : atrasados.length + ' pedidos no han llegado';
+  document.getElementById('lateList').innerHTML = atrasados.map(o => {
+    const e = entregaPedido(o);
+    const cuando = o.entrega_esperada ? 'esperado ' + fmtDia(o.entrega_esperada) : 'enviado hace ' + e.tiempo;
+    return `<div><span>${escapeHtml([o.codigo, o.proveedor].filter(Boolean).join(' · '))}</span><b>${cuando}</b></div>`;
+  }).join('');
+  document.getElementById('lateModal').classList.add('open');
+}
+
+document.getElementById('lateClose').addEventListener('click', ()=> document.getElementById('lateModal').classList.remove('open'));
+document.getElementById('lateGo').addEventListener('click', ()=>{
+  document.getElementById('lateModal').classList.remove('open');
+  document.getElementById('orderKanban').dataset.col = 'aprobado';
+  switchTab('pedidos');
+});
+
+// Aviso fijo sobre el tablero cuando hay pedidos atrasados.
+function avisoAtrasadosTablero(boardEl, list){
+  const id = boardEl.id + 'Aviso';
+  let aviso = document.getElementById(id);
+  const n = list.filter(o => (entregaPedido(o) || {}).atrasado).length;
+  if(n === 0){ if(aviso) aviso.remove(); return; }
+  if(!aviso){
+    aviso = document.createElement('button');
+    aviso.type = 'button';
+    aviso.id = id;
+    aviso.className = 'aviso-atrasados';
+    const tabs = boardEl.previousElementSibling && boardEl.previousElementSibling.classList.contains('kanban-tabs') ? boardEl.previousElementSibling : boardEl;
+    tabs.parentNode.insertBefore(aviso, tabs);
+    aviso.addEventListener('click', ()=>{
+      const tab = boardEl.previousElementSibling && boardEl.previousElementSibling.querySelector('.kanban-tab[data-col="aprobado"]');
+      if(tab) tab.click();
+      const card = boardEl.querySelector('.kanban-card .badge.danger.pulse');
+      if(card) card.closest('.kanban-card').scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  }
+  aviso.innerHTML = `<b>${n === 1 ? '1 pedido atrasado: no ha llegado' : n + ' pedidos atrasados: no han llegado'}</b><span>Márcalos como recibidos o registra el seguimiento</span>`;
+}
+
+async function loadMyOrders(){
+  renderOrderKanban(await cargarPedidosArea(), document.getElementById('orderKanban'), 'own');
 }
 
 const KANBAN_COLUMNS = [
@@ -6465,6 +6576,56 @@ function semaforoEnvio(o){
   const nivel = min < 120 ? 'ok' : (min <= 300 ? 'warn' : 'danger');
   const titulo = nivel === 'danger' ? 'Aprobado hace ' + tiempo + ': ¡falta enviarlo!' : 'Aprobado hace ' + tiempo + ', sin enviar';
   return { nivel, badge: `<span class="badge ${nivel}${nivel === 'danger' ? ' pulse' : ''}" title="${titulo}">Sin enviar · ${tiempo}</span>` };
+}
+
+// Pedidos enviados que no han llegado. Atrasado = más de 2 días desde el envío o,
+// si se anotó una fecha esperada en el seguimiento, después de esa fecha.
+const HORAS_ATRASO_PEDIDO = 48;
+function entregaPedido(o){
+  if(o.status !== 'aprobado' || !o.enviado || o.recibido || !o.enviado_at) return null;
+  const h = Math.max(0, Math.floor((Date.now() - new Date(o.enviado_at).getTime()) / 3600000));
+  const tiempo = h < 24 ? h + ' h' : Math.floor(h / 24) + ' d ' + (h % 24) + ' h';
+  const atrasado = o.entrega_esperada ? toISODate(new Date()) > o.entrega_esperada : h >= HORAS_ATRASO_PEDIDO;
+  return { h, tiempo, atrasado };
+}
+
+const fmtFechaHora = iso => iso ? new Date(iso).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+const fmtDia = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es-CO', {weekday:'short', day:'numeric', month:'short'}) : '';
+
+// Sin fecha esperada: azul < 24 h, amarillo 24–48 h, rojo (atrasado) > 48 h.
+// Con fecha esperada: azul hasta esa fecha, rojo cuando pasa.
+function semaforoEntrega(o){
+  const e = entregaPedido(o);
+  if(!e) return null;
+  const titulo = 'Enviado hace ' + e.tiempo + ', sin recibir';
+  if(e.atrasado){
+    const texto = o.entrega_esperada ? 'Atrasado · esperado ' + fmtDia(o.entrega_esperada) : 'Atrasado · ' + e.tiempo;
+    return { nivel:'danger', badge: `<span class="badge danger pulse" title="${titulo}">${texto}</span>` };
+  }
+  if(o.entrega_esperada) return { nivel:'info', badge: `<span class="badge info" title="${titulo}">Llega · ${fmtDia(o.entrega_esperada)}</span>` };
+  const nivel = e.h < 24 ? 'info' : 'warn';
+  return { nivel, badge: `<span class="badge ${nivel}" title="${titulo}">Por recibir · ${e.tiempo}</span>` };
+}
+
+function ultimoSeguimiento(o){
+  const s = (o.order_seguimientos || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return s[0] || null;
+}
+
+// Bloque de recepción de la tarjeta (enviado → por recibir / recibido).
+function recepcionPedidoHtml(o, mode){
+  if(o.status !== 'aprobado' || !o.enviado) return '';
+  const enviado = `<span class="badge neutral">Enviado · ${fmtFechaHora(o.enviado_at)}</span>`;
+  if(o.recibido){
+    const quien = o.recibido_por && o.recibido_por !== 'Histórico' ? ' · ' + escapeHtml(o.recibido_por) : '';
+    return `${o.recibido_nota ? `<div class="kc-note recepcion"><b>Nota de recepción</b>${escapeHtml(o.recibido_nota)}</div>` : ''}
+      <div class="kc-actions"><span class="badge ok">Recibido · ${fmtFechaHora(o.recibido_at)}${quien}</span>
+      ${mode === 'admin' ? `<button class="btn btn-secondary btn-small" data-unreceive-id="${o.id}">Desmarcar</button>` : ''}</div>`;
+  }
+  const seg = ultimoSeguimiento(o);
+  const segHtml = seg ? `<div class="kc-note recepcion"><b>Seguimiento · ${escapeHtml(seg.creado_por_nombre || '')} · ${fmtFechaHora(seg.created_at)}</b>${escapeHtml(seg.nota)}</div>` : '';
+  return `${segHtml}<div class="kc-actions">${enviado}</div>
+    <div class="kc-actions"><button class="btn btn-secondary btn-small" data-follow-id="${o.id}">Seguimiento</button><button class="btn btn-ok btn-small" data-receive-id="${o.id}">Marcar recibido</button></div>`;
 }
 
 // Tarjetas del kanban que se abren al tocarlas: también con Enter o Espacio desde el teclado
@@ -6505,15 +6666,12 @@ function orderKanbanCardHtml(o, mode){
   if(o.status === 'rechazado' && o.rechazo_motivo){
     extra = `<div class="kc-note"><b>Motivo del rechazo</b>${escapeHtml(o.rechazo_motivo)}</div>`;
   }
-  let actions = '';
+  let actions = recepcionPedidoHtml(o, mode);
   if(mode === 'admin' && (o.status === 'aprobado' || o.status === 'rechazado')){
     actions += `<div class="kc-actions"><button class="btn btn-secondary btn-small" data-unlock-id="${o.id}">Desbloquear</button></div>`;
   }
   if(mode === 'own' && o.status === 'aprobado'){
-    if(o.enviado){
-      const enviadoHora = o.enviado_at ? new Date(o.enviado_at).toLocaleString('es-CO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
-      actions += `<div class="kc-actions"><span class="badge ok">Enviado · ${enviadoHora}</span></div>`;
-    } else {
+    if(!o.enviado){
       let sendBtns = '<div class="kc-actions">';
       sendBtns += `<button class="btn btn-secondary btn-small" data-wa-id="${o.id}" title="Enviar el pedido por WhatsApp">WhatsApp</button>`;
       if(o.proveedor_correo) sendBtns += `<button class="btn btn-secondary btn-small" data-mail-id="${o.id}" title="Enviar el pedido por correo">Correo</button>`;
@@ -6522,7 +6680,7 @@ function orderKanbanCardHtml(o, mode){
     }
   }
   const clickable = (mode === 'admin' && o.status === 'pendiente') || (mode === 'own' && o.status === 'pendiente');
-  const sem = semaforoEnvio(o);
+  const sem = semaforoEnvio(o) || semaforoEntrega(o);
   const badges = (o.urgente ? '<span class="badge info">Urgente</span>' : '') + (sem ? sem.badge : '');
   return `<div class="kanban-card ${o.status}${sem ? ' semaforo-' + sem.nivel : ''}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}"${clickable ? ' role="button" tabindex="0"' : ''}>
     ${o.codigo || badges ? `<div class="kc-head"><span class="kc-code">${o.codigo || ''}</span><span class="kc-badges">${badges}</span></div>` : ''}
@@ -6586,8 +6744,11 @@ function sendPedidoEmail(o){
 }
 
 function renderOrderKanban(list, boardEl, mode){
+  // En Aprobados: primero lo que falta enviar, luego lo que falta recibir, al final lo recibido.
+  const etapa = o => !o.enviado ? 0 : (!o.recibido ? 1 : 2);
   boardEl.innerHTML = KANBAN_COLUMNS.map(col => {
     const items = list.filter(o => o.status === col.key);
+    if(col.key === 'aprobado') items.sort((a, b) => etapa(a) - etapa(b));
     const cards = items.length === 0
       ? '<div class="kanban-empty">Sin pedidos ' + col.tab.toLowerCase() + ' esta semana</div>'
       : items.map(o => orderKanbanCardHtml(o, mode)).join('');
@@ -6629,12 +6790,110 @@ function renderOrderKanban(list, boardEl, mode){
       if(order) sendPedidoEmail(order);
     });
   });
+  boardEl.querySelectorAll('[data-receive-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const order = list.find(o => o.id === btn.dataset.receiveId);
+      if(order) abrirRecepcion(order, mode);
+    });
+  });
+  boardEl.querySelectorAll('[data-unreceive-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); desmarcarRecibido(btn.dataset.unreceiveId); });
+  });
+  boardEl.querySelectorAll('[data-follow-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const order = list.find(o => o.id === btn.dataset.followId);
+      if(order) abrirSeguimiento(order, mode);
+    });
+  });
+  avisoAtrasadosTablero(boardEl, list);
+}
+
+/* ---------- Seguimiento de pedidos que no han llegado ---------- */
+let seguimientoPedido = null;
+
+function abrirSeguimiento(o, mode){
+  seguimientoPedido = { id: o.id, mode };
+  const e = entregaPedido(o);
+  document.getElementById('followMeta').textContent = [o.codigo, o.proveedor, e ? 'enviado hace ' + e.tiempo : ''].filter(Boolean).join(' · ');
+  const hist = (o.order_seguimientos || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+  document.getElementById('followHist').innerHTML = hist.length === 0 ? '' :
+    '<div class="section-label">Seguimientos anteriores</div>' + hist.map(s =>
+      `<div class="kc-note recepcion seg-hist"><b>${escapeHtml(s.creado_por_nombre || '')} · ${fmtFechaHora(s.created_at)}${s.entrega_esperada ? ' · esperado ' + fmtDia(s.entrega_esperada) : ''}</b>${escapeHtml(s.nota)}</div>`
+    ).join('');
+  document.getElementById('followNota').value = '';
+  document.getElementById('followFecha').value = '';
+  document.getElementById('followFecha').min = toISODate(new Date());
+  document.getElementById('followModal').classList.add('open');
+}
+
+document.getElementById('followCancel').addEventListener('click', ()=>{
+  document.getElementById('followModal').classList.remove('open');
+  seguimientoPedido = null;
+});
+
+document.getElementById('followSave').addEventListener('click', async ()=>{
+  if(!seguimientoPedido) return;
+  const nota = document.getElementById('followNota').value.trim();
+  if(!nota){ showToast('Escribe qué pasó con el pedido', 'warn'); return; }
+  const btn = document.getElementById('followSave');
+  btn.disabled = true;
+  const { error } = await supa.rpc('registrar_seguimiento_pedido', {
+    p_order_id: seguimientoPedido.id, p_nota: nota, p_entrega_esperada: document.getElementById('followFecha').value || null
+  });
+  btn.disabled = false;
+  if(error){ showToast('No se pudo guardar el seguimiento: ' + error.message, 'danger'); return; }
+  showToast('Seguimiento guardado', 'ok');
+  document.getElementById('followModal').classList.remove('open');
+  const mode = seguimientoPedido.mode;
+  seguimientoPedido = null;
+  if(mode === 'admin') loadAdminOrders(); else loadMyOrders();
+});
+
+/* ---------- Recepción: marcar un pedido enviado como recibido ---------- */
+let recepcionPedido = null;
+
+function abrirRecepcion(o, mode){
+  recepcionPedido = { id: o.id, mode };
+  document.getElementById('receiveMeta').textContent = [o.codigo, o.proveedor, 'enviado ' + fmtFechaHora(o.enviado_at)].filter(Boolean).join(' · ');
+  document.getElementById('receiveNota').value = '';
+  document.getElementById('receiveModal').classList.add('open');
+}
+
+document.getElementById('receiveCancel').addEventListener('click', ()=>{
+  document.getElementById('receiveModal').classList.remove('open');
+  recepcionPedido = null;
+});
+
+document.getElementById('receiveConfirm').addEventListener('click', async ()=>{
+  if(!recepcionPedido) return;
+  const btn = document.getElementById('receiveConfirm');
+  btn.disabled = true;
+  const { error } = await supa.rpc('marcar_pedido_recibido', {
+    p_order_id: recepcionPedido.id, p_nota: document.getElementById('receiveNota').value.trim() || null
+  });
+  btn.disabled = false;
+  if(error){ showToast('No se pudo marcar como recibido: ' + error.message, 'danger'); return; }
+  showToast('Pedido marcado como recibido', 'ok');
+  document.getElementById('receiveModal').classList.remove('open');
+  const mode = recepcionPedido.mode;
+  recepcionPedido = null;
+  if(mode === 'admin') loadAdminOrders(); else loadMyOrders();
+});
+
+async function desmarcarRecibido(orderId){
+  const { error } = await supa.rpc('desmarcar_pedido_recibido', { p_order_id: orderId });
+  if(error){ showToast('No se pudo desmarcar: ' + error.message, 'danger'); return; }
+  showToast('El pedido vuelve a estar por recibir');
+  loadAdminOrders();
 }
 
 async function unlockOrder(orderId){
   const { error } = await supa.from('orders').update({
     status: 'pendiente', rechazo_motivo: null, resuelto_por: null, resuelto_at: null,
-    enviado: false, enviado_at: null, enviado_por: null
+    enviado: false, enviado_at: null, enviado_por: null,
+    recibido: false, recibido_at: null, recibido_por: null, recibido_nota: null
   }).eq('id', orderId);
   if(error){ showToast('Error al desbloquear: ' + error.message); return; }
   showToast('Pedido desbloqueado, vuelve a estar pendiente');
@@ -6667,13 +6926,7 @@ function openOrderEdit(orderId, list){
 let currentReviewOrderId = null;
 
 async function loadAdminOrders(){
-  const { monday, sunday } = getWeekRange(new Date());
-  const { data, error } = await supa.from('orders').select('*, order_items(*)')
-    .eq('area_id', currentArea.id)
-    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
-    .order('created_at', {ascending:false});
-  const list = error ? [] : (data || []);
-  renderOrderKanban(list, document.getElementById('adminOrderKanban'), 'admin');
+  renderOrderKanban(await cargarPedidosArea(), document.getElementById('adminOrderKanban'), 'admin');
 }
 
 let currentReviewOrderProveedorId = null;
