@@ -702,6 +702,19 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 #followHist .kc-note{margin-top:var(--space-2); padding:8px 10px; border-radius:var(--radius-sm); border-left:3px solid var(--warn); background:var(--warn-bg); font-size:13px; line-height:1.4;}
 #followHist .kc-note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--warn); margin-bottom:2px;}
 #followHist{margin-bottom:var(--space-3);}
+/* Sugeridos del nuevo pedido */
+.sugeridos{margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2);}
+.sug-head{display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); flex-wrap:wrap;}
+.sug-head .section-label{margin:0; border:none; padding:0;}
+.sug-list{display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:260px; overflow-y:auto;}
+.sug-item{display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto; column-gap:10px; align-items:center; width:100%; min-height:44px; padding:8px 10px; text-align:left; font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer;}
+.sug-item:active{background:var(--accent-soft);}
+.sug-item:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.sug-name{font-size:14px; font-weight:600;}
+.sug-meta{grid-row:2; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.sug-add{grid-row:1 / span 2; grid-column:2; width:20px; height:20px; color:var(--accent-strong);}
+.sug-item.agregado{background:var(--ok-bg); border-color:transparent; cursor:default;}
+.sug-item.agregado .sug-add{color:var(--ok);}
 /* Aviso sobre el tablero: pedidos atrasados sin llegar */
 .aviso-atrasados{display:flex; flex-direction:column; gap:2px; width:100%; text-align:left; margin-bottom:var(--space-3); padding:12px 14px; border:1px solid var(--danger); border-left-width:4px; border-radius:var(--radius-md); background:var(--danger-bg); color:var(--text); font:inherit; font-size:13px; cursor:pointer;}
 .aviso-atrasados b{color:var(--danger); font-size:14px;}
@@ -1650,6 +1663,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
       <button type="button" class="btn btn-accent btn-small" id="orderProvNewSave">Guardar proveedor</button>
     </div>
     <div id="orderItemsBox">
+      <div id="orderSugeridos" class="sugeridos" style="display:none;"></div>
       <div class="section-label" style="margin-top:16px;">Insumos</div>
       <div id="orderItemsRows"></div>
       <button class="btn btn-ghost btn-small" id="orderAddRow" style="margin-top:8px;">+ Agregar insumo</button>
@@ -2374,7 +2388,106 @@ document.getElementById('orderProveedor').addEventListener('change', ()=>{
   rowsBox.querySelectorAll('.order-row').forEach(r => r._setCatalog && r._setCatalog(provId));
   if(provId && !rowsBox.querySelector('.order-row')) rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, provId));
   renderOrderProvScope();
+  cargarSugeridos(provId);
 });
+
+/* ---------- Sugerencias de pedido (historial del área con ese proveedor) ---------- */
+const SEMANAS_SUGERIDOS = 6;
+let sugeridosEstado = { token: 0, items: [], ultimo: null };
+
+function buscarEnCatalogo(code){
+  for(const cat of Object.keys(INSUMOS_CATALOG)){
+    const it = INSUMOS_CATALOG[cat].find(x => x.code === code);
+    if(it) return { ...it, categoria: cat };
+  }
+  return null;
+}
+
+async function cargarSugeridos(provId){
+  const box = document.getElementById('orderSugeridos');
+  const token = ++sugeridosEstado.token;
+  sugeridosEstado.items = []; sugeridosEstado.ultimo = null;
+  box.style.display = 'none'; box.innerHTML = '';
+  if(!provId || editingOrderId) return;
+
+  const desde = new Date(Date.now() - SEMANAS_SUGERIDOS * 7 * 86400000).toISOString();
+  const { data, error } = await supa.from('orders').select('id, codigo, created_at, status, order_items(*)')
+    .eq('area_id', currentArea.id).eq('proveedor_id', provId).neq('status', 'rechazado')
+    .gte('created_at', desde).order('created_at', {ascending:false});
+  if(token !== sugeridosEstado.token || error || !data || data.length === 0) return;
+
+  // Por insumo: en cuántos pedidos aparece, cantidad promedio (en su unidad más usada) y la última pedida.
+  const porInsumo = {};
+  data.forEach(o => (o.order_items || []).forEach(it => {
+    const s = porInsumo[it.ingredient_code] || (porInsumo[it.ingredient_code] = { code: it.ingredient_code, name: it.ingredient_name, pedidos: new Set(), lineas: [], ultimo: null });
+    s.pedidos.add(o.id);
+    s.lineas.push(it);
+    if(!s.ultimo) s.ultimo = it;   // data viene del más reciente al más antiguo
+  }));
+  const minVeces = data.length >= 3 ? 2 : 1;
+  sugeridosEstado.items = Object.values(porInsumo)
+    .filter(s => s.pedidos.size >= minVeces)
+    .map(s => {
+      const cat = buscarEnCatalogo(s.code);
+      if(!cat) return null;   // ya no está activo en el punto
+      const unidad = s.ultimo.unidad;
+      const mismas = s.lineas.filter(l => l.unidad === unidad).map(l => parseFloat(l.cantidad) || 0);
+      const promedio = Math.round(mismas.reduce((a, b) => a + b, 0) / mismas.length * 10) / 10;
+      return { code: s.code, name: cat.name, categoria: cat.categoria, unidad, promedio, ultima: parseFloat(s.ultimo.cantidad) || 0, veces: s.pedidos.size, nota: null };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.veces - a.veces || a.name.localeCompare(b.name))
+    .slice(0, 15);
+  const ult = data[0];
+  sugeridosEstado.ultimo = { codigo: ult.codigo, fecha: ult.created_at, items: (ult.order_items || []).filter(it => buscarEnCatalogo(it.ingredient_code)) };
+  renderSugeridos();
+}
+
+function codigosEnPedido(){
+  return new Set([...document.querySelectorAll('#orderItemsRows .row-insumo-code')].map(i => i.value).filter(Boolean));
+}
+
+function renderSugeridos(){
+  const box = document.getElementById('orderSugeridos');
+  const { items, ultimo } = sugeridosEstado;
+  if(items.length === 0 && !(ultimo && ultimo.items.length)) { box.style.display = 'none'; return; }
+  const ya = codigosEnPedido();
+  const fechaUlt = ultimo ? new Date(ultimo.fecha).toLocaleDateString('es-CO', {day:'numeric', month:'short'}) : '';
+  box.innerHTML = `
+    <div class="sug-head">
+      <span class="section-label">Sugerido para este proveedor</span>
+      ${ultimo && ultimo.items.length ? `<button type="button" class="btn btn-secondary btn-small" id="sugRepetir" title="${escapeHtml(ultimo.codigo || '')} · ${fechaUlt}">Repetir último pedido</button>` : ''}
+    </div>
+    <div class="field-help">Lo que esta área le pidió en las últimas ${SEMANAS_SUGERIDOS} semanas. Toca para agregar y ajusta la cantidad.</div>
+    <div class="sug-list">${items.map(s => `
+      <button type="button" class="sug-item${ya.has(s.code) ? ' agregado' : ''}" data-sug="${s.code}" ${ya.has(s.code) ? 'disabled' : ''}>
+        <span class="sug-name">${escapeHtml(s.name)}</span>
+        <span class="sug-meta">prom. ${fmtQty(s.promedio)} ${escapeHtml(s.unidad)} · último ${fmtQty(s.ultima)} · ${s.veces} ${s.veces === 1 ? 'vez' : 'veces'}</span>
+        <svg class="sug-add" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ya.has(s.code) ? '<path d="M20 6 9 17l-5-5"/>' : '<path d="M12 5v14M5 12h14"/>'}</svg>
+      </button>`).join('')}</div>`;
+  box.style.display = '';
+  box.querySelectorAll('[data-sug]').forEach(b => b.addEventListener('click', ()=>{
+    const s = items.find(x => x.code === b.dataset.sug);
+    if(s) agregarFilasSugeridas([{ ingredient_code: s.code, ingredient_name: s.name, categoria: s.categoria, cantidad: s.promedio, unidad: s.unidad, nota: null }]);
+  }));
+  const rep = document.getElementById('sugRepetir');
+  if(rep) rep.addEventListener('click', ()=> agregarFilasSugeridas(ultimo.items.map(it => {
+    const cat = buscarEnCatalogo(it.ingredient_code);
+    return { ingredient_code: it.ingredient_code, ingredient_name: cat.name, categoria: cat.categoria, cantidad: it.cantidad, unidad: it.unidad, nota: it.nota || null };
+  })));
+}
+
+// Agrega filas al pedido (sin repetir insumos ya cargados); reemplaza la fila vacía inicial.
+function agregarFilasSugeridas(filas){
+  const rowsBox = document.getElementById('orderItemsRows');
+  const provId = document.getElementById('orderProveedor').value;
+  rowsBox.querySelectorAll('.order-row').forEach(r => { if(!r.querySelector('.row-insumo-code').value && !r.querySelector('.row-cant').value.trim()) r.remove(); });
+  const ya = codigosEnPedido();
+  const nuevas = filas.filter(f => !ya.has(f.ingredient_code));
+  nuevas.forEach(f => rowsBox.appendChild(buildOrderRow(orderRowCounter++, f, provId)));
+  if(nuevas.length < filas.length) showToast(nuevas.length === 0 ? 'Esos insumos ya están en el pedido' : 'Se agregaron ' + nuevas.length + '; los demás ya estaban en el pedido');
+  renderSugeridos();
+}
 
 function renderOrderProvScope(){
   const provId = document.getElementById('orderProveedor').value;
@@ -6386,7 +6499,11 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
       keys.map(p => `<option value="${p}" ${cur===p?'selected':''}>${categoryLabel(p)}</option>`).join('');
   };
 
-  wrap.querySelector('.order-row-remove').addEventListener('click', ()=>wrap.remove());
+  wrap.querySelector('.order-row-remove').addEventListener('click', ()=>{
+    const enPedido = wrap.closest('#orderItemsRows');
+    wrap.remove();
+    if(enPedido) renderSugeridos();
+  });
   return wrap;
 }
 
@@ -6420,6 +6537,7 @@ document.getElementById('orderOpenNew').addEventListener('click', ()=>{
   document.getElementById('orderUrgente').checked = false;
   document.getElementById('orderItemsRows').innerHTML = '';
   renderOrderProvScope();
+  cargarSugeridos(null);
   document.getElementById('orderModal').classList.add('open');
 });
 document.getElementById('orderAddRow').addEventListener('click', ()=>{
@@ -6919,6 +7037,7 @@ function openOrderEdit(orderId, list){
   sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it, order.proveedor_id)));
   if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, order.proveedor_id)); }
   renderOrderProvScope();
+  cargarSugeridos(null);
   document.getElementById('orderModal').classList.add('open');
 }
 
