@@ -47,7 +47,7 @@ Todas tienen RLS activo. Los helpers `public.is_admin()`, `public.is_super_admin
 - **Bajas**: mismo patrón que Pedidos (código `BAJ-0001...`), pero a nivel de PUNTO. Tipo: Insumo o Receta preparada, siempre del catálogo existente.
 - **Inventario**: catálogo fijo por área (`inventory_catalog`), NO se deriva automáticamente del catálogo de Pedidos — se carga a mano/por script. Un día se cuenta, se guarda, y queda bloqueado; admin puede desbloquear.
 - **Consolidado**: Admin → Consolidado junta pedidos aprobados y sin enviar de varias áreas de un mismo punto para un proveedor específico, en un solo mensaje.
-- **Tema visual**: fondo crema fijo (`#F8F4EC`) para toda la app; solo el color de acento (`color_accent`/`color_accent_2` en `locations`) cambia por punto. El color de texto sobre botones de acento se calcula dinámicamente (claro u oscuro) según la luminosidad del acento — ver función `pickTextColor()`.
+- **Tema visual**: lo define **`DESIGN.md`** (tokens, componentes, navegación). Cualquier cambio de UI sigue ese archivo; si lo contradice, se pregunta antes. Resumen: neutros y colores de estado (`--ok`/`--warn`/`--danger`/`--info`) fijos para todos los puntos; solo el acento (`color_accent`/`color_accent_2` en `locations`) cambia por punto, aplicado en `applyLocationTheme()`. El texto sobre el acento se calcula con `pickTextColor()`. Cero colores sueltos en componentes: todo sale de un token del `:root`.
 
 ## Estilo de trabajo con el usuario (Miguel / chef@cantinadossantos.com, super admin)
 
