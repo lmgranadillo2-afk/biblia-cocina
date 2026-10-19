@@ -326,6 +326,7 @@ main{flex:1; display:flex; min-height:0; position:relative;}
   letter-spacing:1.2px; color:var(--text-muted); margin-bottom:6px; display:block;
 }
 .field-help{font-size:12px; color:var(--text-dim); margin-top:5px;}
+.field-help a{color:var(--accent-strong); font-weight:600;}
 input[type=text], input[type=date], input[type=email], input[type=password], input[type=number], input[type=time], input[type=search], textarea, select{
   width:100%; min-height:44px; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--surface);
   color:var(--text); font-family:'Inter',sans-serif; font-size:15px; outline:none;
@@ -1586,10 +1587,11 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
     <h3>Nuevo pedido</h3>
     <div class="field"><label class="field-label">Fecha</label><input type="date" id="orderFecha"></div>
     <div class="field">
-      <label class="field-label">Proveedor (opcional)</label>
+      <label class="field-label">Proveedor</label>
       <select id="orderProveedor">
-        <option value="">Sin proveedor</option>
+        <option value="">Elige proveedor...</option>
       </select>
+      <div class="field-help" id="orderProvScope" style="display:none;"></div>
       <div class="field-help"><a href="#" id="orderProvAddNewLink" style="color:var(--accent);">+ Agregar proveedor nuevo</a></div>
     </div>
     <div id="orderProvNewBox" style="display:none; padding:12px; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); margin-bottom:12px;">
@@ -1598,9 +1600,12 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
       <div class="field"><label class="field-label">Correo (opcional)</label><input type="text" id="orderProvNewEmail" placeholder="pedidos@proveedor.com"></div>
       <button type="button" class="btn btn-accent btn-small" id="orderProvNewSave">Guardar proveedor</button>
     </div>
-    <div class="section-label" style="margin-top:16px;">Insumos</div>
-    <div id="orderItemsRows"></div>
-    <button class="btn btn-ghost btn-small" id="orderAddRow" style="margin-top:8px;">+ Agregar insumo</button>
+    <div id="orderItemsBox">
+      <div class="section-label" style="margin-top:16px;">Insumos</div>
+      <div id="orderItemsRows"></div>
+      <button class="btn btn-ghost btn-small" id="orderAddRow" style="margin-top:8px;">+ Agregar insumo</button>
+    </div>
+    <div class="empty-note" id="orderItemsHint" style="margin-top:16px;">Elige el proveedor para ver sus insumos.</div>
     <div id="orderUrgenteBox" style="margin-top:16px; padding:12px; border:1px solid var(--info); border-radius:9px; background:var(--info-bg);">
       <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--text);">
         <input type="checkbox" id="orderUrgente" style="width:auto; margin-top:2px;">
@@ -2306,18 +2311,61 @@ async function loadProveedores(){
   populateProveedorSelect();
 }
 
+// Pedido por proveedor: primero se elige el proveedor y el buscador muestra sus insumos
+// (vinculados en group_ingredient_proveedores; el trigger de la base vincula solo lo que se pide).
+// "Ver todo el catálogo" deja pedir cualquier insumo sin bloquear.
+let ORDER_VER_TODO = false;
+
 document.getElementById('orderProveedor').addEventListener('change', ()=>{
+  const provId = document.getElementById('orderProveedor').value;
+  ORDER_VER_TODO = false;
   const rowsBox = document.getElementById('orderItemsRows');
-  if(rowsBox && rowsBox.querySelector('.order-row')){
-    showToast('Se reiniciaron los insumos según el proveedor elegido');
-    rowsBox.innerHTML = '';
-    rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, document.getElementById('orderProveedor').value));
-  }
+  // Lo ya cargado se conserva: solo cambia lo que ofrece el buscador.
+  rowsBox.querySelectorAll('.order-row').forEach(r => r._setCatalog && r._setCatalog(provId));
+  if(provId && !rowsBox.querySelector('.order-row')) rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, provId));
+  renderOrderProvScope();
 });
+
+function renderOrderProvScope(){
+  const provId = document.getElementById('orderProveedor').value;
+  const box = document.getElementById('orderProvScope');
+  const mostrarInsumos = !!provId || !!document.querySelector('#orderItemsRows .order-row');
+  document.getElementById('orderItemsBox').style.display = mostrarInsumos ? '' : 'none';
+  document.getElementById('orderItemsHint').style.display = mostrarInsumos ? 'none' : '';
+  if(!provId){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const vinculados = PROVEEDOR_INSUMOS_MAP[provId];
+  if(!vinculados || vinculados.size === 0){
+    box.textContent = 'Este proveedor aún no tiene insumos vinculados: se muestra todo el catálogo. Lo que pidas queda vinculado.';
+  } else if(ORDER_VER_TODO){
+    box.innerHTML = 'Mostrando todo el catálogo · <a href="#" data-scope="prov">Ver solo los de este proveedor</a>';
+  } else {
+    const cat = getFilteredInsumosCatalog(provId);
+    const n = Object.keys(cat).reduce((s, k) => s + cat[k].length, 0);
+    box.innerHTML = `Mostrando ${n} insumo${n===1?'':'s'} de este proveedor · <a href="#" data-scope="todo">Ver todo el catálogo</a>`;
+  }
+  box.style.display = '';
+}
+
+document.getElementById('orderProvScope').addEventListener('click', (e)=>{
+  const link = e.target.closest('a[data-scope]');
+  if(!link) return;
+  e.preventDefault();
+  ORDER_VER_TODO = link.dataset.scope === 'todo';
+  const provId = document.getElementById('orderProveedor').value;
+  document.querySelectorAll('#orderItemsRows .order-row').forEach(r => r._setCatalog && r._setCatalog(provId));
+  renderOrderProvScope();
+});
+
+// Después de guardar un pedido, refleja en memoria el vínculo que el trigger crea en la base.
+function vincularInsumosLocal(provId, rows){
+  if(!provId) return;
+  if(!PROVEEDOR_INSUMOS_MAP[provId]) PROVEEDOR_INSUMOS_MAP[provId] = new Set();
+  rows.forEach(r => PROVEEDOR_INSUMOS_MAP[provId].add(r.ingredient_code));
+}
 
 function populateProveedorSelect(selectedId){
   const sel = document.getElementById('orderProveedor');
-  sel.innerHTML = '<option value="">Sin proveedor</option>' +
+  sel.innerHTML = '<option value="">Elige proveedor...</option>' +
     PROVEEDORES.map(p => `<option value="${p.id}" ${selectedId===p.id?'selected':''}>${escapeHtml(p.nombre)}</option>`).join('');
 }
 
@@ -2339,6 +2387,7 @@ document.getElementById('orderProvNewSave').addEventListener('click', async ()=>
   PROVEEDORES.push(data);
   PROVEEDORES.sort((a,b)=>a.nombre.localeCompare(b.nombre));
   populateProveedorSelect(data.id);
+  document.getElementById('orderProveedor').dispatchEvent(new Event('change'));
   document.getElementById('orderProvNewBox').style.display = 'none';
   document.getElementById('orderProvNewName').value = '';
   document.getElementById('orderProvNewPhone').value = '';
@@ -6161,7 +6210,7 @@ document.getElementById('giSearch').addEventListener('input', renderGiList);
 document.getElementById('giFilterCategoria').addEventListener('change', renderGiList);
 
 function getFilteredInsumosCatalog(proveedorId){
-  if(!proveedorId || !PROVEEDOR_INSUMOS_MAP[proveedorId] || PROVEEDOR_INSUMOS_MAP[proveedorId].size === 0){
+  if(ORDER_VER_TODO || !proveedorId || !PROVEEDOR_INSUMOS_MAP[proveedorId] || PROVEEDOR_INSUMOS_MAP[proveedorId].size === 0){
     return INSUMOS_CATALOG;
   }
   const allowedCodes = PROVEEDOR_INSUMOS_MAP[proveedorId];
@@ -6178,7 +6227,7 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
   wrap.className = 'order-row';
   wrap.dataset.rowId = rowId;
 
-  const catalog = getFilteredInsumosCatalog(proveedorIdForFilter);
+  let catalog = getFilteredInsumosCatalog(proveedorIdForFilter);
   const catOptions = Object.keys(catalog).map(p =>
     `<option value="${p}" ${existing && existing.categoria===p ? 'selected':''}>${categoryLabel(p)}</option>`
   ).join('');
@@ -6277,6 +6326,16 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
   });
   searchInput.addEventListener('blur', ()=> setTimeout(()=>{ suggBox.style.display = 'none'; }, 150));
 
+  // Cambia entre "insumos del proveedor" y "todo el catálogo" sin perder lo ya elegido en la fila.
+  wrap._setCatalog = (provId)=>{
+    catalog = getFilteredInsumosCatalog(provId);
+    const cur = catSelect.value;
+    const keys = Object.keys(catalog);
+    if(cur && !keys.includes(cur)) keys.unshift(cur);
+    catSelect.innerHTML = '<option value="">Elige...</option>' +
+      keys.map(p => `<option value="${p}" ${cur===p?'selected':''}>${categoryLabel(p)}</option>`).join('');
+  };
+
   wrap.querySelector('.order-row-remove').addEventListener('click', ()=>wrap.remove());
   return wrap;
 }
@@ -6304,13 +6363,13 @@ document.getElementById('orderOpenNew').addEventListener('click', ()=>{
   document.querySelector('#orderModal h3').textContent = 'Nuevo pedido';
   document.getElementById('orderSubmit').textContent = 'Enviar pedido';
   document.getElementById('orderFecha').value = new Date().toISOString().slice(0,10);
+  ORDER_VER_TODO = false;
   populateProveedorSelect(null);
   document.getElementById('orderProvNewBox').style.display = 'none';
   document.getElementById('orderUrgenteBox').style.display = 'block';
   document.getElementById('orderUrgente').checked = false;
-  const rowsBox = document.getElementById('orderItemsRows');
-  rowsBox.innerHTML = '';
-  rowsBox.appendChild(buildOrderRow(orderRowCounter++));
+  document.getElementById('orderItemsRows').innerHTML = '';
+  renderOrderProvScope();
   document.getElementById('orderModal').classList.add('open');
 });
 document.getElementById('orderAddRow').addEventListener('click', ()=>{
@@ -6332,6 +6391,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   const rows = readOrderRows(document.getElementById('orderItemsRows'));
 
   if(!fecha){ showToast('Selecciona la fecha'); return; }
+  if(!proveedorId){ showToast('Elige el proveedor del pedido', 'warn'); return; }
   if(rows.length === 0){ showToast('Agrega al menos un insumo con cantidad y unidad'); return; }
 
   const semanaInicio = toISODate(getWeekRange(new Date(fecha + 'T00:00:00')).monday);
@@ -6345,6 +6405,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
     const itemsToInsert = rows.map(r => ({ ...r, order_id: editingOrderId }));
     const { error: itemsErr } = await supa.from('order_items').insert(itemsToInsert);
     if(itemsErr){ showToast('Error al guardar los insumos: ' + itemsErr.message); return; }
+    vincularInsumosLocal(proveedorId, rows);
     showToast('Pedido actualizado');
     editingOrderId = null;
     document.getElementById('orderModal').classList.remove('open');
@@ -6371,6 +6432,7 @@ document.getElementById('orderSubmit').addEventListener('click', async ()=>{
   const itemsToInsert = rows.map(r => ({ ...r, order_id: orderData.id }));
   const { error: itemsErr } = await supa.from('order_items').insert(itemsToInsert);
   if(itemsErr){ showToast('Error al guardar los insumos: ' + itemsErr.message); return; }
+  vincularInsumosLocal(proveedorId, rows);
 
   showToast(isUrgente ? 'Pedido urgente aprobado automáticamente' : 'Pedido enviado');
   document.getElementById('orderModal').classList.remove('open');
@@ -6589,6 +6651,7 @@ function openOrderEdit(orderId, list){
   document.querySelector('#orderModal h3').textContent = 'Editar pedido ' + (order.codigo || '');
   document.getElementById('orderSubmit').textContent = 'Guardar cambios';
   document.getElementById('orderFecha').value = order.fecha;
+  ORDER_VER_TODO = false;
   populateProveedorSelect(order.proveedor_id || null);
   document.getElementById('orderProvNewBox').style.display = 'none';
   document.getElementById('orderUrgenteBox').style.display = 'none';
@@ -6596,6 +6659,7 @@ function openOrderEdit(orderId, list){
   rowsBox.innerHTML = '';
   sortByCategoria(order.order_items || []).forEach(it => rowsBox.appendChild(buildOrderRow(orderRowCounter++, it, order.proveedor_id)));
   if((order.order_items || []).length === 0){ rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, order.proveedor_id)); }
+  renderOrderProvScope();
   document.getElementById('orderModal').classList.add('open');
 }
 
