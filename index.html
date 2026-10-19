@@ -366,6 +366,9 @@ input.input-num{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabu
 .modal-actions .btn-ghost:active{background:var(--surface-2);}
 .btn-danger{background:var(--danger); color:var(--on-state);}
 .btn-danger:active{filter:brightness(.85);}
+/* Peligro secundario: abre una confirmación (la acción final sigue siendo .btn-danger sólido) */
+.btn-danger-outline{background:var(--surface); color:var(--danger); border-color:var(--danger);}
+.btn-danger-outline:active{background:var(--danger-bg);}
 .btn-ok{background:var(--ok); color:var(--on-state);}
 .btn-ok:active{filter:brightness(.85);}
 .btn-block{width:100%;}
@@ -5342,7 +5345,7 @@ function prodEntryHtml(p, isAdmin){
     if(!p.ingresado){
       actions += `<button class="btn btn-ok btn-small" data-ingresado="${p.id}">Marcar como ingresado</button>`;
     }
-    actions += `<button class="btn btn-danger btn-small" data-void="${p.id}">Anular registro</button></div>`;
+    actions += `<button class="btn btn-danger-outline btn-small" data-void="${p.id}">Anular registro</button></div>`;
   }
   const porcionado = p.porciones !== null && p.porciones !== undefined;
   // Estado de la franja: anulado > ingresado > variación > solo registrado
