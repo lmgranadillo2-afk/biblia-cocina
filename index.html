@@ -647,7 +647,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .chip-check:has(input:checked){border-color:var(--accent); background:var(--accent-soft); font-weight:600;}
 .cons-head{display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:16px; font-weight:700; color:var(--text);}
 .cons-head .ico{color:var(--accent);}
-.cons-row{cursor:pointer;}
+.cons-row{cursor:pointer; justify-content:flex-start; flex-wrap:nowrap;}
 .cons-row input[type=checkbox]{width:20px; height:20px; margin:0 var(--space-3) 0 0; accent-color:var(--accent); flex-shrink:0;}
 .choice-list.checks .choice{min-height:44px;}
 /* Subpestañas de Admin en celular: una sola fila que se desliza, en vez de 3–4 filas */
@@ -702,6 +702,47 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 #followHist .kc-note{margin-top:var(--space-2); padding:8px 10px; border-radius:var(--radius-sm); border-left:3px solid var(--warn); background:var(--warn-bg); font-size:13px; line-height:1.4;}
 #followHist .kc-note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--warn); margin-bottom:2px;}
 #followHist{margin-bottom:var(--space-3);}
+/* Auditoría de pedidos */
+.aud-estados{display:flex; flex-wrap:wrap; gap:6px; margin:var(--space-4) 0 var(--space-3);}
+.aud-chip{display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:6px 12px; font:inherit; font-size:13px; font-weight:600; color:var(--text-muted); background:var(--surface); border:1px solid var(--border); border-radius:999px; cursor:pointer;}
+.aud-chip span{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-dim);}
+.aud-chip.alerta{border-color:var(--danger); color:var(--danger);}
+.aud-chip.alerta span{color:var(--danger);}
+.aud-chip.active{background:var(--text); border-color:var(--text); color:var(--surface);}
+.aud-chip.active span{color:var(--surface-3);}
+.aud-chip:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.aud-vista{display:inline-flex; margin-bottom:var(--space-2);}
+.aud-row{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:var(--space-2); box-shadow:var(--shadow-1);}
+.aud-row.open{border-color:var(--border-strong);}
+.aud-sum{display:flex; flex-direction:column; gap:3px; width:100%; padding:12px 14px; text-align:left; font:inherit; color:var(--text); background:none; border:none; border-radius:var(--radius-md); cursor:pointer;}
+.aud-sum:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.aud-top{display:flex; justify-content:space-between; align-items:center; gap:var(--space-2); flex-wrap:wrap;}
+.aud-prov{font-size:15px; font-weight:600;}
+.aud-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.aud-det{display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); padding:0 14px 14px; border-top:1px solid var(--border); padding-top:12px;}
+.aud-items div{display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--border); font-size:13.5px;}
+.aud-items div:last-child{border-bottom:none;}
+.aud-items b{font-family:'IBM Plex Mono',monospace; font-weight:500; white-space:nowrap;}
+.aud-items em{color:var(--text-muted);}
+.aud-pasos{list-style:none; margin:0; padding:0 0 0 14px; border-left:2px solid var(--border);}
+.aud-pasos li{position:relative; padding:0 0 10px; font-size:13px;}
+.aud-pasos li::before{content:''; position:absolute; left:-20px; top:5px; width:10px; height:10px; border-radius:50%; background:var(--surface); border:2px solid var(--border-strong);}
+.aud-pasos b{display:block; font-size:13px;}
+.aud-pasos span{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.aud-pasos p{margin:3px 0 0; color:var(--text);}
+.aud-cons{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:var(--space-3); box-shadow:var(--shadow-1); overflow:hidden;}
+.aud-cons-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:10px 14px; background:var(--surface-2); border-bottom:1px solid var(--border);}
+.aud-cons-head span{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
+.aud-cons-row{display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:8px 14px; border-bottom:1px solid var(--border);}
+.aud-cons-row:last-child{border-bottom:none;}
+.aud-cons-name{font-size:14px; font-weight:600;}
+.aud-cons-total{font-family:'IBM Plex Mono',monospace; font-weight:600; text-align:right; white-space:nowrap;}
+.aud-cons-sedes{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px 6px; margin-top:4px; font-size:12px; color:var(--text-muted);}
+.aud-sede{padding:2px 8px; background:var(--surface-2); border-radius:999px;}
+.aud-sede b{font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--text);}
+@media (max-width:799px){
+  .aud-det{grid-template-columns:1fr;}
+}
 /* Sugeridos del nuevo pedido */
 .sugeridos{margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2);}
 .sug-head{display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); flex-wrap:wrap;}
@@ -1235,6 +1276,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
         <button id="adminsub-usuarios">Usuarios</button>
         <button id="adminsub-puntos" style="display:none">Puntos</button>
         <button id="adminsub-pedidos">Pedidos</button>
+        <button id="adminsub-auditoria">Auditoría</button>
         <button id="adminsub-bajas">Bajas</button>
         <button id="adminsub-insumos">Insumos</button>
         <button id="adminsub-proveedores">Proveedores</button>
@@ -1319,6 +1361,30 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
           <span class="list-count" id="ohCount"></span>
           <div id="ohList" style="margin-top:10px;"></div>
         </div>
+      </div>
+
+      <div id="adminpanel-auditoria" class="adminpanel">
+        <div class="admin-header">
+          <h2>Auditoría de pedidos</h2>
+          <button class="btn btn-secondary btn-small" id="audCsv">Exportar CSV</button>
+        </div>
+        <div class="empty-note" style="margin-bottom:14px;">Pedidos de todos los puntos y áreas a los que tienes acceso. Toca un pedido para ver su detalle y su recorrido.</div>
+        <div class="admin-filters">
+          <div class="field"><label class="field-label">Desde</label><input type="date" id="audDesde"></div>
+          <div class="field"><label class="field-label">Hasta</label><input type="date" id="audHasta"></div>
+          <div class="field"><label class="field-label">Punto</label><select id="audPunto"><option value="">Todos</option></select></div>
+          <div class="field"><label class="field-label">Área</label><select id="audArea"><option value="">Todas</option></select></div>
+          <div class="field"><label class="field-label">Proveedor</label><select id="audProveedor"><option value="">Todos</option></select></div>
+          <div class="field"><label class="field-label">Buscar</label><input type="text" id="audBuscar" placeholder="Código, insumo o quién pidió"></div>
+          <button class="btn btn-secondary" id="audFiltrar">Filtrar</button>
+        </div>
+        <div class="aud-estados" id="audEstados" role="group" aria-label="Filtrar por estado"></div>
+        <div class="admin-subtabs aud-vista" role="tablist">
+          <button type="button" class="active" data-vista="lista">Pedidos</button>
+          <button type="button" data-vista="consolidado">Consolidado</button>
+        </div>
+        <span class="list-count" id="audCount"></span>
+        <div id="audContenido" style="margin-top:10px;"></div>
       </div>
 
       <div id="adminpanel-bajas" class="adminpanel">
@@ -1483,8 +1549,9 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 
       <div id="adminpanel-consolidado" class="adminpanel">
         <div class="admin-header"><h2>Pedido consolidado</h2></div>
-        <div class="empty-note" style="margin-bottom:14px;">Junta en un solo mensaje los pedidos ya aprobados de Cocina, Barra y Servicio para Chemestry, y los marca como enviados de una vez.</div>
-        <div class="cons-head"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Chemestry</div>
+        <div class="empty-note" style="margin-bottom:14px;">Junta en un solo mensaje los pedidos aprobados y sin enviar de las áreas de este punto para un mismo proveedor, y los marca como enviados de una vez.</div>
+        <div class="field"><label class="field-label">Proveedor</label><select id="consProveedor"></select></div>
+        <div class="cons-head" id="consHead" style="display:none;"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> <span id="consHeadName"></span></div>
         <div id="consOrdersList" style="margin-top:6px;"></div>
         <button class="btn btn-accent btn-block btn-lg" id="consSendBtn" style="margin-top:14px; display:none;">Generar y enviar por WhatsApp</button>
       </div>
@@ -5657,6 +5724,7 @@ document.getElementById('adminsub-produccion').addEventListener('click', ()=>swi
 document.getElementById('adminsub-usuarios').addEventListener('click', ()=>switchAdminSub('usuarios'));
 document.getElementById('adminsub-puntos').addEventListener('click', ()=>switchAdminSub('puntos'));
 document.getElementById('adminsub-pedidos').addEventListener('click', ()=>switchAdminSub('pedidos'));
+document.getElementById('adminsub-auditoria').addEventListener('click', ()=>switchAdminSub('auditoria'));
 document.getElementById('adminsub-bajas').addEventListener('click', ()=>switchAdminSub('bajas'));
 document.getElementById('adminsub-insumos').addEventListener('click', ()=>switchAdminSub('insumos'));
 document.getElementById('adminsub-proveedores').addEventListener('click', ()=>switchAdminSub('proveedores'));
@@ -5664,13 +5732,14 @@ document.getElementById('adminsub-invcatalogo').addEventListener('click', ()=>sw
 document.getElementById('adminsub-areas').addEventListener('click', ()=>switchAdminSub('areas'));
 document.getElementById('adminsub-consolidado').addEventListener('click', ()=>switchAdminSub('consolidado'));
 function switchAdminSub(name){
-  ['produccion','usuarios','puntos','pedidos','bajas','insumos','proveedores','invcatalogo','areas','consolidado'].forEach(n=>{
+  ['produccion','usuarios','puntos','pedidos','auditoria','bajas','insumos','proveedores','invcatalogo','areas','consolidado'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
   });
   if(name==='usuarios') loadUsers();
   if(name==='puntos') loadLocationsAdmin();
   if(name==='pedidos') loadAdminOrders();
+  if(name==='auditoria') abrirAuditoria();
   if(name==='bajas') loadAdminBajas();
   if(name==='insumos') loadGroupIngredientsAdmin();
   if(name==='proveedores') loadProveedoresAdmin();
@@ -7912,22 +7981,48 @@ let consolidadoOrders = [];
 
 let currentConsolidadoProveedor = null;
 
+// Proveedores con pedidos aprobados y sin enviar en este punto (el que más tenga, primero).
+let consolidadoProveedores = [];
 async function loadConsolidadoProveedores(){
-  const { data, error } = await supa.from('proveedores').select('*').ilike('nombre', 'chemestry').limit(1);
-  currentConsolidadoProveedor = (!error && data && data.length > 0) ? data[0] : null;
+  const sel = document.getElementById('consProveedor');
+  const { data, error } = await supa.from('orders').select('proveedor_id, proveedor')
+    .eq('location_id', currentLocation.id).eq('status', 'aprobado').eq('enviado', false)
+    .not('proveedor_id', 'is', null);
+  const cuenta = {};
+  (error ? [] : (data || [])).forEach(o => {
+    const c = cuenta[o.proveedor_id] || (cuenta[o.proveedor_id] = { id: o.proveedor_id, nombre: o.proveedor || '', n: 0 });
+    c.n++;
+  });
+  consolidadoProveedores = Object.values(cuenta).sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre));
 
-  if(!currentConsolidadoProveedor){
-    document.getElementById('consOrdersList').innerHTML = '<div class="empty-list">No se encontró el proveedor Chemestry. Créalo en Admin → Proveedores.</div>';
+  if(consolidadoProveedores.length === 0){
+    currentConsolidadoProveedor = null;
+    sel.innerHTML = '<option value="">Sin pedidos por enviar</option>';
+    sel.disabled = true;
+    document.getElementById('consHead').style.display = 'none';
+    document.getElementById('consOrdersList').innerHTML = '<div class="empty-list">No hay pedidos aprobados y sin enviar en este punto.</div>';
     document.getElementById('consSendBtn').style.display = 'none';
     return;
   }
+  sel.disabled = false;
+  sel.innerHTML = consolidadoProveedores.map(p => `<option value="${p.id}">${escapeHtml(p.nombre)} (${p.n} pedido${p.n === 1 ? '' : 's'})</option>`).join('');
+  const sigue = currentConsolidadoProveedor && consolidadoProveedores.find(p => p.id === currentConsolidadoProveedor.id);
+  currentConsolidadoProveedor = sigue || consolidadoProveedores[0];
+  sel.value = currentConsolidadoProveedor.id;
   loadConsolidadoOrders();
 }
+
+document.getElementById('consProveedor').addEventListener('change', (e)=>{
+  currentConsolidadoProveedor = consolidadoProveedores.find(p => p.id === e.target.value) || null;
+  loadConsolidadoOrders();
+});
 
 async function loadConsolidadoOrders(){
   const box = document.getElementById('consOrdersList');
   const sendBtn = document.getElementById('consSendBtn');
   if(!currentConsolidadoProveedor){ box.innerHTML = ''; sendBtn.style.display = 'none'; return; }
+  document.getElementById('consHead').style.display = '';
+  document.getElementById('consHeadName').textContent = currentConsolidadoProveedor.nombre;
 
   const { data, error } = await supa.from('orders').select('*, order_items(*), areas(name)')
     .eq('location_id', currentLocation.id)
@@ -7937,7 +8032,7 @@ async function loadConsolidadoOrders(){
   consolidadoOrders = error ? [] : (data || []);
 
   if(consolidadoOrders.length === 0){
-    box.innerHTML = '<div class="empty-list">No hay pedidos aprobados y sin enviar para Chemestry en ninguna área.</div>';
+    box.innerHTML = '<div class="empty-list">No hay pedidos aprobados y sin enviar para ' + escapeHtml(currentConsolidadoProveedor.nombre) + ' en ninguna área.</div>';
     sendBtn.style.display = 'none';
     return;
   }
@@ -7965,7 +8060,7 @@ document.getElementById('consSendBtn').addEventListener('click', async ()=>{
 
   const lines = [];
   lines.push(`${saludoSegunHora()}, les escribimos de ${currentLocation.name}.`);
-  lines.push('Pedido consolidado — Chemestry');
+  lines.push('Pedido consolidado — ' + currentConsolidadoProveedor.nombre);
   const hoy = new Date().toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'});
   lines.push(hoy.charAt(0).toUpperCase() + hoy.slice(1));
 
@@ -7992,8 +8087,220 @@ document.getElementById('consSendBtn').addEventListener('click', async ()=>{
       enviado: true, enviado_at: new Date().toISOString(), enviado_por: profile.name || session.user.email
     }).eq('id', id);
   }
-  showToast('Pedido consolidado enviado y marcado en las ' + selectedIds.length + ' áreas');
-  loadConsolidadoOrders();
+  showToast('Pedido consolidado enviado y marcado en ' + selectedIds.length + (selectedIds.length === 1 ? ' pedido' : ' pedidos'), 'ok');
+  loadConsolidadoProveedores();
+});
+
+/* ---------- ADMIN: auditoría de pedidos (todos los puntos y áreas con acceso; RLS decide qué se ve) ---------- */
+const AUD_LIMITE = 1000;
+const AUD_ESTADOS = [
+  { key:'',            label:'Todos' },
+  { key:'pendiente',   label:'Pendientes',  badge:'warn' },
+  { key:'por_enviar',  label:'Por enviar',  badge:'info' },
+  { key:'por_recibir', label:'Por recibir', badge:'info' },
+  { key:'atrasado',    label:'Atrasados',   badge:'danger' },
+  { key:'recibido',    label:'Recibidos',   badge:'ok' },
+  { key:'rechazado',   label:'Rechazados',  badge:'neutral' },
+  { key:'urgente',     label:'Urgentes',    badge:'info' },
+];
+const AUD_ESTADO_TEXTO = { pendiente:'Pendiente', por_enviar:'Por enviar', por_recibir:'Por recibir', atrasado:'Atrasado', recibido:'Recibido', rechazado:'Rechazado' };
+let aud = { cargado:false, pedidos:[], estado:'', vista:'lista', puntos:{}, areas:{}, abiertos:new Set() };
+
+function estadoAuditoria(o){
+  if(o.status === 'pendiente') return 'pendiente';
+  if(o.status === 'rechazado') return 'rechazado';
+  if(!o.enviado) return 'por_enviar';
+  if(o.recibido) return 'recibido';
+  return (entregaPedido(o) || {}).atrasado ? 'atrasado' : 'por_recibir';
+}
+
+async function abrirAuditoria(){
+  if(!aud.cargado){
+    aud.cargado = true;
+    const hoy = new Date();
+    document.getElementById('audHasta').value = toISODate(hoy);
+    document.getElementById('audDesde').value = toISODate(new Date(hoy.getTime() - 30 * 86400000));
+    const [locs, areas, provs] = await Promise.all([
+      supa.from('locations').select('id, name').order('name'),
+      supa.from('areas').select('id, name, location_id').order('name'),
+      supa.from('proveedores').select('id, nombre').order('nombre')
+    ]);
+    (areas.data || []).forEach(a => { aud.areas[a.id] = a; });
+    const conAreas = new Set(Object.values(aud.areas).map(a => a.location_id));
+    (locs.data || []).forEach(l => { aud.puntos[l.id] = l; });
+    document.getElementById('audPunto').innerHTML = '<option value="">Todos</option>' +
+      (locs.data || []).filter(l => conAreas.has(l.id)).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+    document.getElementById('audProveedor').innerHTML = '<option value="">Todos</option>' +
+      (provs.data || []).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('');
+    llenarAreasAuditoria();
+  }
+  cargarAuditoria();
+}
+
+function llenarAreasAuditoria(){
+  const punto = document.getElementById('audPunto').value;
+  const areas = Object.values(aud.areas).filter(a => !punto || a.location_id === punto);
+  document.getElementById('audArea').innerHTML = '<option value="">Todas</option>' + areas.map(a =>
+    `<option value="${a.id}">${escapeHtml(a.name)}${punto ? '' : ' · ' + escapeHtml((aud.puntos[a.location_id] || {}).name || '')}</option>`).join('');
+}
+
+async function cargarAuditoria(){
+  const box = document.getElementById('audContenido');
+  box.innerHTML = '<div class="empty-note">Cargando...</div>';
+  const desde = document.getElementById('audDesde').value, hasta = document.getElementById('audHasta').value;
+  const punto = document.getElementById('audPunto').value, area = document.getElementById('audArea').value;
+  const prov = document.getElementById('audProveedor').value;
+  let q = supa.from('orders').select('*, order_items(*), order_seguimientos(*)');
+  if(desde) q = q.gte('fecha', desde);
+  if(hasta) q = q.lte('fecha', hasta);
+  if(punto) q = q.eq('location_id', punto);
+  if(area) q = q.eq('area_id', area);
+  if(prov) q = q.eq('proveedor_id', prov);
+  const { data, error } = await q.order('fecha', {ascending:false}).order('created_at', {ascending:false}).limit(AUD_LIMITE);
+  if(error){ box.innerHTML = '<div class="empty-list">No se pudieron cargar los pedidos: ' + escapeHtml(error.message) + '</div>'; return; }
+  aud.pedidos = (data || []).map(o => ({ ...o, _estado: estadoAuditoria(o) }));
+  aud.abiertos = new Set();
+  renderAuditoria();
+}
+
+function pedidosAuditoriaFiltrados(){
+  const txt = document.getElementById('audBuscar').value.trim().toLowerCase();
+  return aud.pedidos.filter(o => {
+    if(aud.estado === 'urgente' ? !o.urgente : (aud.estado && o._estado !== aud.estado)) return false;
+    if(!txt) return true;
+    return (o.codigo || '').toLowerCase().includes(txt) || (o.creado_por_nombre || '').toLowerCase().includes(txt) ||
+      (o.proveedor || '').toLowerCase().includes(txt) || (o.order_items || []).some(it => (it.ingredient_name || '').toLowerCase().includes(txt));
+  });
+}
+
+const audLugar = o => [(aud.puntos[o.location_id] || {}).name, (aud.areas[o.area_id] || {}).name].filter(Boolean).join(' · ');
+
+function renderAuditoria(){
+  const cuenta = k => k === '' ? aud.pedidos.length : k === 'urgente' ? aud.pedidos.filter(o => o.urgente).length : aud.pedidos.filter(o => o._estado === k).length;
+  document.getElementById('audEstados').innerHTML = AUD_ESTADOS.map(e =>
+    `<button type="button" class="aud-chip${aud.estado === e.key ? ' active' : ''}${e.key === 'atrasado' && cuenta(e.key) ? ' alerta' : ''}" data-estado="${e.key}" aria-pressed="${aud.estado === e.key}">${e.label}<span>${cuenta(e.key)}</span></button>`).join('');
+  document.querySelectorAll('.aud-vista button').forEach(b => b.classList.toggle('active', b.dataset.vista === aud.vista));
+
+  const lista = pedidosAuditoriaFiltrados();
+  const tope = aud.pedidos.length >= AUD_LIMITE ? ` · se muestran los primeros ${AUD_LIMITE}, acota las fechas` : '';
+  const box = document.getElementById('audContenido');
+  if(aud.vista === 'consolidado'){
+    const validos = lista.filter(o => o._estado !== 'rechazado' && o._estado !== 'pendiente');
+    document.getElementById('audCount').textContent = `${validos.length} pedido${validos.length === 1 ? '' : 's'} aprobado${validos.length === 1 ? '' : 's'}${tope}`;
+    box.innerHTML = consolidadoAuditoriaHtml(validos);
+    return;
+  }
+  document.getElementById('audCount').textContent = `${lista.length} pedido${lista.length === 1 ? '' : 's'}${tope}`;
+  box.innerHTML = lista.length === 0 ? '<div class="empty-list">No hay pedidos con estos filtros.</div>' : lista.map(audFilaHtml).join('');
+}
+
+function audFilaHtml(o){
+  const e = AUD_ESTADOS.find(x => x.key === o._estado);
+  const sem = o._estado === 'atrasado' || o._estado === 'por_recibir' ? semaforoEntrega(o) : (o._estado === 'por_enviar' ? semaforoEnvio(o) : null);
+  const estadoBadge = sem ? sem.badge : `<span class="badge ${e.badge}">${AUD_ESTADO_TEXTO[o._estado]}</span>`;
+  const items = o.order_items || [];
+  const abierto = aud.abiertos.has(o.id);
+  return `<div class="aud-row${abierto ? ' open' : ''}">
+    <button type="button" class="aud-sum" data-aud="${o.id}" aria-expanded="${abierto}">
+      <span class="aud-top"><span class="kc-code">${escapeHtml(o.codigo || '')}</span><span class="kc-badges">${o.urgente ? '<span class="badge info">Urgente</span>' : ''}${estadoBadge}</span></span>
+      <span class="aud-prov">${escapeHtml(o.proveedor || 'Sin proveedor')}</span>
+      <span class="aud-meta">${fmtDia(o.fecha)} · ${escapeHtml(audLugar(o))} · ${escapeHtml(o.creado_por_nombre || '')} · ${items.length} insumo${items.length === 1 ? '' : 's'}</span>
+    </button>
+    ${abierto ? audDetalleHtml(o) : ''}
+  </div>`;
+}
+
+function audDetalleHtml(o){
+  const items = sortByCategoria(o.order_items || []);
+  const pasos = [];
+  pasos.push(['Creado', fmtFechaHora(o.created_at), o.creado_por_nombre]);
+  if(o.status === 'aprobado') pasos.push([o.urgente ? 'Aprobado solo (urgente)' : 'Aprobado', fmtFechaHora(o.resuelto_at), o.resuelto_por]);
+  if(o.status === 'rechazado') pasos.push(['Rechazado', fmtFechaHora(o.resuelto_at), o.resuelto_por, o.rechazo_motivo]);
+  if(o.enviado) pasos.push(['Enviado', fmtFechaHora(o.enviado_at), o.enviado_por]);
+  (o.order_seguimientos || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).forEach(s =>
+    pasos.push(['Seguimiento', fmtFechaHora(s.created_at), s.creado_por_nombre, s.nota + (s.entrega_esperada ? ' (esperado ' + fmtDia(s.entrega_esperada) + ')' : '')]));
+  if(o.recibido) pasos.push(['Recibido', fmtFechaHora(o.recibido_at), o.recibido_por, o.recibido_nota]);
+  return `<div class="aud-det">
+    <div class="aud-items">${items.map(it => `<div><span>${escapeHtml(it.ingredient_name)}${it.nota ? ` <em>(${escapeHtml(it.nota)})</em>` : ''}</span><b>${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)}</b></div>`).join('') || '<div><span>Sin insumos</span></div>'}</div>
+    <ol class="aud-pasos">${pasos.map(([t, f, q, n]) => `<li><b>${t}</b> <span>${f}${q ? ' · ' + escapeHtml(q) : ''}</span>${n ? `<p>${escapeHtml(n)}</p>` : ''}</li>`).join('')}</ol>
+  </div>`;
+}
+
+// Consolidado: por proveedor → insumo (en su unidad), total y desglose por punto · área.
+function consolidadoAuditoriaHtml(lista){
+  if(lista.length === 0) return '<div class="empty-list">No hay pedidos aprobados con estos filtros.</div>';
+  const provs = {};
+  lista.forEach(o => {
+    const pk = o.proveedor_id || 'sin';
+    const p = provs[pk] || (provs[pk] = { nombre: o.proveedor || 'Sin proveedor', pedidos: new Set(), insumos: {} });
+    p.pedidos.add(o.id);
+    (o.order_items || []).forEach(it => {
+      const k = it.ingredient_code + '|' + it.unidad;
+      const s = p.insumos[k] || (p.insumos[k] = { nombre: it.ingredient_name, unidad: it.unidad, total: 0, pedidos: new Set(), sedes: {} });
+      const cant = parseFloat(it.cantidad) || 0;
+      s.total += cant;
+      s.pedidos.add(o.id);
+      const lugar = audLugar(o);
+      s.sedes[lugar] = (s.sedes[lugar] || 0) + cant;
+    });
+  });
+  return Object.values(provs).sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => `
+    <div class="aud-cons">
+      <div class="aud-cons-head"><b>${escapeHtml(p.nombre)}</b><span>${p.pedidos.size} pedido${p.pedidos.size === 1 ? '' : 's'}</span></div>
+      ${Object.values(p.insumos).sort((a, b) => a.nombre.localeCompare(b.nombre)).map(s => `
+        <div class="aud-cons-row">
+          <span class="aud-cons-name">${escapeHtml(s.nombre)}</span>
+          <b class="aud-cons-total">${fmtQty(Math.round(s.total * 1000) / 1000)} ${escapeHtml(s.unidad)}</b>
+          <span class="aud-cons-sedes">${Object.entries(s.sedes).map(([l, c]) => `<span class="aud-sede">${escapeHtml(l)} <b>${fmtQty(Math.round(c * 1000) / 1000)}</b></span>`).join('')}<span>${s.pedidos.size} pedido${s.pedidos.size === 1 ? '' : 's'}</span></span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+// CSV (una fila por insumo) para Excel en español: separador ";", decimales con coma y BOM UTF-8.
+function exportarAuditoriaCsv(){
+  const lista = pedidosAuditoriaFiltrados();
+  if(lista.length === 0){ showToast('No hay pedidos para exportar con estos filtros', 'warn'); return; }
+  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const num = v => v === null || v === undefined || v === '' ? '' : String(v).replace('.', ',');
+  const fh = iso => iso ? new Date(iso).toLocaleString('es-CO') : '';
+  const filas = [['Fecha','Código','Punto','Área','Proveedor','Estado','Urgente','Pidió','Categoría','Insumo','Cantidad','Unidad','Nota','Resolvió','Resuelto','Enviado','Recibido','Recibió','Nota recepción','Último seguimiento']];
+  lista.forEach(o => {
+    const seg = ultimoSeguimiento(o);
+    const base = it => [o.fecha, o.codigo, (aud.puntos[o.location_id] || {}).name, (aud.areas[o.area_id] || {}).name, o.proveedor, AUD_ESTADO_TEXTO[o._estado],
+      o.urgente ? 'Sí' : 'No', o.creado_por_nombre, it ? categoryLabel(it.categoria) : '', it ? it.ingredient_name : '', it ? num(it.cantidad) : '', it ? it.unidad : '', it ? it.nota : '',
+      o.resuelto_por, fh(o.resuelto_at), fh(o.enviado_at), fh(o.recibido_at), o.recibido_por, o.recibido_nota, seg ? seg.nota : ''];
+    const items = o.order_items || [];
+    if(items.length === 0) filas.push(base(null)); else items.forEach(it => filas.push(base(it)));
+  });
+  const csv = '﻿' + filas.map(f => f.map(celda).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `pedidos_${document.getElementById('audDesde').value || 'inicio'}_${document.getElementById('audHasta').value || 'hoy'}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+document.getElementById('audPunto').addEventListener('change', llenarAreasAuditoria);
+document.getElementById('audFiltrar').addEventListener('click', cargarAuditoria);
+document.getElementById('audBuscar').addEventListener('input', renderAuditoria);
+document.getElementById('audCsv').addEventListener('click', exportarAuditoriaCsv);
+document.getElementById('audEstados').addEventListener('click', e => {
+  const b = e.target.closest('[data-estado]');
+  if(!b) return;
+  aud.estado = b.dataset.estado;
+  renderAuditoria();
+});
+document.querySelector('.aud-vista').addEventListener('click', e => {
+  const b = e.target.closest('[data-vista]');
+  if(!b) return;
+  aud.vista = b.dataset.vista;
+  renderAuditoria();
+});
+document.getElementById('audContenido').addEventListener('click', e => {
+  const b = e.target.closest('[data-aud]');
+  if(!b) return;
+  if(aud.abiertos.has(b.dataset.aud)) aud.abiertos.delete(b.dataset.aud); else aud.abiertos.add(b.dataset.aud);
+  renderAuditoria();
 });
 </script>
 </body>
