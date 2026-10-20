@@ -1133,6 +1133,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
           <label class="field-label" for="prodReceta">Receta</label>
           <input type="text" id="prodReceta" list="recetaList" placeholder="Escribe para buscar..." autocomplete="off">
           <datalist id="recetaList"></datalist>
+          <datalist id="recetaListTodas"></datalist>
         </div>
         <div class="field">
           <label class="field-label" for="prodCantidad">Cantidad a producir</label>
@@ -1837,7 +1838,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
     <div id="bajaRecetaFields" style="display:none;">
       <div class="field">
         <label class="field-label" for="bajaReceta">Receta</label>
-        <input type="text" id="bajaReceta" list="recetaList" placeholder="Escribe para buscar..." autocomplete="off">
+        <input type="text" id="bajaReceta" list="recetaListTodas" placeholder="Escribe para buscar..." autocomplete="off">
       </div>
     </div>
     <div class="field-row">
@@ -5595,11 +5596,18 @@ function pintarCalcResultado(){
 }
 
 /* ---------- PRODUCCION ---------- */
+// Productos de carta de barra (código CS…): no se producen por tanda, así que no salen en
+// Producción, Calcular producción ni Cronograma. Sí salen en Bajas (un coctel servido se puede dar de baja).
+const esProductoCarta = r => /^CS\d/i.test(r.code || '');
+const recetasProducibles = () => RECIPES.filter(r => !esProductoCarta(r));
 function populateRecetaDatalist(){
-  document.getElementById('recetaList').innerHTML = RECIPES.map(r => `<option value="${escapeHtml(r.name)}">`).join('');
+  const opciones = lista => lista.map(r => `<option value="${escapeHtml(r.name)}">`).join('');
+  document.getElementById('recetaList').innerHTML = opciones(recetasProducibles());
+  document.getElementById('recetaListTodas').innerHTML = opciones(RECIPES);
 }
-function findRecetaByName(name){
-  return RECIPES.find(r => r.name.toUpperCase() === name.trim().toUpperCase());
+function findRecetaByName(name, incluirCarta){
+  const lista = incluirCarta ? RECIPES : recetasProducibles();
+  return lista.find(r => r.name.toUpperCase() === name.trim().toUpperCase());
 }
 // Recetas que se porcionan (ej. tinga en porciones de 110 g): se registra cuántas porciones se empacan e ingresan.
 function esPorcionada(receta){ return !!(receta && receta.porcion_gr); }
@@ -7566,7 +7574,7 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
     categoria = document.getElementById('bajaCategoria').value;
     if(!itemCode){ showToast('Selecciona un insumo'); return; }
   } else {
-    const match = findRecetaByName(document.getElementById('bajaReceta').value.trim());
+    const match = findRecetaByName(document.getElementById('bajaReceta').value.trim(), true);
     if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
     itemCode = match.code; itemName = match.name;
   }
