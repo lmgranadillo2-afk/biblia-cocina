@@ -2401,14 +2401,14 @@ function setupRealtime(){
       loadMyOrders();
       if(document.getElementById('adminpanel-pedidos') && document.getElementById('adminpanel-pedidos').classList.contains('active')) loadAdminOrders();
     })
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'bajas', filter:`location_id=eq.${currentLocation.id}` }, payload=>{
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'bajas', filter:`area_id=eq.${currentArea.id}` }, payload=>{
       if(profile.role === 'admin' && payload.new.created_by !== session.user.id){
         showToast('Nueva baja registrada', 'warn');
       }
       loadMyBajas();
       if(document.getElementById('adminpanel-bajas') && document.getElementById('adminpanel-bajas').classList.contains('active')) loadAdminBajas();
     })
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'bajas', filter:`location_id=eq.${currentLocation.id}` }, payload=>{
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'bajas', filter:`area_id=eq.${currentArea.id}` }, payload=>{
       if(payload.new.created_by === session.user.id && payload.old.status !== payload.new.status){
         showToast(payload.new.status === 'aprobado' ? 'Tu baja fue ingresada' : 'Tu baja fue denegada', payload.new.status === 'aprobado' ? 'ok' : 'danger');
       }
@@ -7581,7 +7581,7 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
   }
 
   const { error } = await supa.from('bajas').insert({
-    location_id: currentLocation.id, fecha, tipo, item_code: itemCode, item_name: itemName, categoria,
+    location_id: currentLocation.id, area_id: currentArea.id, fecha, tipo, item_code: itemCode, item_name: itemName, categoria,
     cantidad: parseFloat(cantidad.replace(',','.')) || 0, unidad, motivo,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
   });
@@ -7595,7 +7595,7 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
 async function loadMyBajas(){
   const { monday, sunday } = getWeekRange(new Date());
   const { data, error } = await supa.from('bajas').select('*')
-    .eq('location_id', currentLocation.id)
+    .eq('location_id', currentLocation.id).eq('area_id', currentArea.id)
     .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
     .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
@@ -7627,7 +7627,7 @@ function bajaKanbanCardHtml(b, mode){
   }
   const clickable = puedeResolverBaja(mode) && b.status === 'pendiente';
   return `<div class="kanban-card ${b.status}" data-baja-id="${b.id}" style="${clickable?'':'cursor:default;'}"${clickable ? ' role="button" tabindex="0"' : ''}>
-    <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges"><span class="badge neutral">${tipoLabel}</span></span></div>
+    <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges">${b.area_id ? '' : '<span class="badge warn" title="Baja anterior a la separación por áreas">Sin área</span>'}<span class="badge neutral">${tipoLabel}</span></span></div>
     <div class="kc-title">${escapeHtml(b.item_name)}</div>
     <div class="kc-meta"><span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${fechaCorta}${mode==='admin' ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
     <div class="kc-items"><span class="kc-label">Motivo</span>${escapeHtml(b.motivo)}</div>
@@ -7667,7 +7667,7 @@ function recargarBajas(){ loadMyBajas(); loadAdminBajas(); }
 async function loadAdminBajas(){
   const { monday, sunday } = getWeekRange(new Date());
   const { data, error } = await supa.from('bajas').select('*')
-    .eq('location_id', currentLocation.id)
+    .eq('location_id', currentLocation.id).or(`area_id.eq.${currentArea.id},area_id.is.null`)
     .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
     .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
@@ -7738,7 +7738,7 @@ document.getElementById('bajaToggleView').addEventListener('click', ()=>{
 });
 
 async function loadBajaHistory(){
-  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:false});
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).or(`area_id.eq.${currentArea.id},area_id.is.null`).order('created_at', {ascending:false});
   adminBajaHistoryCache = error ? [] : (data || []);
   renderBajaHistory();
 }
@@ -7787,7 +7787,7 @@ document.getElementById('myBajaToggleHist').addEventListener('click', ()=>{
 });
 
 async function loadMyBajaHistory(){
-  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).eq('created_by', session.user.id).order('created_at', {ascending:false});
+  const { data, error } = await supa.from('bajas').select('*').eq('location_id', currentLocation.id).eq('area_id', currentArea.id).eq('created_by', session.user.id).order('created_at', {ascending:false});
   myBajaHistoryCache = error ? [] : (data || []);
   renderMyBajaHistory();
 }
