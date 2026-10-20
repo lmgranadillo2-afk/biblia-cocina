@@ -845,6 +845,10 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .dup-warning b{color:var(--warn);}
 .dup-warning ul{margin:8px 0 0; padding-left:18px;}
 .dup-warning label{display:flex; align-items:flex-start; gap:8px; margin-top:10px; font-size:13px; cursor:pointer;}
+.dup-warning p{margin:8px 0 0;}
+.dup-warning.urgente{background:var(--danger-bg); border-color:var(--danger);}
+.dup-warning.urgente > b:first-child{color:var(--danger);}
+.dup-warning p b{color:var(--text);}
 .sched-day{
   border:1px solid var(--border); border-radius:10px; background:var(--surface); margin-bottom:12px; overflow:hidden;
 }
@@ -1140,18 +1144,8 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
         </div>
         <div class="field">
           <label class="field-label" for="prodCantidad">Cantidad a producir</label>
-          <select id="prodCantidad">
-            <option value="0.5">Media receta (x0.5)</option>
-            <option value="1" selected>Una receta (x1)</option>
-            <option value="1.5">Receta y media (x1.5)</option>
-            <option value="2">Dos recetas (x2)</option>
-            <option value="2.5">Dos recetas y media (x2.5)</option>
-            <option value="3">Tres recetas (x3)</option>
-            <option value="3.5">Tres recetas y media (x3.5)</option>
-            <option value="4">Cuatro recetas (x4)</option>
-            <option value="4.5">Cuatro recetas y media (x4.5)</option>
-            <option value="5">Cinco recetas (x5)</option>
-          </select>
+          <select id="prodCantidad"></select>
+          <input type="number" id="prodCantidadOtra" min="0.5" max="100" step="0.5" inputmode="decimal" placeholder="Número de recetas, ej: 12" style="display:none; margin-top:8px;">
         </div>
         <div class="field" id="prodTipoField" style="display:none">
           <span class="field-label">¿Qué vas a registrar?</span>
@@ -1740,18 +1734,8 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
     </div>
     <div class="field">
       <label class="field-label">Cantidad</label>
-      <select id="schedCantidad">
-        <option value="0.5">Media receta (x0.5)</option>
-        <option value="1" selected>Una receta (x1)</option>
-        <option value="1.5">Receta y media (x1.5)</option>
-        <option value="2">Dos recetas (x2)</option>
-        <option value="2.5">Dos recetas y media (x2.5)</option>
-        <option value="3">Tres recetas (x3)</option>
-        <option value="3.5">Tres recetas y media (x3.5)</option>
-        <option value="4">Cuatro recetas (x4)</option>
-        <option value="4.5">Cuatro recetas y media (x4.5)</option>
-        <option value="5">Cinco recetas (x5)</option>
-      </select>
+      <select id="schedCantidad"></select>
+      <input type="number" id="schedCantidadOtra" min="0.5" max="100" step="0.5" inputmode="decimal" placeholder="Número de recetas, ej: 12" style="display:none; margin-top:8px;">
     </div>
     <div class="field"><label class="field-label">Notas (opcional)</label><textarea id="schedNotas" placeholder="Ej: para el evento del sábado..."></textarea></div>
     <div class="modal-actions">
@@ -1946,12 +1930,41 @@ const SUPABASE_ANON_KEY = "sb_publishable_ZHjOiAmgamvaTcLfluTxxA_tkhOX-Ve";
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let RECIPES = [];
-const CANTIDAD_LABELS = {
-  "0.5":"Media receta", "1":"Una receta", "1.5":"Receta y media",
-  "2":"Dos recetas", "2.5":"Dos recetas y media", "3":"Tres recetas",
-  "3.5":"Tres recetas y media", "4":"Cuatro recetas", "4.5":"Cuatro recetas y media",
-  "5":"Cinco recetas"
-};
+// Cuántas veces la receta: la lista va de x0.5 a x10 y "Otra cantidad" deja escribir cualquier número (ej. x12),
+// así varias tandas de lo mismo se registran una sola vez.
+const CANT_NUMEROS = ['', 'Una', 'Dos', 'Tres', 'Cuatro', 'Cinco', 'Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'];
+const CANT_MAX_LISTA = 10;
+function cantidadLabel(mult){
+  const m = parseFloat(mult);
+  if(m === 0.5) return 'Media receta';
+  if(m === 1.5) return 'Receta y media';
+  const entero = Math.floor(m), media = m - entero === 0.5;
+  if(entero >= 1 && entero <= CANT_MAX_LISTA && (media || m === entero))
+    return CANT_NUMEROS[entero] + (entero === 1 ? ' receta' : ' recetas') + (media ? ' y media' : '');
+  return fmtQty(m) + ' recetas';
+}
+function llenarSelectCantidad(sel){
+  const opts = [];
+  for(let m = 0.5; m <= CANT_MAX_LISTA; m += 0.5) opts.push(`<option value="${m}" ${m === 1 ? 'selected' : ''}>${cantidadLabel(m)} (x${String(m).replace('.', ',')})</option>`);
+  sel.innerHTML = opts.join('') + '<option value="otra">Otra cantidad…</option>';
+  const otra = document.getElementById(sel.id + 'Otra');
+  sel.addEventListener('change', ()=>{
+    otra.style.display = sel.value === 'otra' ? '' : 'none';
+    if(sel.value === 'otra') otra.focus();
+  });
+}
+// Devuelve el multiplicador elegido como número, o null si "Otra cantidad" está vacía o no es válida.
+function leerCantidad(selId){
+  const sel = document.getElementById(selId);
+  if(sel.value !== 'otra') return parseFloat(sel.value);
+  const n = parseFloat(String(document.getElementById(selId + 'Otra').value).replace(',', '.'));
+  return n > 0 && n <= 100 ? Math.round(n * 100) / 100 : null;
+}
+function reiniciarCantidad(selId){
+  document.getElementById(selId).value = '1';
+  const otra = document.getElementById(selId + 'Otra');
+  otra.value = ''; otra.style.display = 'none';
+}
 
 let currentCode = null;
 let session = null;
@@ -5642,25 +5655,29 @@ function pintarCampoPorciones(receta){
 function kgDePorciones(n, gr){ return (n * gr / 1000).toLocaleString('es-CO', { maximumFractionDigits: 3 }); }
 function updateExpectedYield(){
   const name = document.getElementById('prodReceta').value;
-  const mult = parseFloat(document.getElementById('prodCantidad').value);
+  const mult = leerCantidad('prodCantidad');
   const box = document.getElementById('expectedYieldBox');
   const match = findRecetaByName(name);
   pintarCampoPorciones(match);
-  if(tipoProduccion(match) === 'porcionado' || !match || !match.yield_qty){ box.innerHTML=''; return; }
+  if(tipoProduccion(match) === 'porcionado' || !match || !match.yield_qty || !mult){ box.innerHTML=''; return; }
   const expected = parseFloat(match.yield_qty) * mult;
   box.innerHTML = `<div class="yield-stamp small"><span class="label">Rinde esperado</span><span class="value">${fmtQty(expected)} ${normalizeUnitLabel(match.yield_unit)}</span></div>`;
 }
 document.getElementById('prodReceta').addEventListener('input', updateExpectedYield);
+llenarSelectCantidad(document.getElementById('prodCantidad'));
+llenarSelectCantidad(document.getElementById('schedCantidad'));
 document.getElementById('prodCantidad').addEventListener('change', updateExpectedYield);
+document.getElementById('prodCantidadOtra').addEventListener('input', updateExpectedYield);
 document.getElementById('prodPorciones').addEventListener('input', updateExpectedYield);
 document.querySelectorAll('input[name="prodTipo"]').forEach(r => r.addEventListener('change', updateExpectedYield));
 
 let pendingEntry = null;
+const PROD_REPETIDA_MIN = 60; // minutos: misma receta registrada en este lapso → alerta fuerte
 
 document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('prodFecha').value;
   const recetaName = document.getElementById('prodReceta').value.trim();
-  const cantidadMult = document.getElementById('prodCantidad').value;
+  const cantidadMult = leerCantidad('prodCantidad');
   const responsable = document.getElementById('prodResponsable').value.trim();
   const realYield = document.getElementById('prodRealYield').value.trim();
   const obs = document.getElementById('prodObs').value.trim();
@@ -5673,10 +5690,11 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   const porcionada = tipoProduccion(match) === 'porcionado';
   const porciones = porcionada ? parseInt(document.getElementById('prodPorciones').value, 10) : null;
   if(porcionada && !(porciones > 0)){ showToast('Escribe cuántas porciones vas a ingresar'); return; }
-  let cantidadLabel = CANTIDAD_LABELS[cantidadMult], mult = parseFloat(cantidadMult), expectedYieldStr;
+  if(!porcionada && !cantidadMult){ showToast('Escribe cuántas recetas vas a registrar (entre 0,5 y 100)'); return; }
+  let etiquetaCant = cantidadLabel(cantidadMult), mult = cantidadMult, expectedYieldStr;
   if(porcionada){
     const kg = porciones * match.porcion_gr / 1000;
-    cantidadLabel = porciones + ' porciones de ' + fmtQty(match.porcion_gr) + ' g';
+    etiquetaCant = porciones + ' porciones de ' + fmtQty(match.porcion_gr) + ' g';
     expectedYieldStr = kgDePorciones(porciones, match.porcion_gr) + ' KG';
     const rinde = match.yield_qty ? toBaseQty(parseFloat(match.yield_qty), match.yield_unit) : null;
     mult = !rinde ? 0 : unitGroup(match.yield_unit) === 'MASA' ? Math.round(kg / rinde * 1000) / 1000
@@ -5689,7 +5707,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
     // Solo se envían si hay porciones, así el registro normal no depende de las columnas nuevas.
     ...(porcionada ? { porciones, porcion_gr: match.porcion_gr } : {}),
     fecha, recipe_code: match.code, recipe_name: match.name,
-    cantidad_mult: mult, cantidad_label: cantidadLabel,
+    cantidad_mult: mult, cantidad_label: etiquetaCant,
     rendimiento_esperado: expectedYieldStr, responsable,
     rendimiento_real: porcionada ? '' : realYield, observacion: obs,
     created_by: session.user.id, location_id: currentLocation.id, area_id: currentArea.id
@@ -5697,7 +5715,7 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
 
   document.getElementById('cmFecha').textContent = fecha;
   document.getElementById('cmReceta').textContent = match.name;
-  document.getElementById('cmCantidad').textContent = cantidadLabel;
+  document.getElementById('cmCantidad').textContent = etiquetaCant;
   document.getElementById('cmEsperado').textContent = expectedYieldStr || 'sin dato';
   document.getElementById('cmEsperado').previousElementSibling.textContent = porcionada ? 'Total porcionado' : 'Rinde esperado';
   document.getElementById('cmResponsable').textContent = responsable;
@@ -5711,10 +5729,31 @@ document.getElementById('prodSubmitBtn').addEventListener('click', async ()=>{
   dupBox.innerHTML = '';
   confirmBtn.disabled = false;
 
-  const { data: dupsTodos, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_area_id: currentArea.id });
   const esRegPorcionado = d => (d.porciones !== null && d.porciones !== undefined) || /porciones de/i.test(d.cantidad_label || '');
+  // Registro repetido en poco tiempo (sin importar la fecha elegida): casi siempre es la misma tanda ingresada dos veces.
+  const desde = new Date(Date.now() - PROD_REPETIDA_MIN * 60000).toISOString();
+  const { data: recientesTodos } = await supa.from('productions').select('*')
+    .eq('area_id', currentArea.id).eq('recipe_code', match.code).eq('status', 'activo').gte('created_at', desde)
+    .order('created_at', {ascending:false});
+  const recientes = (recientesTodos || []).filter(d => esRegPorcionado(d) === porcionada);
+  const { data: dupsTodos, error: dupErr } = await supa.rpc('check_same_day_production', { p_recipe_code: match.code, p_fecha: fecha, p_area_id: currentArea.id });
   const dups = (dupsTodos || []).filter(d => esRegPorcionado(d) === porcionada);
-  if(!dupErr && dups.length > 0){
+  if(recientes.length > 0){
+    const items = recientes.map(d => {
+      const min = Math.max(1, Math.round((Date.now() - new Date(d.created_at)) / 60000));
+      return `<li>Hace ${min} min · ${escapeHtml(d.responsable)} · ${escapeHtml(d.cantidad_label)}</li>`;
+    }).join('');
+    dupBox.innerHTML = `<div class="dup-warning urgente">
+      <b>¡Ojo! ${escapeHtml(match.name)} ya se registró hace muy poco:</b>
+      <ul>${items}</ul>
+      <p>Si es la misma tanda, no la registres otra vez. Si hiciste varias tandas, cancela y regístralas juntas en <b>Cantidad a producir</b> (ej. x2, x3 u <b>Otra cantidad</b>).</p>
+      <label><input type="checkbox" id="dupOverride"> Es una producción nueva, distinta a la anterior</label>
+    </div>`;
+    confirmBtn.disabled = true;
+    document.getElementById('dupOverride').addEventListener('change', (e)=>{
+      confirmBtn.disabled = !e.target.checked;
+    });
+  } else if(!dupErr && dups.length > 0){
     const items = dups.map(d => {
       const hora = new Date(d.created_at).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
       return `<li>${escapeHtml(d.responsable)} · ${escapeHtml(d.cantidad_label)} · ${hora}</li>`;
@@ -5749,7 +5788,7 @@ document.getElementById('cmConfirm').addEventListener('click', async ()=>{
   document.getElementById('prodRealYield').value = '';
   document.getElementById('prodPorciones').value = '';
   document.getElementById('prodObs').value = '';
-  document.getElementById('prodCantidad').value = '1';
+  reiniciarCantidad('prodCantidad');
   document.querySelector('input[name="prodTipo"][value="produccion"]').checked = true;
   updateExpectedYield();
   pendingEntry = null;
@@ -6351,7 +6390,7 @@ document.getElementById('schedOpenAdd').addEventListener('click', ()=>{
   document.getElementById('schedFecha').value = calSelectedDate || dateKey(new Date());
   document.getElementById('schedReceta').value = '';
   document.getElementById('schedNotas').value = '';
-  document.getElementById('schedCantidad').value = '1';
+  reiniciarCantidad('schedCantidad');
   document.getElementById('schedAddModal').classList.add('open');
 });
 document.getElementById('schedAddCancel').addEventListener('click', ()=>{
@@ -6361,16 +6400,17 @@ document.getElementById('schedAddCancel').addEventListener('click', ()=>{
 document.getElementById('schedSubmitBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('schedFecha').value;
   const recetaName = document.getElementById('schedReceta').value.trim();
-  const cantidadMult = document.getElementById('schedCantidad').value;
+  const cantidadMult = leerCantidad('schedCantidad');
   const notas = document.getElementById('schedNotas').value.trim();
 
   if(!fecha || !recetaName){ showToast('Completa la fecha y la receta'); return; }
+  if(!cantidadMult){ showToast('Escribe cuántas recetas (entre 0,5 y 100)'); return; }
   const match = findRecetaByName(recetaName);
   if(!match){ showToast('Selecciona una receta válida de la lista'); return; }
 
   const { error } = await supa.from('schedule_items').insert({
     fecha, recipe_code: match.code, recipe_name: match.name,
-    cantidad_mult: parseFloat(cantidadMult), cantidad_label: CANTIDAD_LABELS[cantidadMult],
+    cantidad_mult: cantidadMult, cantidad_label: cantidadLabel(cantidadMult),
     notas: notas || null, created_by: session.user.id, location_id: currentLocation.id, area_id: currentArea.id
   });
   if(error){ showToast('Error al agregar: ' + error.message); return; }
