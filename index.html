@@ -1228,7 +1228,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
           <button class="btn btn-accent btn-small" id="orderOpenNew">+ Nuevo pedido</button>
         </div>
       </div>
-      <div class="empty-note" style="margin-bottom:14px;">Pide insumos a proveedor (no incluye subrecetas, esas se hacen en el punto). Se ve la semana actual — toca un pedido pendiente tuyo para editarlo.</div>
+      <div class="empty-note" style="margin-bottom:14px;">Pide insumos a proveedor (no incluye subrecetas, esas se hacen en el punto). Se ve la semana actual — toca un pedido pendiente para editarlo (si eres admin, para aprobarlo o rechazarlo).</div>
       <div id="myOrderWeekView">
         <div class="kanban-board" id="orderKanban"></div>
       </div>
@@ -2035,7 +2035,7 @@ function fmtMoney(n){
   return Math.round(n).toLocaleString('es-CO', {style:'currency', currency:'COP', maximumFractionDigits:0});
 }
 function escapeHtml(s){
-  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return (s === null || s === undefined || s === false ? '' : String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 // tipo: 'ok' | 'warn' | 'danger'. Si no se pasa, se deduce del texto del mensaje.
 // Los errores se quedan hasta que se cierran; el resto se va solo a los 3 s.
@@ -2149,7 +2149,7 @@ async function onLoggedIn(sess){
   document.getElementById('locationScreen').style.display='flex';
   document.getElementById('locationList').innerHTML = locations.map(loc => `
     <div class="location-card" data-loc-id="${loc.id}">
-      ${loc.logo_data_url ? `<img src="${loc.logo_data_url}" alt="">` : ''}
+      ${loc.logo_data_url ? `<img src="${escapeHtml(loc.logo_data_url)}" alt="">` : ''}
       <div class="lc-name">${escapeHtml(loc.name)}</div>
     </div>
   `).join('');
@@ -2711,7 +2711,7 @@ function renderSugeridos(){
     </div>
     <div class="field-help">Lo que esta área le pidió en las últimas ${SEMANAS_SUGERIDOS} semanas. Toca para agregar y ajusta la cantidad.</div>
     <div class="sug-list">${items.map(s => `
-      <button type="button" class="sug-item${ya.has(s.code) ? ' agregado' : ''}" data-sug="${s.code}" ${ya.has(s.code) ? 'disabled' : ''}>
+      <button type="button" class="sug-item${ya.has(s.code) ? ' agregado' : ''}" data-sug="${escapeHtml(s.code)}" ${ya.has(s.code) ? 'disabled' : ''}>
         <span class="sug-name">${escapeHtml(s.name)}</span>
         <span class="sug-meta">prom. ${fmtQty(s.promedio)} ${escapeHtml(s.unidad)} · último ${fmtQty(s.ultima)} · ${s.veces} ${s.veces === 1 ? 'vez' : 'veces'}</span>
         <svg class="sug-add" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ya.has(s.code) ? '<path d="M20 6 9 17l-5-5"/>' : '<path d="M12 5v14M5 12h14"/>'}</svg>
@@ -5409,7 +5409,7 @@ function renderRecipeList(){
   if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">' + (q ? 'No hay recetas que coincidan con la búsqueda.' : 'Esta área todavía no tiene recetas cargadas.') + '</div>'; return; }
   wrap.innerHTML = list.map(r => {
     const y = r.yield_qty ? (fmtQty(r.yield_qty) + ' ' + r.yield_unit) : '';
-    return `<div class="rec-card ${r.code===currentCode?'selected':''}" data-code="${r.code}">
+    return `<div class="rec-card ${r.code===currentCode?'selected':''}" data-code="${escapeHtml(r.code)}">
       <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-code">${r.code}</div></div>
       ${y ? `<div class="rec-card-yield">${y}</div>` : '<span class="badge neutral">Sin rendimiento</span>'}
     </div>`;
@@ -5448,7 +5448,7 @@ async function renderDetail(r){
 
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-title">${escapeHtml(r.name)}</div>
-    <div class="detail-code">${r.code}</div>
+    <div class="detail-code">${escapeHtml(r.code)}</div>
     ${yieldHtml}
     ${hasYield || r.porcion_gr || isAdminRole() ? `<div class="rec-tools">
       ${hasYield ? `<div class="rec-tool-row">
@@ -6056,7 +6056,7 @@ async function loadLocationsAdmin(){
       return `
       <div class="location-card" style="cursor:default; justify-content:space-between; flex-wrap:wrap;">
         <div class="row-main" style="${isActive?'':'opacity:0.6;'}">
-          ${loc.logo_data_url ? `<img src="${loc.logo_data_url}" alt="">` : ''}
+          ${loc.logo_data_url ? `<img src="${escapeHtml(loc.logo_data_url)}" alt="">` : ''}
           <div class="lc-name">${escapeHtml(loc.name)}</div>
           ${isActive ? '' : '<span class="badge neutral">Inactivo</span>'}
         </div>
@@ -6505,7 +6505,7 @@ async function loadGroupIngredientsAdmin(){
 
   const catSelect = document.getElementById('giFilterCategoria');
   const cats = [...new Set(ALL_GROUP_INGREDIENTS.map(g=>g.categoria))].sort();
-  catSelect.innerHTML = '<option value="">Todas</option>' + cats.map(c => `<option value="${c}">${categoryLabel(c)}</option>`).join('');
+  catSelect.innerHTML = '<option value="">Todas</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(categoryLabel(c))}</option>`).join('');
 
   renderGiList();
 }
@@ -6528,7 +6528,7 @@ function renderGiList(){
     return `<div class="gi-row">
       <div class="gi-main">
         <div class="gi-name">${escapeHtml(g.name)}</div>
-        <div class="gi-meta">${g.code} · ${categoryLabel(g.categoria)} · Compra: ${(g.unidades_compra||['UND','KG']).join(', ')}</div>
+        <div class="gi-meta">${escapeHtml(g.code)} · ${escapeHtml(categoryLabel(g.categoria))} · Compra: ${escapeHtml((g.unidades_compra||['UND','KG']).join(', '))}</div>
       </div>
       <button class="btn btn-secondary btn-small" data-edit-gi="${g.id}">Editar</button>
       <label class="gi-toggle">
@@ -6640,7 +6640,7 @@ function renderInvCatalogList(){
     <div class="gi-row">
       <div class="gi-main">
         <div class="gi-name">${escapeHtml(it.name)}</div>
-        <div class="gi-meta">${it.code} · ${it.unidad}</div>
+        <div class="gi-meta">${escapeHtml(it.code)} · ${escapeHtml(it.unidad)}</div>
       </div>
       <button class="btn btn-secondary btn-small" data-del-ic="${it.id}">Quitar</button>
     </div>
@@ -6700,7 +6700,7 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
 
   let catalog = getFilteredInsumosCatalog(proveedorIdForFilter);
   const catOptions = Object.keys(catalog).map(p =>
-    `<option value="${p}" ${existing && existing.categoria===p ? 'selected':''}>${categoryLabel(p)}</option>`
+    `<option value="${escapeHtml(p)}" ${existing && existing.categoria===p ? 'selected':''}>${escapeHtml(categoryLabel(p))}</option>`
   ).join('');
 
   wrap.innerHTML = `
@@ -6712,11 +6712,11 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
       <label class="field-label">Insumo</label>
       <input type="text" class="row-insumo-search" placeholder="Elige categoría primero..." autocomplete="off" disabled value="${existing ? escapeHtml(existing.ingredient_name) : ''}">
       <div class="insumo-suggestions" style="display:none;"></div>
-      <input type="hidden" class="row-insumo-code" value="${existing ? existing.ingredient_code : ''}">
+      <input type="hidden" class="row-insumo-code" value="${existing ? escapeHtml(existing.ingredient_code) : ''}">
     </div>
     <div class="field f-cant">
       <label class="field-label">Cant.</label>
-      <input type="text" class="row-cant" placeholder="Ej: 5" value="${existing ? existing.cantidad : ''}">
+      <input type="text" class="row-cant" placeholder="Ej: 5" value="${existing ? escapeHtml(existing.cantidad) : ''}">
     </div>
     <div class="field f-unidad">
       <label class="field-label">Unidad</label>
@@ -6724,7 +6724,7 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
     </div>
     <div class="field f-nota">
       <label class="field-label">Nota (opc.)</label>
-      <input type="text" class="row-nota" placeholder="" value="${existing && existing.nota ? existing.nota : ''}">
+      <input type="text" class="row-nota" placeholder="" value="${existing && existing.nota ? escapeHtml(existing.nota) : ''}">
     </div>
     <button type="button" class="order-row-remove" title="Quitar">&times;</button>
   `;
@@ -6739,7 +6739,7 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
     let list = unidades && unidades.length ? unidades : DEFAULT_UNIDADES_COMPRA;
     if(selectedValue && !list.includes(selectedValue)) list = [selectedValue, ...list];
     unidadSelect.innerHTML = list.map(u =>
-      `<option value="${u}" ${selectedValue===u ? 'selected':''}>${UNIDADES_COMPRA_LABELS[u] || u}</option>`
+      `<option value="${escapeHtml(u)}" ${selectedValue===u ? 'selected':''}>${escapeHtml(UNIDADES_COMPRA_LABELS[u] || u)}</option>`
     ).join('');
   }
 
@@ -6804,7 +6804,7 @@ function buildOrderRow(rowId, existing, proveedorIdForFilter){
     const keys = Object.keys(catalog);
     if(cur && !keys.includes(cur)) keys.unshift(cur);
     catSelect.innerHTML = '<option value="">Elige...</option>' +
-      keys.map(p => `<option value="${p}" ${cur===p?'selected':''}>${categoryLabel(p)}</option>`).join('');
+      keys.map(p => `<option value="${escapeHtml(p)}" ${cur===p?'selected':''}>${escapeHtml(categoryLabel(p))}</option>`).join('');
   };
 
   wrap.querySelector('.order-row-remove').addEventListener('click', ()=>{
@@ -7109,7 +7109,7 @@ function orderKanbanCardHtml(o, mode){
   const sem = semaforoEnvio(o) || semaforoEntrega(o);
   const badges = (o.urgente ? '<span class="badge info">Urgente</span>' : '') + (sem ? sem.badge : '');
   return `<div class="kanban-card ${o.status}${sem ? ' semaforo-' + sem.nivel : ''}" data-order-id="${o.id}" style="${clickable?'':'cursor:default;'}"${clickable ? ' role="button" tabindex="0"' : ''}>
-    ${o.codigo || badges ? `<div class="kc-head"><span class="kc-code">${o.codigo || ''}</span><span class="kc-badges">${badges}</span></div>` : ''}
+    ${o.codigo || badges ? `<div class="kc-head"><span class="kc-code">${escapeHtml(o.codigo)}</span><span class="kc-badges">${badges}</span></div>` : ''}
     <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
     <div class="kc-meta">${fechaCorta} · ${items.length} insumo${items.length===1?'':'s'}${mode==='admin' ? '<br>' + escapeHtml(o.creado_por_nombre||'') : ''}</div>
     <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
@@ -7198,7 +7198,8 @@ function renderOrderKanban(list, boardEl, mode){
     });
   } else if(mode === 'own'){
     boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
-      el.addEventListener('click', ()=>openOrderEdit(el.dataset.orderId, list));
+      // Un admin revisa (aprobar / rechazar) también desde Pedidos; cocina edita su pedido pendiente.
+      el.addEventListener('click', ()=> isAdminRole() ? openOrderReview(el.dataset.orderId, list) : openOrderEdit(el.dataset.orderId, list));
     });
   }
 
@@ -7400,7 +7401,7 @@ async function loadOrderHistory(){
   adminOrderHistoryCache.forEach(o => (o.order_items||[]).forEach(it => cats.add(it.categoria)));
   const catSelect = document.getElementById('ohCategoria');
   const sortedCats = [...cats].sort();
-  catSelect.innerHTML = '<option value="">Todas</option>' + sortedCats.map(c => `<option value="${c}">${categoryLabel(c)}</option>`).join('');
+  catSelect.innerHTML = '<option value="">Todas</option>' + sortedCats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(categoryLabel(c))}</option>`).join('');
 
   renderOrderHistory();
 }
@@ -7424,8 +7425,8 @@ function renderOrderHistory(){
   box.innerHTML = list.map(o => {
     const items = sortByCategoria(o.order_items || []);
     const itemsPreview = items.map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ');
-    return `<div class="kanban-card ${o.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-head"><span class="kc-code">${o.codigo || ''}</span><span class="kc-badges"><span class="oe-status-badge ${o.status}">${o.status}</span></span></div>
+    return `<div class="kanban-card ${escapeHtml(o.status)}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(o.codigo)}</span><span class="kc-badges"><span class="oe-status-badge ${escapeHtml(o.status)}">${escapeHtml(o.status)}</span></span></div>
       <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
       <div class="kc-meta">Fecha: ${o.fecha} · ${items.length} insumo${items.length===1?'':'s'} · ${escapeHtml(o.creado_por_nombre||'')}</div>
       <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
@@ -7472,8 +7473,8 @@ function renderMyOrderHistory(){
   box.innerHTML = list.map(o => {
     const items = sortByCategoria(o.order_items || []);
     const itemsPreview = items.map(it => `${escapeHtml(it.ingredient_name)} (${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)})`).join(', ');
-    return `<div class="kanban-card ${o.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-head"><span class="kc-code">${o.codigo || ''}</span><span class="kc-badges"><span class="oe-status-badge ${o.status}">${o.status}</span></span></div>
+    return `<div class="kanban-card ${escapeHtml(o.status)}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(o.codigo)}</span><span class="kc-badges"><span class="oe-status-badge ${escapeHtml(o.status)}">${escapeHtml(o.status)}</span></span></div>
       <div class="kc-title">${escapeHtml(o.proveedor || 'Sin proveedor')}</div>
       <div class="kc-meta">Fecha: ${o.fecha} · ${items.length} insumo${items.length===1?'':'s'}</div>
       <div class="kc-items">${escapeHtml(itemsPreview) || 'Sin insumos'}</div>
@@ -7778,8 +7779,8 @@ function renderBajaHistory(){
 
   box.innerHTML = list.map(b => {
     const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
-    return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges"><span class="oe-status-badge ${b.status}">${BAJA_ESTADO_LABEL[b.status] || b.status}</span></span></div>
+    return `<div class="kanban-card ${escapeHtml(b.status)}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(b.codigo)}</span><span class="kc-badges"><span class="oe-status-badge ${escapeHtml(b.status)}">${escapeHtml(BAJA_ESTADO_LABEL[b.status] || b.status)}</span></span></div>
       <div class="kc-title">${escapeHtml(b.item_name)}</div>
       <div class="kc-meta">${tipoLabel} · <span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${b.fecha} · ${escapeHtml(b.creado_por_nombre||'')}</div>
       <div class="kc-items"><span class="kc-label">Motivo</span>${escapeHtml(b.motivo)}</div>
@@ -7825,8 +7826,8 @@ function renderMyBajaHistory(){
 
   box.innerHTML = list.map(b => {
     const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
-    return `<div class="kanban-card ${b.status}" style="cursor:default; margin-bottom:8px;">
-      <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges"><span class="oe-status-badge ${b.status}">${BAJA_ESTADO_LABEL[b.status] || b.status}</span></span></div>
+    return `<div class="kanban-card ${escapeHtml(b.status)}" style="cursor:default; margin-bottom:8px;">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(b.codigo)}</span><span class="kc-badges"><span class="oe-status-badge ${escapeHtml(b.status)}">${escapeHtml(BAJA_ESTADO_LABEL[b.status] || b.status)}</span></span></div>
       <div class="kc-title">${escapeHtml(b.item_name)}</div>
       <div class="kc-meta">${tipoLabel} · <span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${b.fecha}</div>
       <div class="kc-items"><span class="kc-label">Motivo</span>${escapeHtml(b.motivo)}</div>
@@ -7946,10 +7947,10 @@ async function renderInvDayPanel(){
       html += `<label class="inv-row">
         <div>
           <div class="inv-name">${escapeHtml(it.name)}</div>
-          <div class="inv-code">${it.code}</div>
+          <div class="inv-code">${escapeHtml(it.code)}</div>
         </div>
         <input type="number" step="0.001" inputmode="decimal" placeholder="0" aria-label="Cantidad de ${escapeHtml(it.name)}" data-inv-code="${escapeHtml(it.code)}" data-inv-name="${escapeHtml(it.name)}" data-inv-unidad="${it.unidad}">
-        <span class="inv-unit">${it.unidad}</span>
+        <span class="inv-unit">${escapeHtml(it.unidad)}</span>
       </label>`;
     });
     html += `</div><div class="inv-save-bar"><span class="list-count" id="invProgress"></span><button class="btn btn-accent btn-lg" id="invSaveBtn">Guardar y bloquear</button></div></div>`;
@@ -8000,11 +8001,11 @@ async function renderInvDayPanel(){
     html += `<${isLocked ? 'div' : 'label'} class="inv-row">
       <div>
         <div class="inv-name">${escapeHtml(it.item_name)}</div>
-        <div class="inv-code">${it.item_code}</div>
+        <div class="inv-code">${escapeHtml(it.item_code)}</div>
       </div>
       ${isLocked
-        ? `<span class="inv-valor${it.cantidad === null ? ' vacio' : ''}">${it.cantidad !== null ? fmtQty(it.cantidad) : '—'} ${it.unidad}</span>`
-        : `<input type="number" step="0.001" inputmode="decimal" aria-label="Cantidad de ${escapeHtml(it.item_name)}" value="${it.cantidad !== null ? it.cantidad : ''}" data-inv-item-id="${it.id}"><span class="inv-unit">${it.unidad}</span>`
+        ? `<span class="inv-valor${it.cantidad === null ? ' vacio' : ''}">${it.cantidad !== null ? fmtQty(it.cantidad) : '—'} ${escapeHtml(it.unidad)}</span>`
+        : `<input type="number" step="0.001" inputmode="decimal" aria-label="Cantidad de ${escapeHtml(it.item_name)}" value="${it.cantidad !== null ? it.cantidad : ''}" data-inv-item-id="${it.id}"><span class="inv-unit">${escapeHtml(it.unidad)}</span>`
       }
     </${isLocked ? 'div' : 'label'}>`;
   });
