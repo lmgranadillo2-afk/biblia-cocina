@@ -724,6 +724,9 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .aud-items div:last-child{border-bottom:none;}
 .aud-items b{font-family:'IBM Plex Mono',monospace; font-weight:500; white-space:nowrap;}
 .aud-items em{color:var(--text-muted);}
+.rev-resumen{max-height:55vh; overflow-y:auto; margin-top:6px;}
+.rev-cat{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin:12px 0 2px;}
+.rev-cat:first-child{margin-top:0;}
 .aud-pasos{list-style:none; margin:0; padding:0 0 0 14px; border-left:2px solid var(--border);}
 .aud-pasos li{position:relative; padding:0 0 10px; font-size:13px;}
 .aud-pasos li::before{content:''; position:absolute; left:-20px; top:5px; width:10px; height:10px; border-radius:50%; background:var(--surface); border:2px solid var(--border-strong);}
@@ -1800,8 +1803,12 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
   <div class="modal-box" style="max-width:560px;">
     <h3>Revisar pedido</h3>
     <div class="modal-sub" id="orderReviewMeta"></div>
-    <div id="orderReviewRows"></div>
-    <button class="btn btn-ghost btn-small" id="orderReviewAddRow" style="margin-top:8px;">+ Agregar insumo</button>
+    <div id="orderReviewResumen"></div>
+    <div id="orderReviewEditBox" style="display:none;">
+      <div id="orderReviewRows"></div>
+      <button class="btn btn-ghost btn-small" id="orderReviewAddRow" style="margin-top:8px;">+ Agregar insumo</button>
+    </div>
+    <button class="btn btn-ghost btn-small" id="orderReviewToggleEdit" style="margin-top:10px;">Editar cantidades / insumos</button>
     <div class="field" id="orderRejectBox" style="display:none; margin-top:14px;">
       <label class="field-label">Motivo de rechazo</label>
       <textarea id="orderRejectMotivo" placeholder="Explica por qué se rechaza..."></textarea>
@@ -7346,17 +7353,19 @@ function openOrderReview(orderId, list){
   if(!order) return;
   currentReviewOrderId = orderId;
   currentReviewOrderProveedorId = order.proveedor_id;
-  const semanaTxt = order.semana_inicio ? ' · Semana del ' + new Date(order.semana_inicio+'T00:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'}) : '';
-  document.getElementById('orderReviewMeta').textContent =
-    `${order.codigo || ''} · ${order.proveedor || 'Sin proveedor'} · Fecha ${order.fecha}${semanaTxt} · Pedido por ${order.creado_por_nombre || ''}`;
+  const items = order.order_items || [];
+  document.getElementById('orderReviewMeta').innerHTML =
+    `<b>${escapeHtml(order.proveedor || 'Sin proveedor')}</b>${order.urgente ? ' <span class="badge info">Urgente</span>' : ''}<br>` +
+    `${escapeHtml(order.codigo || '')} · ${fmtDia(order.fecha)} · ${escapeHtml(order.creado_por_nombre || '')} · ${items.length} insumo${items.length === 1 ? '' : 's'}`;
   const rowsBox = document.getElementById('orderReviewRows');
   rowsBox.innerHTML = '';
-  sortByCategoria(order.order_items || []).forEach(it=>{
+  sortByCategoria(items).forEach(it=>{
     rowsBox.appendChild(buildOrderRow(orderRowCounter++, it, order.proveedor_id));
   });
-  if((order.order_items || []).length === 0){
+  if(items.length === 0){
     rowsBox.appendChild(buildOrderRow(orderRowCounter++, null, order.proveedor_id));
   }
+  mostrarEdicionRevision(items.length === 0);
   document.getElementById('orderRejectBox').style.display = 'none';
   document.getElementById('orderRejectMotivo').value = '';
   document.getElementById('orderReviewModal').classList.add('open');
@@ -7470,6 +7479,24 @@ document.getElementById('mohFilterApply').addEventListener('click', renderMyOrde
 document.getElementById('orderReviewCancel').addEventListener('click', ()=>{
   document.getElementById('orderReviewModal').classList.remove('open');
   currentReviewOrderId = null;
+});
+// Resumen de solo lectura agrupado por categoría; los campos editables quedan detrás de "Editar".
+function renderResumenRevision(items){
+  const porCat = {};
+  sortByCategoria(items).forEach(it => (porCat[it.categoria] = porCat[it.categoria] || []).push(it));
+  document.getElementById('orderReviewResumen').innerHTML = items.length === 0
+    ? '<div class="empty-list">Sin insumos.</div>'
+    : `<div class="rev-resumen">${Object.keys(porCat).map(c => `<div class="rev-cat">${escapeHtml(categoryLabel(c))}</div>
+        <div class="aud-items">${porCat[c].map(it => `<div><span>${escapeHtml(it.ingredient_name)}${it.nota ? ` <em>(${escapeHtml(it.nota)})</em>` : ''}</span><b>${fmtQty(it.cantidad)} ${escapeHtml(it.unidad)}</b></div>`).join('')}</div>`).join('')}</div>`;
+}
+function mostrarEdicionRevision(editar){
+  if(!editar) renderResumenRevision(readOrderRows(document.getElementById('orderReviewRows')));
+  document.getElementById('orderReviewResumen').style.display = editar ? 'none' : 'block';
+  document.getElementById('orderReviewEditBox').style.display = editar ? 'block' : 'none';
+  document.getElementById('orderReviewToggleEdit').textContent = editar ? 'Ver resumen' : 'Editar cantidades / insumos';
+}
+document.getElementById('orderReviewToggleEdit').addEventListener('click', ()=>{
+  mostrarEdicionRevision(document.getElementById('orderReviewEditBox').style.display === 'none');
 });
 document.getElementById('orderReviewAddRow').addEventListener('click', ()=>{
   document.getElementById('orderReviewRows').appendChild(buildOrderRow(orderRowCounter++, null, currentReviewOrderProveedorId));
