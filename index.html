@@ -5597,9 +5597,9 @@ function pintarCalcResultado(){
 }
 
 /* ---------- PRODUCCION ---------- */
-// Productos de carta de barra (código CS…): no se producen por tanda, así que no salen en el Recetario,
-// Producción, Calcular producción ni Cronograma. Sí salen en Bajas (un coctel servido se puede dar de baja).
-const esProductoCarta = r => /^CS\d/i.test(r.code || '');
+// Productos de carta de barra (código CS… en Dos Santos, CC… en Canta Corazón): no se producen por tanda, así que
+// no salen en el Recetario, Producción, Calcular producción ni Cronograma. Sí salen en Bajas (un coctel servido se puede dar de baja).
+const esProductoCarta = r => /^C[SC]\d/i.test(r.code || '');
 const recetasProducibles = () => RECIPES.filter(r => !esProductoCarta(r));
 function populateRecetaDatalist(){
   const opciones = lista => lista.map(r => `<option value="${escapeHtml(r.name)}">`).join('');
