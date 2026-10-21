@@ -1742,7 +1742,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 <div class="modal-overlay" id="evProxModal">
   <div class="modal-box">
     <h3 id="evProxTitle">Eventos próximos</h3>
-    <div class="modal-sub">Eventos confirmados en este punto. Revisa el menú y los invitados para preparar compras y producción.</div>
+    <div class="modal-sub" id="evProxSub">Eventos confirmados en este punto. Revisa el menú y los invitados para preparar compras y producción.</div>
     <div id="evProxList" class="ev-prox-list"></div>
     <div class="modal-actions">
       <button class="btn btn-accent" id="evProxOk">Entendido</button>
@@ -2321,28 +2321,41 @@ function marcarRecordatorioVisto(e, etapa){ try { localStorage.setItem(claveReco
 
 function cuandoEvento(dias){ return dias === 0 ? 'Hoy' : dias === 1 ? 'Mañana' : 'En ' + dias + ' días'; }
 
+// Cada área ve solo su parte del menú: barra las bebidas (grupos de bebidas y categorías de carta de bebida),
+// cocina lo demás; cualquier otra área (pastelería, administración…) ve el menú completo.
+const RE_BEBIDA = /BEBID|COCTEL|C[OÓ]CTEL|COCKTAIL|MOCKTAIL|CERVEZ|VINO|ESPUMANT|CHAMPA|LICOR|TEQUIL|MEZCAL|WHISK|\bRON\b|VODKA|GINEBRA|\bGIN\b|AGUARDIENTE|SPRITZ|SANGR[IÍ]A|SODA|JUGO|LIMONAD|GASEOSA|\bAGUA\b|CAF[EÉ]|INFUSI|MICHELAD|TRAGO|BOTELLA/i;
+function parteMenuDeArea(area){
+  const n = (area && area.name) || '';
+  return /\bBAR(RA)?\b/i.test(n) ? 'barra' : /COCINA/i.test(n) ? 'cocina' : null;
+}
+const esTiempoBebida = (t, ops) => RE_BEBIDA.test(t.nombre || '') || (ops.length > 0 && ops.every(o => RE_BEBIDA.test(o.categoria || '')));
+// parte: 'cocina' | 'barra' | null (todo el menú)
+const entraEnParte = (esBebida, parte) => !parte || (parte === 'barra') === esBebida;
+
 // Menú del evento para cocina/barra (sin precios): grupos con sus opciones y otros de carta.
-function eventoMenuLineas(e){
+function eventoMenuLineas(e, parte){
   const lineas = [];
   (e.tiempos || []).forEach(t => {
     const ops = (t.opciones || []).filter(o => o.nombre);
-    if(!ops.length) return;
+    if(!ops.length || !entraEnParte(esTiempoBebida(t, ops), parte)) return;
     const porciones = t.modo === 'individual' ? '' : (hasValue(t.cantidad) ? ' (' + fmtQty(t.cantidad) + ' porciones)' : '');
     lineas.push([t.nombre || 'Tiempo', ops.map(o => o.nombre + (t.modo === 'individual' && toNum(o.cantidad) ? ' ×' + fmtQty(o.cantidad) : '')).join(' / ') + porciones]);
   });
-  const otros = (e.items || []).filter(i => i.nombre);
+  const otros = (e.items || []).filter(i => i.nombre && entraEnParte(RE_BEBIDA.test(i.categoria || ''), parte));
   if(otros.length) lineas.push(['Otros', otros.map(i => i.nombre + (toNum(i.cantidad) ? ' ×' + fmtQty(i.cantidad) : '')).join(', ')]);
   return lineas;
 }
 
-function mensajeRecordatorioEvento(e){
+// *texto* sale en negrita y _texto_ en cursiva en WhatsApp.
+function mensajeRecordatorioEvento(e, parte){
   const fecha = e.fecha ? new Date(e.fecha + 'T00:00:00').toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long'}) : '';
-  const l = [`Recordatorio de evento — ${currentLocation ? currentLocation.name : ''}`, '', e.nombre];
+  const nombreParte = parte === 'barra' ? 'Barra' : parte === 'cocina' ? 'Cocina' : '';
+  const l = [`*Recordatorio de evento — ${currentLocation ? currentLocation.name : ''}${nombreParte ? ' · ' + nombreParte : ''}*`, '', `*${e.nombre}*`];
   l.push([fecha.charAt(0).toUpperCase() + fecha.slice(1), e.horario].filter(Boolean).join(' · '));
   if(e.invitados) l.push(e.invitados + ' invitados');
-  const menu = eventoMenuLineas(e);
-  if(menu.length){ l.push('', 'MENÚ'); menu.forEach(([t, txt]) => l.push(`- ${t}: ${txt}`)); }
-  if(e.notas) l.push('', 'Notas: ' + e.notas);
+  const menu = eventoMenuLineas(e, parte);
+  if(menu.length){ l.push('', `*MENÚ${nombreParte ? ' DE ' + nombreParte.toUpperCase() : ''}*`); menu.forEach(([t, txt]) => l.push(`- ${t}: ${txt}`)); }
+  if(e.notas) l.push('', `_Notas: ${e.notas.replace(/\s*\n\s*/g, ' ')}_`);
   return l.join('\n');
 }
 
@@ -2355,22 +2368,27 @@ async function avisarEventosProximos(){
     .eq('restaurante_id', currentLocation.id).eq('estado', 'confirmado')
     .gte('fecha', toISODate(hoy)).lte('fecha', toISODate(en7)).order('fecha', {ascending:true});
   if(error || !data) return;
+  const parte = parteMenuDeArea(currentArea);
   eventosProximos = data.map(e => ({ ...e, _dias: diasParaEvento(e.fecha) }))
     .map(e => ({ ...e, _etapa: etapaRecordatorio(e._dias) }))
-    .filter(e => e._etapa && !recordatorioVisto(e, e._etapa));
+    // A un área solo le avisa si el evento tiene algo suyo en el menú (o si el evento todavía no tiene menú).
+    .filter(e => e._etapa && !recordatorioVisto(e, e._etapa) && (eventoMenuLineas(e, parte).length > 0 || eventoMenuLineas(e, null).length === 0));
   if(eventosProximos.length === 0) return;
   document.getElementById('evProxTitle').textContent = eventosProximos.length === 1 ? 'Evento próximo' : eventosProximos.length + ' eventos próximos';
+  document.getElementById('evProxSub').textContent = 'Eventos confirmados en este punto. ' + (parte
+    ? `Solo ves lo de ${parte} en el menú; revisa invitados y menú para preparar compras y producción.`
+    : 'Revisa el menú y los invitados para preparar compras y producción.');
   document.getElementById('evProxList').innerHTML = eventosProximos.map(e => `
     <div class="ev-prox">
       <div class="ev-prox-head"><b>${escapeHtml(e.nombre)}</b><span class="badge ${e._dias <= 1 ? 'danger' : 'info'}">${cuandoEvento(e._dias)}</span></div>
       <div class="ev-prox-meta">${escapeHtml([fmtDia(e.fecha), e.horario, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).join(' · '))}</div>
-      ${eventoMenuLineas(e).map(([t, txt]) => `<div class="ev-prox-menu"><b>${escapeHtml(t)}</b> ${escapeHtml(txt)}</div>`).join('')}
+      ${eventoMenuLineas(e, parte).map(([t, txt]) => `<div class="ev-prox-menu"><b>${escapeHtml(t)}</b> ${escapeHtml(txt)}</div>`).join('')}
       ${e.notas ? `<div class="ev-prox-menu"><b>Notas</b> ${escapeHtml(e.notas)}</div>` : ''}
       <button type="button" class="btn btn-secondary btn-small" data-ev-wa="${e.id}">Enviar recordatorio por WhatsApp</button>
     </div>`).join('');
   document.querySelectorAll('[data-ev-wa]').forEach(b => b.addEventListener('click', ()=>{
     const e = eventosProximos.find(x => x.id === b.dataset.evWa);
-    if(e) window.open('https://wa.me/?text=' + encodeURIComponent(mensajeRecordatorioEvento(e)), '_blank');
+    if(e) window.open('https://wa.me/?text=' + encodeURIComponent(mensajeRecordatorioEvento(e, parte)), '_blank');
   }));
   abrirAviso('evProxModal');
 }
