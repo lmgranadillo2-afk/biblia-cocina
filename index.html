@@ -224,7 +224,7 @@ nav.tabs button.active{color:var(--accent);}
   nav.tabs button.active::before{left:-16px;}
   .shell-top .header-logo{height:48px; max-width:180px;}
   /* Contenido con 32 px de aire (las vistas traen su padding en línea) */
-  main > .view:not(#view-recetario):not(#view-costeo){padding:32px !important;}
+  main > .view:not(#view-recetario):not(#view-costeo):not(#view-chat){padding:32px !important;}
 }
 
 /* ===== MAIN LAYOUT ===== */
@@ -754,6 +754,65 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .rec-card.rec-inactiva{opacity:.65;}
 .rec-inactiva-aviso{margin:var(--space-3) 0; padding:10px 14px; border-radius:var(--radius-md); background:var(--surface-2); border:1px solid var(--border-strong); font-size:13px; color:var(--text);}
 .rec-activa-row{display:flex; justify-content:flex-end; margin:var(--space-3) 0;}
+/* ===== CHAT: lista de conversaciones + conversación (en celular, una a la vez) ===== */
+nav.tabs button{position:relative;}
+.nav-badge{position:absolute; top:4px; left:calc(50% + 4px); min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--danger); color:var(--on-state); font:700 10.5px 'Inter',sans-serif; display:grid; place-items:center; line-height:1;}
+.nav-badge[hidden]{display:none;}
+@media(min-width:800px){ .nav-badge{top:8px; left:30px;} }
+@media(min-width:1024px){ .nav-badge{position:static; margin-left:auto;} }
+#view-chat{padding:0 !important;}
+.chat-layout{display:grid; grid-template-columns:minmax(0, 320px) minmax(0, 1fr); height:100vh; height:100dvh; min-height:0; background:var(--surface);}
+.chat-lista{display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--border);}
+.chat-lista-top{display:flex; flex-direction:column; gap:var(--space-3); padding:var(--space-4); border-bottom:1px solid var(--border);}
+.chat-lista-titulo{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+.chat-lista-titulo h2{margin:0; font-family:'Playfair Display',serif; font-size:24px;}
+.chat-convs{flex:1; overflow-y:auto; min-height:0;}
+.chat-sec{padding:12px 16px 4px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim);}
+.chat-item{display:flex; align-items:center; gap:10px; width:100%; min-height:64px; padding:10px 16px; font:inherit; color:var(--text); text-align:left; background:transparent; border:none; border-bottom:1px solid var(--border); cursor:pointer;}
+.chat-item:focus-visible{outline:none; box-shadow:inset var(--focus-ring);}
+.chat-item.activa{background:var(--accent-soft);}
+.chat-item-txt{flex:1; min-width:0;}
+.chat-item-n{display:flex; justify-content:space-between; gap:6px; font-weight:600; font-size:14px;}
+.chat-item-n span{flex-shrink:0; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; color:var(--text-dim);}
+.chat-item-u{display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px; font-size:12.5px; color:var(--text-muted);}
+.chat-item-u em{font-style:normal; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.chat-item-u .nav-badge{position:static; flex-shrink:0; background:var(--accent); color:var(--accent-text);}
+.chat-av{flex-shrink:0; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; font:700 14px 'Inter',sans-serif; color:#FFFDF8;}
+.chat-av.grupo{border-radius:12px; background:var(--accent-strong);}
+.chat-conv{display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--bg);}
+.chat-vacio{margin:auto; color:var(--text-muted); font-size:14px;}
+.chat-conv-top{display:flex; align-items:center; gap:10px; padding:10px var(--space-4); background:var(--surface); border-bottom:1px solid var(--border);}
+.chat-conv-top[hidden], .chat-msgs[hidden], .chat-escribir[hidden], .chat-previa[hidden]{display:none;}
+.chat-conv-tit{min-width:0;}
+.chat-conv-tit b{display:block; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.chat-conv-tit span{font-size:12px; color:var(--text-muted);}
+.chat-volver{display:none;}
+.chat-msgs{flex:1; overflow-y:auto; min-height:0; padding:var(--space-4); display:flex; flex-direction:column; gap:6px;}
+.chat-dia{align-self:center; margin:6px 0; padding:3px 10px; border-radius:999px; background:var(--surface-2); font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-muted);}
+.chat-m{max-width:78%; display:flex; flex-direction:column; gap:2px; align-self:flex-start;}
+.chat-m.mio{align-self:flex-end;}
+.chat-who{padding-left:4px; font-size:11.5px; font-weight:600; color:var(--accent-strong);}
+.chat-who i{font-style:normal; font-weight:500; color:var(--text-dim);}
+.chat-bub{padding:8px 11px 6px; background:var(--surface); border:1px solid var(--border); border-radius:4px 14px 14px 14px; font-size:14.5px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere;}
+.chat-m.mio .chat-bub{background:var(--accent-soft); border-color:var(--accent); border-radius:14px 4px 14px 14px;}
+.chat-bub img{display:block; width:240px; max-width:100%; min-height:60px; margin-bottom:4px; border-radius:9px; background:var(--surface-2); cursor:zoom-in;}
+.chat-hora{display:block; margin-top:2px; text-align:right; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-dim);}
+.chat-m.enviando{opacity:.6;}
+.chat-previa{display:flex; align-items:center; gap:10px; padding:8px var(--space-4); background:var(--surface-2); border-top:1px solid var(--border); font-size:13px;}
+.chat-previa img{width:48px; height:48px; object-fit:cover; border-radius:8px;}
+.chat-previa button{margin-left:auto;}
+.chat-escribir{display:flex; align-items:flex-end; gap:8px; padding:10px var(--space-3); background:var(--surface); border-top:1px solid var(--border);}
+.chat-escribir textarea{flex:1; min-height:44px; max-height:120px; resize:none; padding:10px 12px; font-size:15px; line-height:1.4;}
+.chat-adjuntar{cursor:pointer;}
+.chat-personas{max-height:50vh; overflow-y:auto; margin:var(--space-3) 0;}
+@media(max-width:799px){
+  .chat-layout{grid-template-columns:minmax(0, 1fr); height:calc(100dvh - 56px - 64px - env(safe-area-inset-bottom));}
+  .chat-conv{display:none;}
+  .chat-layout.abierta .chat-lista{display:none;}
+  .chat-layout.abierta .chat-conv{display:flex;}
+  .chat-volver{display:inline-flex;}
+  .chat-lista{border-right:none;}
+}
 /* Eventos: vista Agenda (grupos por semana/mes) y Calendario */
 .ev-vista{margin-bottom:var(--space-3);}
 .ev-vista .estado-op{min-height:38px;}
@@ -1074,6 +1133,7 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
       <button id="tab-bajas" title="Bajas" aria-label="Bajas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span class="tab-label">Bajas</span></button>
       <button id="tab-inventario" title="Inventario" aria-label="Inventario"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="tab-label">Inventario</span></button>
       <button id="tab-costeo" title="Costeo" aria-label="Costeo"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg><span class="tab-label">Costeo</span></button>
+      <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
       <button id="navMore" type="button" class="nav-more" title="Más" aria-label="Más"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg><span class="tab-label">Más</span></button>
@@ -1317,6 +1377,32 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
       <div id="invDayPanel" style="margin-top:18px;"></div>
     </div>
 
+    <div id="view-chat" class="view">
+      <div class="chat-layout" id="chatLayout">
+        <aside class="chat-lista">
+          <div class="chat-lista-top">
+            <div class="chat-lista-titulo"><h2>Chat</h2><button type="button" class="btn btn-secondary btn-small" id="chatNuevoDm">+ Directo</button></div>
+            <input type="search" id="chatBuscar" placeholder="Buscar conversación..." aria-label="Buscar conversación">
+          </div>
+          <div class="chat-convs" id="chatConvs"><div class="empty-note">Cargando...</div></div>
+        </aside>
+        <section class="chat-conv" id="chatConv" aria-label="Conversación">
+          <div class="chat-vacio" id="chatVacio">Elige una conversación.</div>
+          <div class="chat-conv-top" id="chatConvTop" hidden>
+            <button type="button" class="btn btn-secondary btn-icon chat-volver" id="chatVolver" aria-label="Volver a las conversaciones"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <span class="chat-av" id="chatConvAv"></span>
+            <div class="chat-conv-tit"><b id="chatConvNombre"></b><span id="chatConvSub"></span></div>
+          </div>
+          <div class="chat-msgs" id="chatMsgs" hidden></div>
+          <div class="chat-previa" id="chatPrevia" hidden><img id="chatPreviaImg" alt="Foto por enviar"><span>Foto lista para enviar</span><button type="button" class="btn btn-ghost btn-small" id="chatQuitarFoto">Quitar</button></div>
+          <form class="chat-escribir" id="chatForm" hidden>
+            <label class="btn btn-secondary btn-icon chat-adjuntar" title="Adjuntar foto" aria-label="Adjuntar foto"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-3z"/><circle cx="12" cy="13" r="3.5"/></svg><input type="file" id="chatFoto" accept="image/*" hidden></label>
+            <textarea id="chatTexto" rows="1" maxlength="4000" placeholder="Escribe un mensaje..." aria-label="Mensaje"></textarea>
+            <button type="submit" class="btn btn-accent btn-icon" id="chatEnviar" aria-label="Enviar"><svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg></button>
+          </form>
+        </section>
+      </div>
+    </div>
     <div id="view-admin" class="view">
       <div class="admin-subtabs">
         <button id="adminsub-produccion" class="active">Producción</button>
@@ -1736,6 +1822,16 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
       <button class="btn btn-ghost" id="evEstadoLater">Después</button>
       <button class="btn btn-accent" id="evEstadoSave">Guardar</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="chatPersonasModal">
+  <div class="modal-box">
+    <h3>Nuevo mensaje directo</h3>
+    <div class="modal-sub">Personas con acceso a este punto.</div>
+    <input type="search" id="chatPersonasBuscar" placeholder="Buscar persona..." aria-label="Buscar persona">
+    <div id="chatPersonasLista" class="chat-personas"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="chatPersonasCerrar">Cancelar</button></div>
   </div>
 </div>
 
@@ -2296,6 +2392,7 @@ function enterArea(loc, area){
   avisarPedidosAtrasados();
   avisarEventosSinEstado();
   avisarEventosProximos();
+  chatIniciar();
 }
 
 // Avisos al abrir la app (pedidos atrasados, eventos sin estado, eventos próximos):
@@ -2445,6 +2542,323 @@ document.getElementById('evEstadoSave').addEventListener('click', async ()=>{
   }
 });
 
+/* ---------- CHAT INTERNO: grupo del punto + mensajes directos, con fotos ----------
+   Tablas chat_conversaciones / chat_mensajes / chat_lecturas y bucket privado chat-fotos (sql/chat_paso1.sql).
+   Los permisos los pone la base: cada uno solo recibe los mensajes de sus conversaciones. */
+const CHAT = { convs: [], actual: null, mensajes: [], canal: null, foto: null, fotoUrl: null, urls: {}, listo: false, personas: [] };
+const CHAT_COLORES = ['#2D628C', '#2F7A45', '#A4660A', '#8C3F6B', '#B0382A', '#5B5F97'];
+const chatColor = id => CHAT_COLORES[[...String(id || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % CHAT_COLORES.length];
+const chatIniciales = n => String(n || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+function chatAvatar(c){
+  return c.tipo === 'punto'
+    ? `<span class="chat-av grupo" aria-hidden="true">${escapeHtml(chatIniciales(c.titulo))}</span>`
+    : `<span class="chat-av" style="background:${chatColor(c.otro_id)}" aria-hidden="true">${escapeHtml(chatIniciales(c.titulo))}</span>`;
+}
+function chatHoraCorta(iso){
+  if(!iso) return '';
+  const d = new Date(iso), hoy = new Date();
+  if(d.toDateString() === hoy.toDateString()) return d.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+  const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+  if(d.toDateString() === ayer.toDateString()) return 'ayer';
+  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+}
+function chatDiaTexto(d){
+  const hoy = new Date(), ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+  if(d.toDateString() === hoy.toDateString()) return 'Hoy';
+  if(d.toDateString() === ayer.toDateString()) return 'Ayer';
+  return d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+// Al entrar a un punto/área: crea el grupo del punto si no existe, carga las conversaciones y escucha mensajes nuevos.
+async function chatIniciar(){
+  CHAT.listo = false; CHAT.actual = null; CHAT.convs = [];
+  if(CHAT.canal){ supa.removeChannel(CHAT.canal); CHAT.canal = null; }
+  document.getElementById('chatLayout').classList.remove('abierta');
+  chatMostrarConversacion(null);
+  const { error } = await supa.rpc('chat_grupo_punto', { p_location_id: currentLocation.id });
+  if(error){ // SQL del chat aún sin correr: la pestaña lo explica
+    document.getElementById('chatConvs').innerHTML = '<div class="empty-note" style="padding:16px;">El chat todavía no está activado (falta correr sql/chat_paso1.sql en Supabase).</div>';
+    return;
+  }
+  CHAT.listo = true;
+  await chatCargarConvs();
+  CHAT.canal = supa.channel('chat-' + session.user.id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes' }, p => chatAlLlegar(p.new))
+    .subscribe();
+}
+
+async function chatCargarConvs(){
+  const { data, error } = await supa.rpc('chat_mis_conversaciones', { p_location_id: currentLocation.id });
+  if(error){ document.getElementById('chatConvs').innerHTML = `<div class="empty-note" style="padding:16px;">No se pudo cargar el chat: ${escapeHtml(error.message)}</div>`; return; }
+  CHAT.convs = data || [];
+  // La conversación que se está viendo cuenta como leída aunque la lectura aún no se haya guardado.
+  const viendo = CHAT.convs.find(c => c.id === CHAT.actual);
+  if(viendo && document.getElementById('view-chat').classList.contains('active')) viendo.no_leidos = 0;
+  chatPintarLista();
+  chatPintarBadge();
+}
+
+function chatPintarBadge(){
+  const total = CHAT.convs.reduce((s, c) => s + (c.no_leidos || 0), 0);
+  const b = document.getElementById('chatBadge');
+  b.textContent = total > 99 ? '99+' : total;
+  b.hidden = !total;
+}
+
+function chatPintarLista(){
+  const q = document.getElementById('chatBuscar').value.trim().toUpperCase();
+  const lista = CHAT.convs.filter(c => !q || (c.titulo || '').toUpperCase().includes(q));
+  const fila = c => {
+    const quien = c.ultimo_autor && c.tipo === 'punto' ? c.ultimo_autor.split(' ')[0] + ': ' : '';
+    return `<button type="button" class="chat-item${c.id === CHAT.actual ? ' activa' : ''}" data-chat-conv="${c.id}">
+      ${chatAvatar(c)}
+      <span class="chat-item-txt">
+        <span class="chat-item-n">${escapeHtml(c.titulo)}<span>${c.ultimo_texto ? chatHoraCorta(c.ultimo_at) : ''}</span></span>
+        <span class="chat-item-u"><em>${c.ultimo_texto ? escapeHtml(quien + c.ultimo_texto) : escapeHtml(c.subtitulo || 'Sin mensajes todavía')}</em>${c.no_leidos ? `<span class="nav-badge">${c.no_leidos}</span>` : ''}</span>
+      </span>
+    </button>`;
+  };
+  const grupo = lista.filter(c => c.tipo === 'punto'), directos = lista.filter(c => c.tipo === 'directo');
+  document.getElementById('chatConvs').innerHTML =
+    (grupo.length ? '<div class="chat-sec">Grupo del punto</div>' + grupo.map(fila).join('') : '') +
+    '<div class="chat-sec">Mensajes directos</div>' +
+    (directos.length ? directos.map(fila).join('') : `<div class="empty-note" style="padding:8px 16px 16px;">${q ? 'Sin resultados.' : 'Todavía no tienes mensajes directos. Toca "+ Directo" para escribirle a alguien del punto.'}</div>`);
+  document.querySelectorAll('[data-chat-conv]').forEach(b => b.addEventListener('click', () => chatAbrir(b.dataset.chatConv)));
+}
+
+async function chatAlEntrar(){
+  if(!CHAT.listo) return;
+  await chatCargarConvs();
+  // En computador se abre sola la última conversación vista (o el grupo del punto).
+  if(!navMovil.matches && CHAT.convs.length) chatAbrir(CHAT.actual && CHAT.convs.some(c => c.id === CHAT.actual) ? CHAT.actual : CHAT.convs[0].id);
+  else if(CHAT.actual){ const c = CHAT.convs.find(x => x.id === CHAT.actual); if(c && c.no_leidos) chatMarcarLeido(c); }
+}
+
+function chatMostrarConversacion(c){
+  document.getElementById('chatVacio').hidden = !!c;
+  ['chatConvTop', 'chatMsgs', 'chatForm'].forEach(id => { document.getElementById(id).hidden = !c; });
+  if(!c){ document.getElementById('chatPrevia').hidden = true; return; }
+  document.getElementById('chatConvAv').outerHTML = chatAvatar(c).replace('<span class="chat-av', '<span id="chatConvAv" class="chat-av');
+  document.getElementById('chatConvNombre').textContent = c.titulo;
+  document.getElementById('chatConvSub').textContent = c.tipo === 'punto' ? 'Todo el punto · ' + currentLocation.name : (c.subtitulo || '');
+}
+
+async function chatAbrir(id){
+  const c = CHAT.convs.find(x => x.id === id);
+  if(!c) return;
+  CHAT.actual = id;
+  document.getElementById('chatLayout').classList.add('abierta');
+  chatMostrarConversacion(c);
+  chatPintarLista();
+  const box = document.getElementById('chatMsgs');
+  box.innerHTML = '<div class="empty-note">Cargando...</div>';
+  const { data, error } = await supa.from('chat_mensajes').select('*').eq('conversacion_id', id).order('created_at', { ascending: false }).limit(150);
+  if(CHAT.actual !== id) return;
+  if(error){ box.innerHTML = `<div class="empty-note">No se pudieron cargar los mensajes: ${escapeHtml(error.message)}</div>`; return; }
+  CHAT.mensajes = (data || []).reverse();
+  await chatFirmarFotos(CHAT.mensajes);
+  chatPintarMensajes();
+  chatMarcarLeido(c);
+  if(!navMovil.matches) document.getElementById('chatTexto').focus();
+}
+
+// Las fotos son privadas: se piden enlaces temporales (1 hora) para mostrarlas.
+async function chatFirmarFotos(msgs){
+  const faltan = [...new Set(msgs.filter(m => m.foto_path && !CHAT.urls[m.foto_path]).map(m => m.foto_path))];
+  if(!faltan.length) return;
+  const { data } = await supa.storage.from('chat-fotos').createSignedUrls(faltan, 3600);
+  (data || []).forEach(r => { if(r.signedUrl) CHAT.urls[r.path] = r.signedUrl; });
+}
+
+function chatMensajeHtml(m, c){
+  const mio = m.autor_id === session.user.id;
+  const url = m.foto_path ? CHAT.urls[m.foto_path] : null;
+  const hora = new Date(m.created_at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+  return `<div class="chat-m${mio ? ' mio' : ''}${m._enviando ? ' enviando' : ''}" data-msg="${m.id}">
+    ${c.tipo === 'punto' && !mio ? `<span class="chat-who">${escapeHtml(m.autor_nombre || 'Alguien')}${m.autor_area ? ` <i>· ${escapeHtml(m.autor_area)}</i>` : ''}</span>` : ''}
+    <div class="chat-bub">${m.foto_path ? (url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><img src="${escapeHtml(url)}" alt="Foto enviada por ${escapeHtml(m.autor_nombre || '')}" loading="lazy"></a>` : (m._previa ? `<img src="${m._previa}" alt="Foto por enviar">` : '📷 Foto')) : ''}${m.texto ? escapeHtml(m.texto) : ''}<span class="chat-hora">${m._enviando ? 'Enviando...' : hora}</span></div>
+  </div>`;
+}
+
+function chatPintarMensajes(){
+  const c = CHAT.convs.find(x => x.id === CHAT.actual);
+  const box = document.getElementById('chatMsgs');
+  if(!c) return;
+  if(!CHAT.mensajes.length){ box.innerHTML = `<div class="chat-vacio">Todavía no hay mensajes. ${c.tipo === 'punto' ? 'Escribe el primero para todo el punto.' : 'Escribe el primero.'}</div>`; return; }
+  let html = '', dia = '';
+  CHAT.mensajes.forEach(m => {
+    const d = new Date(m.created_at), k = d.toDateString();
+    if(k !== dia){ dia = k; html += `<div class="chat-dia">${chatDiaTexto(d)}</div>`; }
+    html += chatMensajeHtml(m, c);
+  });
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+  box.querySelectorAll('img').forEach(img => img.addEventListener('load', () => { box.scrollTop = box.scrollHeight; }, { once: true }));
+}
+
+async function chatMarcarLeido(c){
+  if(!c) return;
+  c.no_leidos = 0;
+  chatPintarLista(); chatPintarBadge();
+  await supa.from('chat_lecturas').upsert({ conversacion_id: c.id, user_id: session.user.id, leido_at: new Date().toISOString() });
+}
+
+// Mensaje nuevo (tiempo real): si es de la conversación abierta se muestra; si no, suma a no leídos y avisa.
+async function chatAlLlegar(m){
+  if(!m || !CHAT.listo) return;
+  let c = CHAT.convs.find(x => x.id === m.conversacion_id);
+  if(!c){ // directo nuevo que alguien me abrió (los grupos de otros puntos se ignoran aquí)
+    await chatCargarConvs();
+    c = CHAT.convs.find(x => x.id === m.conversacion_id);
+    if(!c) return;
+  } else {
+    c.ultimo_at = m.created_at; c.ultimo_texto = m.texto && m.texto.trim() ? m.texto.slice(0, 140) : '📷 Foto'; c.ultimo_autor = m.autor_nombre;
+    CHAT.convs.sort((a, b) => (b.tipo === 'punto') - (a.tipo === 'punto') || String(b.ultimo_at).localeCompare(String(a.ultimo_at)));
+  }
+  const mio = m.autor_id === session.user.id;
+  const viendo = CHAT.actual === c.id && document.getElementById('view-chat').classList.contains('active') && document.visibilityState === 'visible'
+    && (!navMovil.matches || document.getElementById('chatLayout').classList.contains('abierta'));
+  if(CHAT.actual === c.id && !CHAT.mensajes.some(x => x.id === m.id)){
+    if(m.foto_path) await chatFirmarFotos([m]);
+    CHAT.mensajes.push(m);
+    chatPintarMensajes();
+  }
+  if(mio){ chatPintarLista(); return; }
+  if(viendo){ chatMarcarLeido(c); return; }
+  c.no_leidos = (c.no_leidos || 0) + 1;
+  chatPintarLista(); chatPintarBadge();
+  const de = c.tipo === 'punto' ? (m.autor_nombre || 'Alguien') + ' (grupo)' : (m.autor_nombre || c.titulo);
+  showToast('💬 ' + de + ': ' + (m.texto && m.texto.trim() ? m.texto.slice(0, 80) : 'envió una foto'));
+}
+
+// Fotos: se reducen a máx. 1600 px en JPEG antes de subirlas (las del celular pesan varios MB).
+function chatComprimirFoto(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la foto')), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Ese archivo no es una imagen que se pueda abrir')); };
+    img.src = url;
+  });
+}
+function chatQuitarFoto(){
+  if(CHAT.fotoUrl) URL.revokeObjectURL(CHAT.fotoUrl);
+  CHAT.foto = null; CHAT.fotoUrl = null;
+  document.getElementById('chatPrevia').hidden = true;
+}
+document.getElementById('chatFoto').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!f) return;
+  if(!/^image\//.test(f.type)){ showToast('Solo se pueden enviar fotos', 'warn'); return; }
+  chatQuitarFoto();
+  CHAT.foto = f; CHAT.fotoUrl = URL.createObjectURL(f);
+  document.getElementById('chatPreviaImg').src = CHAT.fotoUrl;
+  document.getElementById('chatPrevia').hidden = false;
+});
+document.getElementById('chatQuitarFoto').addEventListener('click', chatQuitarFoto);
+
+document.getElementById('chatForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const c = CHAT.convs.find(x => x.id === CHAT.actual);
+  const input = document.getElementById('chatTexto');
+  const texto = input.value.trim();
+  if(!c || (!texto && !CHAT.foto)) return;
+  const btn = document.getElementById('chatEnviar');
+  btn.disabled = true;
+  const foto = CHAT.foto, previa = CHAT.fotoUrl;
+  // Se muestra de una vez mientras se envía
+  const temporal = { id: 'tmp-' + Date.now(), autor_id: session.user.id, autor_nombre: profile.name, texto, foto_path: foto ? 'pendiente' : null, _previa: previa, _enviando: true, created_at: new Date().toISOString() };
+  CHAT.mensajes.push(temporal); chatPintarMensajes();
+  input.value = ''; input.style.height = '';
+  CHAT.foto = null; CHAT.fotoUrl = null; document.getElementById('chatPrevia').hidden = true;
+  try{
+    let foto_path = null;
+    if(foto){
+      const blob = await chatComprimirFoto(foto);
+      foto_path = `${c.id}/${crypto.randomUUID()}.jpg`;
+      const { error: upErr } = await supa.storage.from('chat-fotos').upload(foto_path, blob, { contentType: 'image/jpeg' });
+      if(upErr) throw new Error('No se pudo subir la foto: ' + upErr.message);
+      CHAT.urls[foto_path] = previa;
+    }
+    const { data, error } = await supa.from('chat_mensajes').insert({
+      conversacion_id: c.id, texto: texto || null, foto_path,
+      autor_nombre: profile.name || session.user.email, autor_area: currentArea ? currentArea.name : null
+    }).select().single();
+    if(error) throw new Error(error.message);
+    const i = CHAT.mensajes.findIndex(x => x.id === temporal.id);
+    const yaLlego = CHAT.mensajes.some(x => x.id === data.id); // pudo llegar antes por tiempo real
+    if(i >= 0){ if(yaLlego) CHAT.mensajes.splice(i, 1); else CHAT.mensajes.splice(i, 1, data); }
+    else if(!yaLlego && CHAT.actual === c.id) CHAT.mensajes.push(data);
+    chatPintarMensajes();
+  } catch(err){
+    CHAT.mensajes = CHAT.mensajes.filter(x => x.id !== temporal.id);
+    chatPintarMensajes();
+    if(texto && !input.value) input.value = texto;
+    showToast('No se envió: ' + err.message, 'danger');
+  } finally {
+    btn.disabled = false;
+  }
+});
+// Enter envía (en computador); Shift+Enter hace salto de línea. El cuadro crece con el texto.
+document.getElementById('chatTexto').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey && !navMovil.matches){ e.preventDefault(); document.getElementById('chatForm').requestSubmit(); }
+});
+document.getElementById('chatTexto').addEventListener('input', e => {
+  e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+});
+document.getElementById('chatBuscar').addEventListener('input', chatPintarLista);
+document.getElementById('chatVolver').addEventListener('click', () => {
+  document.getElementById('chatLayout').classList.remove('abierta');
+  CHAT.actual = null;
+  chatMostrarConversacion(null);
+  chatPintarLista();
+});
+// Volver a la pestaña con la conversación abierta: se da por leída.
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState !== 'visible' || !CHAT.actual || !document.getElementById('view-chat').classList.contains('active')) return;
+  const c = CHAT.convs.find(x => x.id === CHAT.actual);
+  if(c && c.no_leidos) chatMarcarLeido(c);
+});
+
+// Nuevo directo: personas con acceso a este punto
+function chatPintarPersonas(){
+  const q = document.getElementById('chatPersonasBuscar').value.trim().toUpperCase();
+  const lista = CHAT.personas.filter(p => !q || p.nombre.toUpperCase().includes(q) || (p.areas || '').toUpperCase().includes(q));
+  document.getElementById('chatPersonasLista').innerHTML = lista.length ? lista.map(p => `
+    <button type="button" class="chat-item" data-chat-persona="${p.id}">
+      <span class="chat-av" style="background:${chatColor(p.id)}" aria-hidden="true">${escapeHtml(chatIniciales(p.nombre))}</span>
+      <span class="chat-item-txt"><span class="chat-item-n">${escapeHtml(p.nombre)}</span><span class="chat-item-u"><em>${escapeHtml([p.rol === 'admin' ? 'Admin' : '', p.areas].filter(Boolean).join(' · ') || 'Sin área')}</em></span></span>
+    </button>`).join('') : '<div class="empty-note">No hay personas con ese nombre.</div>';
+  document.querySelectorAll('[data-chat-persona]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const { data: id, error } = await supa.rpc('chat_abrir_directo', { p_otro: b.dataset.chatPersona });
+    b.disabled = false;
+    if(error){ showToast('No se pudo abrir el chat: ' + error.message, 'danger'); return; }
+    document.getElementById('chatPersonasModal').classList.remove('open');
+    await chatCargarConvs();
+    chatAbrir(id);
+  }));
+}
+document.getElementById('chatNuevoDm').addEventListener('click', async () => {
+  if(!CHAT.listo){ showToast('El chat todavía no está activado', 'warn'); return; }
+  document.getElementById('chatPersonasBuscar').value = '';
+  document.getElementById('chatPersonasLista').innerHTML = '<div class="empty-note">Cargando...</div>';
+  document.getElementById('chatPersonasModal').classList.add('open');
+  const { data, error } = await supa.rpc('chat_personas', { p_location_id: currentLocation.id });
+  if(error){ document.getElementById('chatPersonasLista').innerHTML = `<div class="empty-note">${escapeHtml(error.message)}</div>`; return; }
+  CHAT.personas = data || [];
+  chatPintarPersonas();
+});
+document.getElementById('chatPersonasBuscar').addEventListener('input', chatPintarPersonas);
+document.getElementById('chatPersonasCerrar').addEventListener('click', () => document.getElementById('chatPersonasModal').classList.remove('open'));
+
 /* ---------- TIEMPO REAL: pedidos y bajas ---------- */
 let realtimeChannel = null;
 
@@ -2498,8 +2912,9 @@ document.getElementById('tab-inventario').addEventListener('click', ()=>switchTa
 document.getElementById('tab-costeo').addEventListener('click', ()=>switchTab('costeo'));
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 document.getElementById('tab-calculadora').addEventListener('click', ()=>switchTab('calculadora'));
+document.getElementById('tab-chat').addEventListener('click', ()=>switchTab('chat'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -2510,6 +2925,7 @@ function switchTab(name){
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
   if(name==='inventario') loadInventarioMonth();
+  if(name==='chat') chatAlEntrar();
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
     // Qué pestañas ve cada punto:
     //  - Restaurante: Platos, Eventos (los suyos), Carta (la suya), Cargos (para Platos), Food cost (admin).
@@ -2528,10 +2944,11 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','calculadora','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','calculadora','chat','admin'];
+// En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
-  cocina: ['recetario','produccion','pedidos','inventario'],
-  admin:  ['recetario','pedidos','costeo','admin']
+  cocina: ['recetario','produccion','pedidos','chat'],
+  admin:  ['recetario','pedidos','admin','chat']
 };
 let USER_LOCATIONS = [];
 const navMovil = window.matchMedia('(max-width: 799px)');
