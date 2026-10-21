@@ -751,6 +751,9 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .ev-estado-badge{margin-top:5px;}
 .rec-card.ev-cancelado{opacity:.6;}
 .rec-card.ev-cancelado .rec-card-name{text-decoration:line-through;}
+.rec-card.rec-inactiva{opacity:.65;}
+.rec-inactiva-aviso{margin:var(--space-3) 0; padding:10px 14px; border-radius:var(--radius-md); background:var(--surface-2); border:1px solid var(--border-strong); font-size:13px; color:var(--text);}
+.rec-activa-row{display:flex; justify-content:flex-end; margin:var(--space-3) 0;}
 /* Eventos: vista Agenda (grupos por semana/mes) y Calendario */
 .ev-vista{margin-bottom:var(--space-3);}
 .ev-vista .estado-op{min-height:38px;}
@@ -2916,6 +2919,8 @@ async function loadRecipes(){
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
     yield_unit: r.yield_unit || '',
     activo_inventario: r.activo_inventario !== false,
+    // Sin la columna (SQL recetas_activa.sql aún sin correr) todas cuentan como activas.
+    activa: r.activa !== false, activa_por: r.activa_por || '', activa_at: r.activa_at || null,
     porcion_gr: r.porcion_gr === null || r.porcion_gr === undefined ? null : Number(r.porcion_gr)
   }));
 }
@@ -5538,18 +5543,29 @@ function abrirCalculadoraPrecios(){
 function renderRecipeList(){
   const q = document.getElementById('searchInput').value.trim().toUpperCase();
   // Los productos de carta (CS…) no se muestran en el Recetario: solo subrecetas y recetas que se preparan.
-  const list = recetasProducibles().filter(r => !q || r.name.toUpperCase().includes(q) || r.code.toUpperCase().includes(q));
+  const coincide = r => !q || r.name.toUpperCase().includes(q) || r.code.toUpperCase().includes(q);
+  const list = recetasProducibles().filter(coincide);
+  const inactivas = recetasInactivas().filter(coincide);
   const wrap = document.getElementById('recItems');
-  document.getElementById('recCount').textContent = list.length + ' receta' + (list.length===1?'':'s');
-  if(list.length === 0){ wrap.innerHTML = '<div class="empty-list">' + (q ? 'No hay recetas que coincidan con la búsqueda.' : 'Esta área todavía no tiene recetas cargadas.') + '</div>'; return; }
-  wrap.innerHTML = list.map(r => {
+  document.getElementById('recCount').textContent = list.length + ' receta' + (list.length===1?'':'s') + (inactivas.length ? ` · ${inactivas.length} inactiva${inactivas.length===1?'':'s'}` : '');
+  const tarjeta = r => {
     const y = r.yield_qty ? (fmtQty(r.yield_qty) + ' ' + r.yield_unit) : '';
-    return `<div class="rec-card ${r.code===currentCode?'selected':''}" data-code="${escapeHtml(r.code)}">
-      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-code">${r.code}</div></div>
-      ${y ? `<div class="rec-card-yield">${y}</div>` : '<span class="badge neutral">Sin rendimiento</span>'}
+    return `<div class="rec-card ${r.code===currentCode?'selected':''}${r.activa === false ? ' rec-inactiva' : ''}" data-code="${escapeHtml(r.code)}">
+      <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(r.name)}</div><div class="rec-card-code">${escapeHtml(r.code)}</div></div>
+      ${r.activa === false ? '<span class="badge neutral">Inactiva</span>' : y ? `<div class="rec-card-yield">${y}</div>` : '<span class="badge neutral">Sin rendimiento</span>'}
     </div>`;
-  }).join('');
+  };
+  let html = list.length ? list.map(tarjeta).join('')
+    : '<div class="empty-list">' + (q ? 'No hay recetas activas que coincidan con la búsqueda.' : 'Esta área todavía no tiene recetas activas.') + '</div>';
+  if(inactivas.length){
+    const abiertas = recetasInactivasAbiertas || !!q; // al buscar también se muestran
+    html += `<button type="button" class="ev-pasados-btn" id="recInactivasBtn" aria-expanded="${abiertas}" style="margin-top:var(--space-3);"><span>Recetas inactivas (${inactivas.length})</span><span>${abiertas ? 'Ocultar' : 'Ver'}</span></button>`;
+    if(abiertas) html += inactivas.map(tarjeta).join('');
+  }
+  wrap.innerHTML = html;
   wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openRecipe(el.dataset.code)));
+  const inBtn = document.getElementById('recInactivasBtn');
+  if(inBtn) inBtn.addEventListener('click', ()=>{ recetasInactivasAbiertas = !recetasInactivasAbiertas; renderRecipeList(); });
 }
 document.getElementById('searchInput').addEventListener('input', renderRecipeList);
 
@@ -5584,7 +5600,11 @@ async function renderDetail(r){
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-title">${escapeHtml(r.name)}</div>
     <div class="detail-code">${escapeHtml(r.code)}</div>
+    ${r.activa === false ? `<div class="rec-inactiva-aviso"><b>Receta inactiva.</b> No sale en Producción, Calcular producción ni Cronograma.${r.activa_por ? ` Desactivada por ${escapeHtml(r.activa_por)}${r.activa_at ? ' el ' + new Date(r.activa_at).toLocaleDateString('es-CO') : ''}.` : ''}</div>` : ''}
     ${yieldHtml}
+    ${isAdminRole() ? `<div class="rec-activa-row">${r.activa === false
+      ? '<button class="btn btn-accent btn-small" id="recActivaBtn">Activar receta</button>'
+      : '<button class="btn btn-danger-outline btn-small" id="recActivaBtn">Desactivar receta</button>'}</div>` : ''}
     ${hasYield || r.porcion_gr || isAdminRole() ? `<div class="rec-tools">
       ${hasYield ? `<div class="rec-tool-row">
         <label class="field-label" for="calcDesdeQty">¿Cuánto vas a producir?</label>
@@ -5610,6 +5630,8 @@ async function renderDetail(r){
     </div>
   `;
 
+  const actBtn = document.getElementById('recActivaBtn');
+  if(actBtn) actBtn.addEventListener('click', ()=> cambiarRecetaActiva(r, r.activa === false));
   const porBtn = document.getElementById('recPorcionBtn');
   if(porBtn) porBtn.addEventListener('click', async ()=>{
     const v = document.getElementById('recPorcionGr').value.trim();
@@ -5649,6 +5671,28 @@ async function renderDetail(r){
     showToast('Observación guardada');
     renderDetail(r);
   });
+}
+
+// Activar / desactivar una receta en esta área (solo admin; lo valida la función set_receta_activa).
+async function cambiarRecetaActiva(r, activar){
+  if(!activar){
+    const hoy = isoDia(new Date());
+    const { data: prog } = await supa.from('schedule_items').select('fecha').eq('area_id', currentArea.id).eq('recipe_code', r.code).gte('fecha', hoy).order('fecha');
+    const aviso = prog && prog.length
+      ? `\n\nOjo: está programada en el cronograma ${prog.length} vez${prog.length === 1 ? '' : 'es'} (desde el ${fmtFecha(prog[0].fecha)}). Seguirá en el cronograma, pero no se podrá registrar su producción.`
+      : '';
+    if(!confirm(`¿Desactivar "${r.name}"?\n\nNo saldrá en Producción, Calcular producción ni Cronograma. El historial no cambia y la puedes volver a activar.${aviso}`)) return;
+  }
+  const { error } = await supa.rpc('set_receta_activa', { p_recipe_id: r.id, p_activa: activar });
+  if(error){
+    showToast(/set_receta_activa|function/i.test(error.message) ? 'Falta correr el SQL recetas_activa.sql en Supabase' : 'No se pudo cambiar: ' + error.message, 'danger');
+    return;
+  }
+  r.activa = activar; r.activa_por = profile.name || session.user.email; r.activa_at = new Date().toISOString();
+  populateRecetaDatalist();
+  renderRecipeList();
+  renderDetail(r);
+  showToast(activar ? 'Receta activada' : 'Receta desactivada');
 }
 
 /* ---------- CALCULADORA DE PRODUCCIÓN ----------
@@ -5760,7 +5804,10 @@ function pintarCalcResultado(){
 // Productos de carta de barra (código CS… en Dos Santos, CC… en Canta Corazón): no se producen por tanda, así que
 // no salen en el Recetario, Producción, Calcular producción ni Cronograma. Sí salen en Bajas (un coctel servido se puede dar de baja).
 const esProductoCarta = r => /^C[SC]\d/i.test(r.code || '');
-const recetasProducibles = () => RECIPES.filter(r => !esProductoCarta(r));
+// Las recetas desactivadas (activa = false) tampoco: no se pueden registrar, calcular ni programar. Quedan en "Inactivas" del Recetario.
+const recetasProducibles = () => RECIPES.filter(r => !esProductoCarta(r) && r.activa !== false);
+const recetasInactivas = () => RECIPES.filter(r => !esProductoCarta(r) && r.activa === false);
+let recetasInactivasAbiertas = false;
 function populateRecetaDatalist(){
   const opciones = lista => lista.map(r => `<option value="${escapeHtml(r.name)}">`).join('');
   document.getElementById('recetaList').innerHTML = opciones(recetasProducibles());
