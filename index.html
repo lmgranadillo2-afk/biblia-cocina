@@ -7130,6 +7130,7 @@ function orderKanbanCardHtml(o, mode){
       let sendBtns = '<div class="kc-actions">';
       sendBtns += `<button class="btn btn-secondary btn-small" data-wa-id="${o.id}" title="Enviar el pedido por WhatsApp">WhatsApp</button>`;
       if(o.proveedor_correo) sendBtns += `<button class="btn btn-secondary btn-small" data-mail-id="${o.id}" title="Enviar el pedido por correo">Correo</button>`;
+      sendBtns += `<button class="btn btn-secondary btn-small" data-file-id="${o.id}" title="Descargar el pedido en Excel (CSV) para subirlo al portal del proveedor">Archivo</button>`;
       sendBtns += '</div>';
       actions += sendBtns;
     }
@@ -7198,6 +7199,26 @@ function sendPedidoEmail(o){
   markOrderAsSent(o.id);
 }
 
+// Pedido en CSV (abre en Excel: separador ";" y coma decimal) para subirlo al portal del proveedor (ej. Diez Equis).
+function descargarPedidoArchivo(o){
+  if(o.enviado){ showToast('Este pedido ya fue enviado'); return; }
+  const items = sortByCategoria(o.order_items || []);
+  if(items.length === 0){ showToast('El pedido no tiene insumos', 'warn'); return; }
+  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const sede = currentLocation ? currentLocation.name : '';
+  const filas = [['Pedido', 'Fecha', 'Sede', 'Área', 'Proveedor', 'Categoría', 'Código', 'Producto', 'Cantidad', 'Unidad', 'Nota']];
+  items.forEach(it => filas.push([o.codigo, o.fecha, sede, currentArea ? currentArea.name : '', o.proveedor, categoryLabel(it.categoria),
+    it.ingredient_code, it.ingredient_name, String(it.cantidad ?? '').replace('.', ','), it.unidad, it.nota]));
+  const csv = '﻿' + filas.map(f => f.map(celda).join(';')).join('\r\n');
+  const nombre = ['pedido', o.codigo, o.proveedor, sede].filter(Boolean).join('_').replace(/[^\w\-áéíóúñÁÉÍÓÚÑ]+/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = nombre + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  markOrderAsSent(o.id);
+}
+
 function renderOrderKanban(list, boardEl, mode){
   // En Aprobados: primero lo que falta enviar, luego lo que falta recibir, al final lo recibido.
   const etapa = o => !o.enviado ? 0 : (!o.recibido ? 1 : 2);
@@ -7244,6 +7265,13 @@ function renderOrderKanban(list, boardEl, mode){
       e.stopPropagation();
       const order = list.find(o => o.id === btn.dataset.mailId);
       if(order) sendPedidoEmail(order);
+    });
+  });
+  boardEl.querySelectorAll('[data-file-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const order = list.find(o => o.id === btn.dataset.fileId);
+      if(order) descargarPedidoArchivo(order);
     });
   });
   boardEl.querySelectorAll('[data-receive-id]').forEach(btn=>{
