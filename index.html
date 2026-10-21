@@ -750,6 +750,29 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .ev-estados{margin:0 0 var(--space-3);}
 .ev-estado-badge{margin-top:5px;}
 .rec-card.ev-cancelado{opacity:.6;}
+.rec-card.ev-cancelado .rec-card-name{text-decoration:line-through;}
+/* Eventos: vista Agenda (grupos por semana/mes) y Calendario */
+.ev-vista{margin-bottom:var(--space-3);}
+.ev-vista .estado-op{min-height:38px;}
+.ev-vista .estado-op.active{background:var(--surface); border-color:var(--border-strong); color:var(--text);}
+.ev-grupo{margin-bottom:var(--space-4);}
+.ev-grupo-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:0 2px var(--space-2); font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.ev-grupo-head b{color:var(--text); font-weight:600;}
+.ev-grupo-head span{font-variant-numeric:tabular-nums; letter-spacing:.02em; text-align:right;}
+.rec-card.ev-card{justify-content:flex-start;}
+.rec-card.ev-card .rec-card-main{flex:1;}
+.ev-dia{flex-shrink:0; width:44px; padding:4px 0; text-align:center; line-height:1.05; background:var(--surface-2); border-radius:var(--radius-sm);}
+.ev-dia b{display:block; font-family:'Playfair Display',serif; font-size:18px;}
+.ev-dia span{font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; color:var(--text-muted);}
+.ev-pasados-btn{display:flex; justify-content:space-between; align-items:center; width:100%; min-height:44px; padding:10px 14px; margin-bottom:var(--space-3); font:inherit; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:1px dashed var(--border-strong); border-radius:var(--radius-md); cursor:pointer;}
+.ev-pasados-btn:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.ev-cal .cal-cell{aspect-ratio:auto; height:52px; min-height:0; font:inherit;}
+.ev-cal .cal-cell.selected .cal-num{color:var(--accent-strong);}
+.ev-dots{display:flex; gap:2px; height:6px;}
+.ev-dot{width:6px; height:6px; border-radius:50%; background:var(--text-dim);}
+.ev-dot.ok{background:var(--ok);} .ev-dot.warn{background:var(--warn);} .ev-dot.danger{background:var(--danger);} .ev-dot.info{background:var(--info);}
+.ev-cal-leyenda{display:flex; flex-wrap:wrap; gap:4px 12px; margin:var(--space-2) 0 var(--space-4); font-size:11.5px; color:var(--text-muted);}
+.ev-cal-leyenda span{display:inline-flex; align-items:center; gap:5px;}
 .estado-seg{display:flex; flex-wrap:wrap; gap:4px; padding:4px; background:var(--surface-2); border-radius:var(--radius-md);}
 .estado-op{flex:1 1 0; min-height:44px; padding:8px 10px; font:inherit; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:1px solid transparent; border-radius:var(--radius-sm); cursor:pointer;}
 .estado-op:focus-visible{outline:none; box-shadow:var(--focus-ring);}
@@ -4140,10 +4163,18 @@ const EVENTO_GRUPOS_BEBIDAS = ['Bebidas sin licor', 'Bebidas con licor'];
 
 async function loadCosteoEventos(){
   // Eventos ve todos; cada restaurante ve los que se hacen en él.
-  let q = supa.from('costeo_eventos').select('*');
-  if(!esHub()) q = q.eq('restaurante_id', currentLocation.id);
-  const { data, error } = await q.order('fecha', {ascending:false, nullsFirst:false});
-  COSTEO_EVENTOS = error ? [] : (data || []);
+  // Por páginas de 1.000 (el máximo que entrega Supabase por consulta): así no hay tope de eventos.
+  const PAG = 1000, todos = [];
+  let error = null;
+  for(let desde = 0; ; desde += PAG){
+    let q = supa.from('costeo_eventos').select('*');
+    if(!esHub()) q = q.eq('restaurante_id', currentLocation.id);
+    const r = await q.order('fecha', {ascending:false, nullsFirst:false}).order('id').range(desde, desde + PAG - 1);
+    if(r.error){ error = r.error; break; }
+    todos.push(...(r.data || []));
+    if(!r.data || r.data.length < PAG) break;
+  }
+  COSTEO_EVENTOS = error ? [] : todos;
   if(error) showToast('No se pudieron cargar los eventos: ' + error.message);
 }
 
@@ -4784,21 +4815,130 @@ function renderCosteoEventosList(){
   const filtros = [{ key:'', corto:'Todos' }, ...EVENTO_ESTADOS, ...(porTexto.some(e => !e.estado) ? [{ key:'sin', corto:'Sin estado' }] : [])];
   const chips = COSTEO_EVENTOS.length === 0 ? '' : `<div class="aud-estados ev-estados">${filtros.map(f =>
     `<button type="button" class="aud-chip${eventosFiltroEstado === f.key ? ' active' : ''}" data-ev-estado="${f.key}" aria-pressed="${eventosFiltroEstado === f.key}">${f.corto}<span>${f.key ? deEstado(f.key).length : porTexto.length}</span></button>`).join('')}</div>`;
-  if(list.length === 0){
-    wrap.innerHTML = chips + `<div class="empty-list">${COSTEO_EVENTOS.length ? 'No hay eventos con este filtro.' : 'Todavía no hay eventos. Tocá "+ Nuevo evento".'}</div>`;
+  const vista = COSTEO_EVENTOS.length === 0 ? '' : `<div class="estado-seg ev-vista" role="group" aria-label="Vista de eventos">
+    ${[['agenda', 'Agenda'], ['calendario', 'Calendario']].map(([k, t]) => `<button type="button" class="estado-op${eventosVista === k ? ' active' : ''}" data-ev-vista="${k}" aria-pressed="${eventosVista === k}">${t}</button>`).join('')}
+  </div>`;
+  if(COSTEO_EVENTOS.length === 0){
+    wrap.innerHTML = `<div class="empty-list">Todavía no hay eventos. Tocá "+ Nuevo evento".</div>`;
+  } else if(eventosVista === 'calendario'){
+    wrap.innerHTML = vista + chips + eventosCalendarioHtml(list);
   } else {
-    wrap.innerHTML = chips + list.map(e => {
-      const t = eventoCalcTotals(e);
-      const rest = esHub() ? restauranteDe(e.restaurante_id) : null;
-      const sub = [rest && rest.name, fmtFecha(e.fecha), e.cliente, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).map(escapeHtml).join(' · ');
-      return `<div class="rec-card ${e.id===currentCosteoEventoId?'selected':''}${e.estado === 'cancelado' ? ' ev-cancelado' : ''}" data-id="${e.id}">
-        <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(e.nombre)}</div><div class="rec-card-code">${sub || 'sin fecha'}</div><div class="ev-estado-badge">${eventoEstadoBadge(e)}</div></div>
-        <div class="rec-card-yield">${fmtMoney(t.total)}</div>
-      </div>`;
-    }).join('');
+    wrap.innerHTML = vista + chips + (list.length === 0 ? '<div class="empty-list">No hay eventos con este filtro.</div>' : eventosAgendaHtml(list, !!q));
   }
   wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoEvento(el.dataset.id)));
   wrap.querySelectorAll('[data-ev-estado]').forEach(b => b.addEventListener('click', ()=>{ eventosFiltroEstado = b.dataset.evEstado; renderCosteoEventosList(); }));
+  wrap.querySelectorAll('[data-ev-vista]').forEach(b => b.addEventListener('click', ()=>{
+    eventosVista = b.dataset.evVista;
+    try { localStorage.setItem('eventosVista', eventosVista); } catch(err){}
+    renderCosteoEventosList();
+  }));
+  const pasBtn = wrap.querySelector('#evPasadosBtn');
+  if(pasBtn) pasBtn.addEventListener('click', ()=>{ eventosPasadosAbiertos = !eventosPasadosAbiertos; renderCosteoEventosList(); });
+  wrap.querySelectorAll('[data-ev-mes]').forEach(b => b.addEventListener('click', ()=>{
+    eventosCalMes = new Date(eventosCalMes.getFullYear(), eventosCalMes.getMonth() + Number(b.dataset.evMes), 1);
+    eventosCalDia = null; renderCosteoEventosList();
+  }));
+  wrap.querySelectorAll('[data-ev-dia]').forEach(c => c.addEventListener('click', ()=>{
+    eventosCalDia = eventosCalDia === c.dataset.evDia ? null : c.dataset.evDia; renderCosteoEventosList();
+  }));
+}
+
+/* Vistas de la lista de eventos: Agenda (próximos por semana y mes; pasados cerrados) y Calendario (puntos por estado). */
+let eventosVista = (()=>{ try { return localStorage.getItem('eventosVista') === 'calendario' ? 'calendario' : 'agenda'; } catch(err){ return 'agenda'; } })();
+let eventosPasadosAbiertos = false;
+let eventosCalMes = (()=>{ const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1); })();
+let eventosCalDia = null; // 'YYYY-MM-DD'
+const EV_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const EV_DIAS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const isoDia = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Mismo semáforo que eventoEstadoBadge(), como clase de color para el punto del calendario.
+function eventoNivel(e){
+  if(e.estado === 'confirmado') return 'ok';
+  if(e.estado === 'cancelado') return 'neutral';
+  if(e.estado !== 'pendiente') return 'warn';
+  const dias = diasParaEvento(e.fecha);
+  return dias === null ? 'info' : dias <= 3 ? 'danger' : dias <= 7 ? 'warn' : 'info';
+}
+
+function eventoCardHtml(e){
+  const t = eventoCalcTotals(e);
+  const rest = esHub() ? restauranteDe(e.restaurante_id) : null;
+  const sub = [rest && rest.name, e.cliente, e.invitados ? e.invitados + ' invitados' : ''].filter(Boolean).map(escapeHtml).join(' · ');
+  const f = e.fecha ? new Date(e.fecha + 'T00:00:00') : null;
+  return `<div class="rec-card ev-card ${e.id===currentCosteoEventoId?'selected':''}${e.estado === 'cancelado' ? ' ev-cancelado' : ''}" data-id="${e.id}">
+    <div class="ev-dia">${f ? `<b>${f.getDate()}</b><span>${EV_DIAS[f.getDay()]}</span>` : '<b>–</b><span>s/f</span>'}</div>
+    <div class="rec-card-main"><div class="rec-card-name">${escapeHtml(e.nombre)}</div>${sub ? `<div class="rec-card-code">${sub}</div>` : ''}<div class="ev-estado-badge">${eventoEstadoBadge(e)}</div></div>
+    <div class="rec-card-yield">${fmtMoney(t.total)}</div>
+  </div>`;
+}
+
+// Encabezado del grupo: cuántos eventos y cuánto suman (sin contar cancelados).
+function eventoGrupoHtml(titulo, lista){
+  if(!lista.length) return '';
+  const activos = lista.filter(e => e.estado !== 'cancelado');
+  const suma = activos.reduce((s, e) => s + eventoCalcTotals(e).total, 0);
+  return `<div class="ev-grupo"><div class="ev-grupo-head"><b>${escapeHtml(titulo)}</b><span>${lista.length} · ${fmtMoney(suma)}</span></div>${lista.map(eventoCardHtml).join('')}</div>`;
+}
+
+function eventosPorMes(lista){
+  const grupos = [];
+  lista.forEach(e => {
+    const f = new Date(e.fecha + 'T00:00:00'), k = EV_MESES[f.getMonth()] + ' ' + f.getFullYear();
+    const g = grupos.find(x => x.k === k) || (grupos.push({ k, l: [] }), grupos[grupos.length - 1]);
+    g.l.push(e);
+  });
+  return grupos.map(g => eventoGrupoHtml(g.k, g.l)).join('');
+}
+
+function eventosAgendaHtml(list, buscando){
+  const finSemana = 7 - ((new Date().getDay() + 6) % 7); // días que faltan para el próximo lunes
+  const conFecha = list.filter(e => e.fecha);
+  const proximos = conFecha.filter(e => diasParaEvento(e.fecha) >= 0).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const pasados = conFecha.filter(e => diasParaEvento(e.fecha) < 0).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const sinFecha = list.filter(e => !e.fecha);
+  const d = e => diasParaEvento(e.fecha);
+  let html = eventoGrupoHtml('Esta semana', proximos.filter(e => d(e) < finSemana))
+    + eventoGrupoHtml('Próxima semana', proximos.filter(e => d(e) >= finSemana && d(e) < finSemana + 7))
+    + eventosPorMes(proximos.filter(e => d(e) >= finSemana + 7))
+    + eventoGrupoHtml('Sin fecha', sinFecha);
+  if(!proximos.length && !sinFecha.length) html += '<div class="empty-list">No hay eventos próximos con este filtro.</div>';
+  if(pasados.length){
+    const abiertos = eventosPasadosAbiertos || buscando; // al buscar se muestran también los pasados
+    html += `<button type="button" class="ev-pasados-btn" id="evPasadosBtn" aria-expanded="${abiertos}"><span>Eventos pasados (${pasados.length})</span><span>${abiertos ? 'Ocultar' : 'Ver'}</span></button>`;
+    if(abiertos) html += eventosPorMes(pasados);
+  }
+  return html;
+}
+
+function eventosCalendarioHtml(list){
+  const y = eventosCalMes.getFullYear(), m = eventosCalMes.getMonth();
+  const hoy = isoDia(new Date());
+  const delMes = list.filter(e => e.fecha && e.fecha.startsWith(`${y}-${String(m + 1).padStart(2, '0')}-`)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const primero = (new Date(y, m, 1).getDay() + 6) % 7, nDias = new Date(y, m + 1, 0).getDate();
+  const flecha = p => `<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p}"/></svg>`;
+  let celdas = '';
+  for(let i = 0; i < primero; i++) celdas += '<div class="cal-cell empty"></div>';
+  for(let dia = 1; dia <= nDias; dia++){
+    const k = isoDia(new Date(y, m, dia)), evs = delMes.filter(e => e.fecha === k);
+    const puntos = evs.slice(0, 4).map(e => `<i class="ev-dot ${eventoNivel(e)}"></i>`).join('');
+    celdas += `<button type="button" class="cal-cell${k === hoy ? ' today' : ''}${k === eventosCalDia ? ' selected' : ''}" data-ev-dia="${k}" aria-label="${dia} de ${EV_MESES[m]}: ${evs.length} evento${evs.length === 1 ? '' : 's'}">
+      <span class="cal-num">${dia}</span><span class="ev-dots">${puntos}</span></button>`;
+  }
+  const lista = eventosCalDia ? delMes.filter(e => e.fecha === eventosCalDia) : delMes;
+  const fSel = eventosCalDia ? new Date(eventosCalDia + 'T00:00:00') : null;
+  const titulo = fSel ? `${EV_DIAS[fSel.getDay()]} ${fSel.getDate()} de ${EV_MESES[m]}` : `Todo ${EV_MESES[m]}`;
+  return `<div class="ev-cal">
+    <div class="cal-nav">
+      <button type="button" class="btn btn-secondary" data-ev-mes="-1" aria-label="Mes anterior">${flecha('m15 18-6-6 6-6')}</button>
+      <div class="cal-month-label">${EV_MESES[m].charAt(0).toUpperCase() + EV_MESES[m].slice(1)} ${y}</div>
+      <button type="button" class="btn btn-secondary" data-ev-mes="1" aria-label="Mes siguiente">${flecha('m9 18 6-6-6-6')}</button>
+    </div>
+    <div class="cal-weekdays"><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span></div>
+    <div class="cal-grid">${celdas}</div>
+    <div class="ev-cal-leyenda"><span><i class="ev-dot ok"></i>Confirmado</span><span><i class="ev-dot info"></i>Pendiente</span><span><i class="ev-dot warn"></i>≤ 7 días o sin estado</span><span><i class="ev-dot danger"></i>≤ 3 días</span><span><i class="ev-dot"></i>Cancelado</span></div>
+    ${lista.length ? eventoGrupoHtml(titulo, lista) : `<div class="empty-list">Sin eventos ${fSel ? 'este día' : 'este mes'}${eventosFiltroEstado ? ' con este filtro' : ''}.</div>`}
+  </div>`;
 }
 
 function openCosteoEvento(id){
