@@ -14,6 +14,14 @@ import webpush from "npm:web-push@3.6.7";
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+// Las llaves pegadas a mano en Secrets pueden traer espacios, saltos de línea, comillas, "=" al final
+// o el nombre del secreto pegado: se toma solo el bloque base64url más largo.
+const llave = (nombre: string) => {
+  const v = Deno.env.get(nombre) ?? "";
+  const bloques = v.replace(/=+/g, " ").match(/[A-Za-z0-9_-]{30,}/g) ?? [];
+  return bloques.sort((a, b) => b.length - a.length)[0] ?? "";
+};
+
 Deno.serve(async (req) => {
   try {
     const { token, mensaje_id } = await req.json().catch(() => ({}));
@@ -22,9 +30,11 @@ Deno.serve(async (req) => {
     const { data: cfg } = await svc.from("chat_push_config").select("token").eq("id", 1).maybeSingle();
     if (!cfg || !token || cfg.token !== token) return json({ ok: false, error: "Token inválido" }, 401);
 
-    const pub = Deno.env.get("VAPID_PUBLIC_KEY"), priv = Deno.env.get("VAPID_PRIVATE_KEY");
-    if (!pub || !priv) return json({ ok: false, error: "Faltan los secretos VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY" }, 500);
-    webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "https://biblia-cocina.vercel.app", pub, priv);
+    const pub = llave("VAPID_PUBLIC_KEY"), priv = llave("VAPID_PRIVATE_KEY");
+    if (pub.length !== 87) return json({ ok: false, error: `VAPID_PUBLIC_KEY mal copiada (tiene ${pub.length} caracteres, deben ser 87)` }, 500);
+    if (priv.length !== 43) return json({ ok: false, error: `VAPID_PRIVATE_KEY mal copiada (tiene ${priv.length} caracteres, deben ser 43)` }, 500);
+    const sujeto = (Deno.env.get("VAPID_SUBJECT") ?? "").match(/(https:\/\/\S+|mailto:\S+)/)?.[1]?.replace(/["'”“]+$/, "") || "https://biblia-cocina.vercel.app";
+    webpush.setVapidDetails(sujeto, pub, priv);
 
     const { data: m } = await svc.from("chat_mensajes").select("*").eq("id", mensaje_id).maybeSingle();
     if (!m) return json({ ok: false, error: "Mensaje no encontrado" }, 404);
