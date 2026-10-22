@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Biblia de Cocina</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<meta name="theme-color" content="#F7F2E8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Biblia Cocina">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
@@ -805,6 +813,11 @@ nav.tabs button{position:relative;}
 .chat-escribir textarea{flex:1; min-height:44px; max-height:120px; resize:none; padding:10px 12px; font-size:15px; line-height:1.4;}
 .chat-adjuntar{cursor:pointer;}
 .chat-personas{max-height:50vh; overflow-y:auto; margin:var(--space-3) 0;}
+.chat-push{display:flex; flex-direction:column; gap:8px; padding:10px 12px; border-radius:var(--radius-md); background:var(--accent-soft); border:1px solid var(--border-strong); font-size:13px; line-height:1.4; color:var(--text);}
+.chat-push[hidden]{display:none;}
+.chat-push.ok{flex-direction:row; align-items:center; justify-content:space-between; background:transparent; border-style:dashed; color:var(--text-muted);}
+.chat-push.bloqueado{background:var(--warn-bg); border-color:var(--warn);}
+.chat-push .btn{align-self:flex-start;}
 @media(max-width:799px){
   .chat-layout{grid-template-columns:minmax(0, 1fr); height:calc(100dvh - 56px - 64px - env(safe-area-inset-bottom));}
   .chat-conv{display:none;}
@@ -1383,6 +1396,7 @@ nav.tabs button{position:relative;}
           <div class="chat-lista-top">
             <div class="chat-lista-titulo"><h2>Chat</h2><button type="button" class="btn btn-secondary btn-small" id="chatNuevoDm">+ Directo</button></div>
             <input type="search" id="chatBuscar" placeholder="Buscar conversación..." aria-label="Buscar conversación">
+            <div class="chat-push" id="chatPush" hidden></div>
           </div>
           <div class="chat-convs" id="chatConvs"><div class="empty-note">Cargando...</div></div>
         </aside>
@@ -2224,6 +2238,9 @@ document.getElementById('loginSubmit').addEventListener('click', async ()=>{
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   if(realtimeChannel){ supa.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if(CHAT.canal){ supa.removeChannel(CHAT.canal); CHAT.canal = null; }
+  CHAT.listo = false;
+  await pushOlvidarDispositivo();
   await supa.auth.signOut();
   session = null; profile = null; currentLocation = null; currentArea = null;
   document.getElementById('app').style.display='none';
@@ -2585,6 +2602,9 @@ async function chatIniciar(){
   CHAT.canal = supa.channel('chat-' + session.user.id)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes' }, p => chatAlLlegar(p.new))
     .subscribe();
+  pushRefrescar();
+  pushPintar();
+  if(chatPendiente){ const id = chatPendiente; chatPendiente = null; chatAbrirDesdeAviso(id); }
 }
 
 async function chatCargarConvs(){
@@ -2628,6 +2648,7 @@ function chatPintarLista(){
 
 async function chatAlEntrar(){
   if(!CHAT.listo) return;
+  pushPintar();
   await chatCargarConvs();
   // En computador se abre sola la última conversación vista (o el grupo del punto).
   if(!navMovil.matches && CHAT.convs.length) chatAbrir(CHAT.actual && CHAT.convs.some(c => c.id === CHAT.actual) ? CHAT.actual : CHAT.convs[0].id);
@@ -2858,6 +2879,110 @@ document.getElementById('chatNuevoDm').addEventListener('click', async () => {
 });
 document.getElementById('chatPersonasBuscar').addEventListener('input', chatPintarPersonas);
 document.getElementById('chatPersonasCerrar').addEventListener('click', () => document.getElementById('chatPersonasModal').classList.remove('open'));
+
+/* ---------- CHAT · NOTIFICACIONES AL CELULAR (Web Push) ----------
+   El service worker (/sw.js) recibe la notificación aunque la app esté cerrada; la manda la función chat-push
+   (supabase/functions/chat-push) cuando la base guarda un mensaje. Aquí solo va la llave PÚBLICA. */
+const VAPID_PUBLICA = 'BN_heUKlhvQPLVs3oYdsCZBfh-fkFNVVStWn4tCwILT4IqC2yZ87L-h4SlwBKY4w17GVWZf4PZnqV0ud9RkmxXw';
+const pushSoportado = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const esIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const appInstalada = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let swRegistro = null;
+const contextoSeguro = location.protocol === 'https:' || location.hostname === 'localhost';
+if('serviceWorker' in navigator && contextoSeguro){
+  navigator.serviceWorker.register('/sw.js').then(r => { swRegistro = r; }).catch(() => {});
+  // Tocar una notificación con la app abierta: el service worker pide abrir esa conversación.
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data && e.data.tipo === 'abrir-chat') chatAbrirDesdeAviso(e.data.conversacion_id);
+  });
+}
+// Abrir la app desde una notificación (?chat=<id>): se abre esa conversación al entrar.
+let chatPendiente = new URLSearchParams(location.search).get('chat');
+if(chatPendiente) history.replaceState(null, '', location.pathname);
+async function chatAbrirDesdeAviso(convId){
+  if(!session || !currentLocation || !CHAT.listo){ chatPendiente = convId; return; }
+  switchTab('chat');
+  if(!CHAT.convs.some(c => c.id === convId)) await chatCargarConvs();
+  if(CHAT.convs.some(c => c.id === convId)) chatAbrir(convId);
+  else showToast('Ese mensaje es del grupo de otro punto: cambia de punto para verlo', 'warn');
+}
+
+function base64UrlABytes(b64){
+  const s = (b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+}
+async function pushSuscripcionActual(){
+  if(!pushSoportado()) return null;
+  const reg = swRegistro || await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+async function pushGuardar(sub){
+  const j = sub.toJSON();
+  const { error } = await supa.rpc('push_guardar', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_user_agent: navigator.userAgent });
+  return error;
+}
+async function pushEstado(){
+  if(esIOS() && !appInstalada()) return 'ios-instalar';
+  if(!pushSoportado() || !contextoSeguro) return 'no-soportado';
+  if(Notification.permission === 'denied') return 'bloqueado';
+  if(Notification.permission === 'granted' && await pushSuscripcionActual()) return 'activo';
+  return 'inactivo';
+}
+async function pushPintar(){
+  const box = document.getElementById('chatPush');
+  const estado = await pushEstado();
+  box.className = 'chat-push' + (estado === 'activo' ? ' ok' : estado === 'bloqueado' ? ' bloqueado' : '');
+  box.hidden = estado === 'no-soportado';
+  if(estado === 'ios-instalar') box.innerHTML = '<b>Notificaciones en iPhone</b><span>Para que te lleguen los mensajes con la app cerrada: en Safari toca <b>Compartir</b> → <b>Agregar a pantalla de inicio</b>, y abre la app desde ese ícono.</span>';
+  else if(estado === 'bloqueado') box.innerHTML = '<b>Notificaciones bloqueadas</b><span>Este navegador tiene bloqueados los avisos de la app. Actívalos en los ajustes del sitio (el candado junto a la dirección) y vuelve a entrar.</span>';
+  else if(estado === 'activo') box.innerHTML = '<span>🔔 Notificaciones activas en este dispositivo</span><button type="button" class="btn btn-ghost btn-small" id="pushDesactivar">Desactivar</button>';
+  else if(estado === 'inactivo') box.innerHTML = '<span><b>Recibe los mensajes con la app cerrada.</b> Activa las notificaciones en este dispositivo.</span><button type="button" class="btn btn-accent btn-small" id="pushActivar">Activar notificaciones</button>';
+  const act = document.getElementById('pushActivar');
+  if(act) act.addEventListener('click', pushActivar);
+  const des = document.getElementById('pushDesactivar');
+  if(des) des.addEventListener('click', pushDesactivar);
+}
+async function pushActivar(){
+  const btn = document.getElementById('pushActivar');
+  if(btn){ btn.disabled = true; btn.textContent = 'Activando...'; }
+  try{
+    const permiso = await Notification.requestPermission();
+    if(permiso !== 'granted'){ showToast(permiso === 'denied' ? 'Bloqueaste las notificaciones' : 'No se activaron las notificaciones', 'warn'); return; }
+    const reg = swRegistro || await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlABytes(VAPID_PUBLICA) });
+    const error = await pushGuardar(sub);
+    if(error) throw new Error(/push_guardar|function/i.test(error.message) ? 'falta correr sql/chat_paso2_push.sql' : error.message);
+    showToast('Notificaciones activadas en este dispositivo', 'ok');
+  } catch(err){
+    showToast('No se pudieron activar: ' + err.message, 'danger');
+  } finally {
+    pushPintar();
+  }
+}
+async function pushDesactivar(){
+  const sub = await pushSuscripcionActual();
+  if(sub){
+    await supa.rpc('push_borrar', { p_endpoint: sub.endpoint });
+    await sub.unsubscribe().catch(() => {});
+  }
+  showToast('Notificaciones desactivadas en este dispositivo');
+  pushPintar();
+}
+// Al entrar: si este dispositivo ya tenía notificaciones, quedan a nombre de quien entró (por si cambió de usuario).
+async function pushRefrescar(){
+  try{
+    if(!pushSoportado() || Notification.permission !== 'granted') return;
+    const sub = await pushSuscripcionActual();
+    if(sub) await pushGuardar(sub);
+  } catch(_){}
+}
+// Al salir de la cuenta: este dispositivo deja de recibir los mensajes de esa persona.
+async function pushOlvidarDispositivo(){
+  try{
+    const sub = await pushSuscripcionActual();
+    if(sub) await supa.rpc('push_borrar', { p_endpoint: sub.endpoint });
+  } catch(_){}
+}
 
 /* ---------- TIEMPO REAL: pedidos y bajas ---------- */
 let realtimeChannel = null;
