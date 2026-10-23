@@ -2587,6 +2587,14 @@ async function onLoggedIn(sess){
   }
   profile = prof;
 
+  // Enlace de marcación (?marcacion=<área>): entra directo a la pantalla de marcación de esa área, sin cargar la app.
+  const marcArea = new URLSearchParams(location.search).get('marcacion');
+  if(marcArea && /^[0-9a-f-]{36}$/i.test(marcArea)){
+    const { data: ar } = await supa.from('areas').select('*, locations(*)').eq('id', marcArea).maybeSingle();
+    if(ar && ar.locations && (ar.modules || []).includes('horarios')){ marcacionEntrar(ar.locations, ar); return; }
+    showToast('Esta cuenta no tiene acceso a la marcación de esa área', 'danger');
+  }
+
   const { data: locRows, error: locErr } = await supa.from('user_locations').select('location_id, locations(*)').eq('user_id', sess.user.id);
   if(locErr){
     showToast('No se pudieron cargar tus puntos asignados.');
@@ -2740,7 +2748,7 @@ function enterArea(loc, area){
   avisarEventosProximos();
   avisarQuincena();
   chatIniciar();
-  if(new URLSearchParams(location.search).has('marcacion') && (area.modules || []).includes('horarios')) setTimeout(kioscoAbrir, 300);
+  if(new URLSearchParams(location.search).get('marcacion') === '1' && (area.modules || []).includes('horarios')) setTimeout(kioscoAbrir, 300);
 }
 
 // Avisos al abrir la app (pedidos atrasados, eventos sin estado, eventos próximos):
@@ -5258,6 +5266,16 @@ function faceFoto(video, ancho){
 
 /* ---------- Pantalla de marcación (quiosco) ---------- */
 const KIO = { stream: null, timer: null, estado: 'apagado', datos: null, ultimo: null, racha: 0, persona: null, match: null, wake: null, recarga: null, ocupado: false };
+function marcacionEntrar(loc, area){
+  const { locations, ...a } = area;
+  currentLocation = loc; currentArea = a; applyLocationTheme(loc);
+  ['loginScreen', 'locationScreen', 'areaScreen'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+  document.getElementById('app').style.display = 'none';
+  document.title = 'Marcación · ' + a.name + ' · ' + loc.name;
+  KIO.separado = true;
+  kioscoAbrir();
+}
+function marcacionEnlace(){ return location.origin + location.pathname + '?marcacion=' + currentArea.id; }
 async function kioscoAbrir(){
   const k = document.getElementById('horKiosco');
   k.hidden = false; document.body.style.overflow = 'hidden'; document.getElementById('app').inert = true;
@@ -5267,7 +5285,7 @@ async function kioscoAbrir(){
     KIO.stream = await faceCamara(document.getElementById('kioVideo'));
   } catch(e){ kioscoPintar('error', e.message); return; }
   try { KIO.wake = await navigator.wakeLock?.request('screen'); } catch(_){}
-  if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  if(!KIO.separado && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
   kioscoPintar('espera');
   kioscoBucle();
   clearInterval(KIO.recarga); KIO.recarga = setInterval(() => { if(KIO.estado === 'espera') kioscoCargarDatos().catch(() => {}); }, 5 * 60 * 1000);
@@ -5278,6 +5296,8 @@ function kioscoCerrar(){
   try { KIO.wake && KIO.wake.release(); } catch(_){}
   if(document.fullscreenElement) document.exitFullscreen().catch(() => {});
   document.getElementById('horKiosco').hidden = true; document.body.style.overflow = ''; document.getElementById('app').inert = false;
+  // En la ventana aparte, salir lleva a la app normal (o cierra la ventana si la abrió la app).
+  if(KIO.separado){ if(window.opener){ window.close(); } location.href = location.pathname; }
 }
 async function kioscoCargarDatos(){
   const a = currentArea.id, hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
@@ -5315,6 +5335,8 @@ async function kioscoBucle(){
       const m = faceBuscar(c.descriptor, KIO.datos.rostros);
       if(!m || m.d > FACE_DUDA){ KIO.racha = 0; kioscoPintar('desconocido-auto'); }
       else {
+        // Quien acaba de marcar no se vuelve a reconocer durante 1 minuto (evita marcar dos veces sin querer).
+        if(KIO.reciente && KIO.reciente.pid === m.pid && Date.now() < KIO.reciente.hasta){ KIO.racha = 0; if(KIO.estado !== 'espera') kioscoPintar('espera'); document.getElementById('kioEstado').textContent = 'Ya marcaste, ' + ((KIO.datos.personal.find(p => p.id === m.pid) || {}).nombre || '').split(' ')[0]; KIO.timer = setTimeout(kioscoBucle, 800); return; }
         KIO.racha = KIO.ultimo === m.pid ? KIO.racha + 1 : 1; KIO.ultimo = m.pid;
         if(KIO.racha >= 2){
           KIO.persona = KIO.datos.personal.find(p => p.id === m.pid);
@@ -5375,7 +5397,7 @@ function kioscoPintar(estado, extra){
     setTimeout(() => document.getElementById(manual ? 'kioPersona' : 'kioClave')?.focus(), 50);
   }
 }
-function kioscoPie(){ return '<div class="kio-pie"><button type="button" class="kio-sec kio-plano" data-kio="manual">Marcar con la clave del líder</button><button type="button" class="kio-sec kio-plano" data-kio="salirclave">Salir</button></div>'; }
+function kioscoPie(){ return '<div class="kio-pie"><button type="button" class="kio-sec kio-plano" data-kio="manual">Marcar con la clave del líder</button>' + (KIO.separado && document.documentElement.requestFullscreen && !document.fullscreenElement ? '<button type="button" class="kio-sec kio-plano" data-kio="completa">Pantalla completa</button>' : '') + '<button type="button" class="kio-sec kio-plano" data-kio="salirclave">Salir</button></div>'; }
 function kioscoReiniciar(){ KIO.persona = null; KIO.match = null; KIO.racha = 0; KIO.ultimo = null; kioscoPintar('espera'); kioscoBucle(); }
 async function kioscoVerificarClave(){
   const clave = document.getElementById('kioClave').value;
@@ -5400,6 +5422,7 @@ async function kioscoMarcar(pid, tipo, opciones){
     const { data, error } = await supa.from('horario_marcaciones').insert(fila).select().single();
     if(error){ showToast('No se pudo marcar: ' + error.message, 'danger'); kioscoReiniciar(); return; }
     KIO.datos.marc.push({ personal_id: pid, tipo, at: data.at, fecha_turno: data.fecha_turno });
+    KIO.reciente = { pid, hasta: Date.now() + 60 * 1000 };
     const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(KIO.datos.cfg.tolerancia_min ?? 5);
     kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path });
   } finally { KIO.ocupado = false; }
@@ -5426,6 +5449,7 @@ document.getElementById('horKiosco').addEventListener('click', async e => {
   else if(a === 'salirclave'){ clearTimeout(KIO.timer); kioscoPintar('clave', 'salir'); }
   else if(a === 'reintentar'){ kioscoCerrar(); kioscoAbrir(); }
   else if(a === 'salir') kioscoCerrar();
+  else if(a === 'completa'){ document.documentElement.requestFullscreen().then(() => { if(KIO.estado === 'espera') kioscoPintar('espera'); }).catch(() => {}); }
   else if(a === 'confirmarsalir'){ b.disabled = true; if(await kioscoVerificarClave()) kioscoCerrar(); else b.disabled = false; }
   else if(a === 'confirmarmanual'){
     b.disabled = true;
@@ -5561,7 +5585,7 @@ function entPintar(){
   const n = k => personas.filter(x => x.e.k === k).length;
   const dudosas = D.marc.filter(m => m.dudosa && m.estado === 'valida');
   let h = `<div class="hor-bar"><div class="hor-nav"><span class="hor-rango">En turno ahora</span><span class="badge ok">En vivo</span></div>
-    <button type="button" class="btn btn-accent btn-small" data-ent="kiosco">Abrir pantalla de marcación</button></div>
+    <div class="hor-acciones"><button type="button" class="btn btn-secondary btn-small" data-ent="copiar">Copiar enlace de marcación</button><button type="button" class="btn btn-accent btn-small" data-ent="ventana">Abrir marcación en otra ventana</button></div></div>
     <div class="pren-totales">
       <div class="pren-tot ent ok"><span class="field-label">En turno</span><b>${n('dentro')}</b></div>
       <div class="pren-tot ent danger"><span class="field-label">No han llegado</span><b>${n('tarde')}</b></div>
@@ -5584,13 +5608,22 @@ function entPintar(){
   });
   const hoyM = D.marc.slice().reverse();
   h += `<details class="pren-sec"><summary>Marcaciones de hoy (${hoyM.length})</summary><div class="pren-cuerpo"><ul class="ent-lista">${hoyM.map(m => { const p = HOR.personal.find(x => x.id === m.personal_id); return `<li class="${m.estado === 'rechazada' ? 'rech' : ''}"><b>${escapeHtml(new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))}</b> ${escapeHtml(p ? p.nombre : '?')} · ${m.tipo}${m.manual ? ' · marcada por ' + escapeHtml(m.marcado_por || 'el líder') : ''}${m.estado === 'rechazada' ? ' · anulada' : ''}${m.foto_path ? ` <button type="button" class="btn btn-ghost btn-small" data-ent-foto="${escapeHtml(m.foto_path)}">Foto</button>` : ''}</li>`; }).join('') || '<li>Todavía no hay marcaciones.</li>'}</ul></div></details>
-    <p class="field-help">Las marcaciones llenan solas el registro del día (llegada a tiempo o tarde y horas reales). Tú revisas y cierras cada turno, como siempre. Tolerancia de llegada: ${Number((HOR.cfg && HOR.cfg.tolerancia_min) ?? 5)} min.</p>`;
+    <p class="field-help">La marcación se abre en una ventana aparte (enlace de esta área: <span style="font-family:'IBM Plex Mono',monospace;word-break:break-all">${escapeHtml(marcacionEnlace())}</span>), así el PC sigue sirviendo para producciones y pedidos en la otra. Las marcaciones llenan solas el registro del día (llegada a tiempo o tarde y horas reales). Tú revisas y cierras cada turno, como siempre. Tolerancia de llegada: ${Number((HOR.cfg && HOR.cfg.tolerancia_min) ?? 5)} min.</p>`;
   box.innerHTML = h;
   ENT.flash = null;
 }
 document.getElementById('horSemana').addEventListener('click', async e => {
   if(HOR.sub !== 'enturno') return;
-  if(e.target.closest('[data-ent="kiosco"]')){ kioscoAbrir(); return; }
+  if(e.target.closest('[data-ent="ventana"]')){
+    const w = window.open(marcacionEnlace(), 'marcacion-' + HOR.areaId, 'popup=yes,width=1180,height=760');
+    if(!w) location.href = marcacionEnlace();
+    return;
+  }
+  if(e.target.closest('[data-ent="copiar"]')){
+    try { await navigator.clipboard.writeText(marcacionEnlace()); showToast('Enlace copiado. Ábrelo en el PC de la cocina y guárdalo como favorito.', 'ok'); }
+    catch(_){ showToast(marcacionEnlace(), 'ok'); }
+    return;
+  }
   const f = e.target.closest('[data-ent-foto]');
   if(f){
     const w = window.open('', '_blank');
