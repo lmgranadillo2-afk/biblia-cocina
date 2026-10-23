@@ -1012,6 +1012,24 @@ nav.tabs button{position:relative;}
 .hor-marca.noct{background:var(--info-bg); color:var(--info);}
 .hor-otro-prev{font-size:13px; color:var(--text-muted); margin:0 0 8px;}
 .pren-controles{align-items:flex-end;}
+.hor-soportes{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;}
+.hor-sop{display:inline-flex; align-items:center; border:1px solid var(--border-strong); border-radius:var(--radius-md); background:var(--surface); overflow:hidden; max-width:100%;}
+.hor-sop button{border:none; background:none; cursor:pointer; font:500 13px 'Inter',sans-serif; color:var(--text); min-height:36px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; min-width:0;}
+.hor-sop button span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;}
+.hor-sop button + button{border-left:1px solid var(--border); color:var(--text-muted); padding:0 10px;}
+.hor-sop button:focus-visible, .hor-sop-add:focus-within{outline:none; box-shadow:var(--focus-ring);}
+.hor-sop-add{cursor:pointer;}
+.hor-sop-add input{position:absolute; width:1px; height:1px; opacity:0;}
+.pren-aviso.ok{background:var(--ok-bg); color:var(--text);} .pren-aviso.ok b{color:var(--ok);}
+.hor-grid thead th.bloq{color:var(--text-dim);}
+.hor-bloq{display:block; font:600 9px 'IBM Plex Mono',monospace; letter-spacing:.6px; color:var(--text-dim);}
+.quin-lista{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+.quin-lista li{display:flex; gap:10px; align-items:flex-start; font-size:14px; line-height:1.4;}
+.quin-lista .ic{flex-shrink:0; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font:700 12px 'Inter',sans-serif; color:var(--on-state);}
+.quin-lista .ic.ok{background:var(--ok);} .quin-lista .ic.no{background:var(--danger);} .quin-lista .ic.info{background:var(--info);}
+.quin-confirmar{display:flex; gap:10px; align-items:center; font-size:14px; font-weight:600; min-height:44px;}
+.quin-confirmar input{width:20px; height:20px; accent-color:var(--accent);}
+.quin-hist{font-size:13px; color:var(--text-muted); display:flex; flex-direction:column; gap:4px; margin:0; padding-left:18px;}
 .pren-switch{display:inline-flex; align-items:center; gap:8px; cursor:pointer; font:600 14px 'Inter',sans-serif; background:none; border:none; color:var(--text); padding:0 4px; min-height:44px;}
 .pren-switch i{width:40px; height:24px; border-radius:var(--radius-pill); background:var(--surface-3); position:relative; transition:background .15s ease-out;}
 .pren-switch i::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-1); transition:transform .15s ease-out;}
@@ -1581,6 +1599,7 @@ nav.tabs button{position:relative;}
           <button type="button" data-hor-sub="semana" class="active">Semana</button>
           <button type="button" data-hor-sub="novedades">Novedades</button>
           <button type="button" data-hor-sub="registro">Registro del día</button>
+          <button type="button" data-hor-sub="quincena">Quincena</button>
           <button type="button" data-hor-sub="config">Configuración</button>
           <button type="button" data-hor-sub="prenomina" id="horSubPren" hidden>Pre-nómina</button>
         </div>
@@ -2051,6 +2070,17 @@ nav.tabs button{position:relative;}
 
 <div class="modal-overlay" id="horCeldaModal">
   <div class="modal-box" id="horCeldaBox" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="modal-overlay" id="horQuinModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="horQuinTit">
+    <h3 id="horQuinTit"></h3>
+    <div class="modal-sub" id="horQuinTxt"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="horQuinCerrar" type="button">Después</button>
+      <button class="btn btn-accent" id="horQuinIr" type="button"></button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="evProxModal">
@@ -2613,6 +2643,7 @@ function enterArea(loc, area){
   avisarPedidosAtrasados();
   avisarEventosSinEstado();
   avisarEventosProximos();
+  avisarQuincena();
   chatIniciar();
 }
 
@@ -3385,7 +3416,12 @@ const HOR_EXTRA_MAX = 12; // tope legal de horas extra a la semana (solo aviso)
 const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], turnos:[], tareas:[], lunes:null, semana:null,
   asig:{}, tareaAsig:{}, domPasadoTemprano:new Set(), haySemanaAnterior:false, sub:'semana', confirmar:false, verTexto:false,
   imgBlob:null, carga:0, error:null,
-  nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false, propuesta:null, pedirReemplazo:false };
+  nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false, propuesta:null, pedirReemplazo:false,
+  quincenas:[], bloqueadas:{}, subPedida:null };
+// Días de la semana que están en una quincena cerrada (nadie los puede cambiar).
+function horBloqueado(dia){ return !!HOR.bloqueadas[horIso(horFecha(dia))]; }
+// Los admin sí pueden corregir días de una quincena cerrada (queda en horario_cambios_cierre); los líderes no.
+function horBloqueadoParaMi(dia){ return horBloqueado(dia) && !horEsAdmin(); }
 const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', vacante:'Vacante', retardo:'Retardo' };
 const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', vacante:'VACANTE', retardo:'RETARDO' };
 const HOR_AYUDA_NOV = {
@@ -3450,9 +3486,11 @@ async function horAlEntrar(){
   if(!currentArea) return;
   if(HOR.areaId !== currentArea.id){
     HOR.areaId = currentArea.id; HOR.sub = 'semana'; HOR.lunes = horLunesDe(new Date());
+    PREN.periodo = null; QUIN.periodo = null;
     document.getElementById('horSemana').innerHTML = '<div class="empty-note">Cargando...</div>';
     await horCargarConfig();
   }
+  if(HOR.subPedida){ HOR.sub = HOR.subPedida; HOR.subPedida = null; }
   horPintarSub();
   if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
 }
@@ -3460,6 +3498,7 @@ function horPintar(){
   if(HOR.sub === 'novedades' && HOR.editor) horPintarNovedades();
   else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
   else if(HOR.sub === 'prenomina' && horEsAdmin()) horPintarPrenomina();
+  else if(HOR.sub === 'quincena' && HOR.editor) horPintarQuincena();
   else horPintarSemana();
 }
 
@@ -3514,6 +3553,9 @@ async function horCargarSemana(){
   }
   const domingo = horIso(horFecha(7));
   let nov = [], reg = {}, cerrados = {}, regError = null;
+  let quincenas = [];
+  consultas.push(supa.from('horario_quincenas_cerradas').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes)
+    .then(r => { quincenas = r.error ? [] : (r.data || []); }));
   if(HOR.editor){
     consultas.push(supa.from('horario_novedades').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes).order('desde')
       .then(r => { nov = r.data || []; }));
@@ -3531,7 +3573,9 @@ async function horCargarSemana(){
   }
   await Promise.all(consultas);
   if(carga !== HOR.carga) return;
-  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError });
+  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError, quincenas });
+  HOR.bloqueadas = {};
+  quincenas.forEach(q => { for(let d = 1; d <= 7; d++){ const f = horIso(horFecha(d)); if(f >= q.desde && f <= q.hasta) HOR.bloqueadas[f] = q; } });
   horPintar();
 }
 
@@ -3669,6 +3713,8 @@ function horPintarSemana(){
     box.innerHTML = html; return;
   }
   const v = horValidar();
+  const bloq = [1,2,3,4,5,6,7].filter(horBloqueado);
+  if(bloq.length && HOR.editor) html += `<div class="pren-aviso info">${bloq.length === 7 ? 'Toda esta semana está' : 'Del ' + horFecha(bloq[0]).getDate() + ' al ' + horFecha(bloq[bloq.length - 1]).getDate() + ' la semana está'} en una quincena cerrada: ${horEsAdmin() ? 'como admin puedes corregir esos días; cada cambio queda registrado y la pre-nómina lo avisa.' : 'esos días no se pueden cambiar. Si hay que corregir algo, pídeselo a un admin.'}</div>`;
   if(HOR.pedirReemplazo && horEditable()) html += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">Proponer semana</span> ¿Reemplazar lo que ya hay?</h3>
     <span class="field-help">La propuesta reemplaza todos los turnos y el Bunker de esta semana. Después puedes editar lo que quieras antes de publicar.</span>
     <div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-accent btn-small" data-hor-act="proponer">Reemplazar con la propuesta</button><button type="button" class="btn btn-secondary btn-small" data-hor-act="noreemplazar">Cancelar</button></div></div></div>`;
@@ -3754,7 +3800,7 @@ function horChecksHtml(v){
 function horGrillaHtml(v){
   const ed = horEditable(), jornada = horJornada();
   let h = `<div class="hor-grid-wrap"><table class="hor-grid"><thead><tr><th class="hor-first">Persona</th>`;
-  for(let d = 1; d <= 7; d++) h += `<th class="${horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small></th>`;
+  for(let d = 1; d <= 7; d++) h += `<th class="${horBloqueado(d) ? 'bloq' : horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small>${horBloqueado(d) ? '<span class="hor-bloq">CERRADO</span>' : ''}</th>`;
   h += `<th>Horas</th></tr></thead><tbody>`;
   const grupos = horGrupos();
   for(const { e, gente } of grupos){
@@ -3777,7 +3823,7 @@ function horGrillaHtml(v){
           sub = `<span class="h">${horNum(a.horas)} h${a.cubre_manana ? '<span class="hor-marca">M</span>' : ''}${a.cubre_cierre ? '<span class="hor-marca">C</span>' : ''}${noc ? `<span class="hor-marca noct" title="${horNum(noc)} h nocturnas">N${horNum(noc)}</span>` : ''}${a.tipo === 'otro' ? '<span class="hor-marca">OTRO</span>' : ''}</span>`;
         }
         if(lvl) cls += ' ' + lvl;
-        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
+        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed && !horBloqueadoParaMi(d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
       }
       const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
       const nn = horNocDe(p.id);
@@ -3800,7 +3846,7 @@ function horGrillaHtml(v){
     h += `<tr class="hor-tarea"><td class="hor-first"><span class="hor-pname">${escapeHtml(t.nombre)}</span><span class="hor-pmeta">${escapeHtml(t.detalle || 'tarea del día')}</span></td>`;
     for(let d = 1; d <= 7; d++){
       const pid = HOR.tareaAsig[t.id + '|' + d], lvl = v.tar[t.id + '|' + d] || '';
-      if(ed){
+      if(ed && !horBloqueadoParaMi(d)){
         const ops = horPersonasSemana().filter(p => horTrabaja(p.id, d) || p.id === pid)
           .map(p => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>${escapeHtml(horCorto(p))}${horTrabaja(p.id, d) ? '' : ' (no trabaja)'}</option>`).join('');
         h += `<td class="hor-cw"><select id="horc-tar-${t.id}-${d}" class="${lvl}" data-hor-tarea="${t.id}|${d}" aria-label="${escapeHtml(t.nombre + ' del ' + HOR_DIAS[d - 1].toLowerCase())}"><option value="">Sin asignar</option>${ops}</select></td>`;
@@ -3817,7 +3863,7 @@ function horGrillaHtml(v){
 /* --- Acciones de la semana --- */
 document.getElementById('horSemana').addEventListener('click', async e => {
   const cell = e.target.closest('[data-hor-cell]');
-  if(cell){ if(horEditable()) horAbrirCelda(cell.dataset.horCell); return; }
+  if(cell){ if(horEditable() && !horBloqueadoParaMi(Number(cell.dataset.horCell.split('|')[1]))) horAbrirCelda(cell.dataset.horCell); return; }
   const irSub = e.target.closest('[data-hor-ir-sub]');
   if(irSub){ HOR.sub = irSub.dataset.horIrSub; horPintarSub(); horPintar(); return; }
   const ir = e.target.closest('[data-hor-ir]');
@@ -3937,8 +3983,11 @@ async function horProponerSemana(){
     (t.data || []).forEach(x => { histTareas[x.tarea_id + '|' + x.dia] = x.personal_id; });
   }
   const prop = horCalcularPropuesta(hist, histTareas);
-  const del1 = await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id);
-  const del2 = await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', sem.id);
+  const libres = [1,2,3,4,5,6,7].filter(d => !horBloqueado(d));
+  if(!libres.length){ showToast('Toda esta semana está en una quincena cerrada', 'warn'); horCargarSemana(); return; }
+  prop.filas = prop.filas.filter(x => libres.includes(x.dia)); prop.tareas = prop.tareas.filter(x => libres.includes(x.dia));
+  const del1 = await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id).in('dia', libres);
+  const del2 = await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', sem.id).in('dia', libres);
   if(del1.error || del2.error){ showToast('No se pudo preparar la semana: ' + (del1.error || del2.error).message, 'danger'); horCargarSemana(); return; }
   if(prop.filas.length){
     const { error } = await supa.from('horario_asignaciones').insert(prop.filas.map(x => ({ semana_id: sem.id, ...horFilaCompleta(x) })));
@@ -4260,8 +4309,9 @@ function horPintarNovedades(){
     <div class="hor-nov ${n.tipo}">
       <div><b>${escapeHtml(nombre(n.personal_id))}</b> <span class="badge ${badge(n.tipo)}">${HOR_TIPOS[n.tipo]}</span>${n.tipo === 'permiso' && n.remunerado === false ? ' <span class="badge neutral">No remunerado</span>' : n.tipo === 'permiso' && n.remunerado ? ' <span class="badge ok">Remunerado</span>' : ''}
         <div class="m">${horRangoNov(n)}${n.creado_por ? ' · por ' + escapeHtml(n.creado_por) : ''}</div>
-        ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}</div>
-      <button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>
+        ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}
+        ${horSoportesHtml(n)}</div>
+      ${!horEsAdmin() && HOR.quincenas.some(q => q.desde <= n.hasta && q.hasta >= n.desde) ? '<span class="badge neutral">Quincena cerrada</span>' : `<button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>`}
     </div>`).join('') : '<div class="empty-note">Sin novedades esta semana.</div>'}</div>`;
   h += `<form class="hor-form" id="horNovForm">
     <div class="field"><label class="field-label" for="horNovP">Persona</label><select id="horNovP" required>${HOR.personal.filter(p => p.activo).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
@@ -4271,6 +4321,8 @@ function horPintarNovedades(){
     <div class="field" id="horNovRemBox" hidden><label class="field-label" for="horNovRem">¿Remunerado?</label><select id="horNovRem"><option value="si">Sí, se paga</option><option value="no">No se paga</option></select></div>
     <span class="field-help full" id="horNovAyuda">${HOR_AYUDA_NOV.incapacidad}</span>
     <div class="field full"><label class="field-label" for="horNovN">Nota</label><input type="text" id="horNovN" maxlength="300" placeholder="Ej.: incapacidad de 3 días, trae soporte"></div>
+    <div class="field full"><label class="field-label" for="horNovSop">Soporte (foto o PDF, opcional)</label><input type="file" id="horNovSop" accept="image/*,application/pdf" multiple>
+      <span class="field-help">Ej.: la foto de la incapacidad médica. Solo la ven admin y líderes. Hasta 10 MB por archivo; las fotos se reducen solas.</span></div>
     <div class="full"><button type="submit" class="btn btn-accent">Agregar novedad</button></div>
   </form>
   <p class="field-help">La novedad tapa la casilla en la grilla y no cuenta en la cobertura; si deja una estación corta, sale en rojo en Semana. El equipo solo ve "No viene", sin el motivo.</p>`;
@@ -4284,15 +4336,79 @@ document.getElementById('horSemana').addEventListener('submit', async e => {
   if(hasta < desde) [desde, hasta] = [hasta, desde];
   const btn = e.target.querySelector('[type=submit]'); btn.disabled = true;
   const antes = horValidar().err.filter(i => i.k.startsWith('cov|')).length;
-  const { error } = await supa.from('horario_novedades').insert({
+  const archivos = [...(document.getElementById('horNovSop').files || [])];
+  const { data: creada, error } = await supa.from('horario_novedades').insert({
     area_id: HOR.areaId, personal_id: document.getElementById('horNovP').value, tipo: document.getElementById('horNovT').value,
     desde, hasta, nota: document.getElementById('horNovN').value.trim() || null, creado_por: profile.name || session.user.email,
     ...(document.getElementById('horNovT').value === 'permiso' ? { remunerado: document.getElementById('horNovRem').value === 'si' } : {}),
-  });
-  if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); btn.disabled = false; return; }
+  }).select().single();
+  if(error){ showToast(/row-level security/i.test(error.message) ? 'Esas fechas están en una quincena cerrada: no se pueden agregar novedades' : 'No se pudo guardar: ' + error.message, 'danger'); btn.disabled = false; return; }
+  if(archivos.length && creada){ showToast('Subiendo soporte...', 'ok'); await horSubirSoportes(creada, archivos); }
   await horCargarSemana();
   const despues = horValidar().err.filter(i => i.k.startsWith('cov|')).length;
   showToast(despues > antes ? 'Novedad guardada. Deja una estación corta: míralo en Semana.' : 'Novedad guardada', despues > antes ? 'warn' : 'ok');
+});
+
+/* --- Soportes de novedades (foto o PDF, ej. incapacidad). Bucket privado "horario-soportes", ruta <área>/<novedad>/<archivo>;
+   solo admin y líderes (dato de salud). La lista vive en horario_novedades.soportes y se guarda con la RPC horario_novedad_soportes. --- */
+const HOR_SOP_MAX = 10 * 1024 * 1024;
+const HOR_ICO_CLIP = '<svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>';
+function horSoportesHtml(n){
+  const sops = n.soportes || [];
+  return `<div class="hor-soportes">${sops.map((x, i) => `<span class="hor-sop"><button type="button" data-hor-ver-sop="${n.id}|${i}" title="Ver ${escapeHtml(x.nombre || 'soporte')}">${HOR_ICO_CLIP}<span>${escapeHtml(x.nombre || 'Soporte')}</span></button><button type="button" data-hor-quitar-sop="${n.id}|${i}" aria-label="Quitar ${escapeHtml(x.nombre || 'soporte')}">×</button></span>`).join('')}
+    ${!sops.length && n.tipo === 'incapacidad' ? '<span class="badge warn">Sin soporte</span>' : ''}
+    ${sops.length < 10 ? `<label class="btn btn-ghost btn-small hor-sop-add">+ ${sops.length ? 'Otro soporte' : 'Adjuntar soporte'}<input type="file" accept="image/*,application/pdf" multiple data-hor-sop="${n.id}"></label>` : ''}</div>`;
+}
+async function horSubirSoportes(nov, files){
+  const nuevos = [];
+  for(const file of files.slice(0, 10 - (nov.soportes || []).length)){
+    const esPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    let blob = file, tipo = 'application/pdf', ext = 'pdf';
+    if(!esPdf){
+      try { blob = await chatComprimirFoto(file); tipo = 'image/jpeg'; ext = 'jpg'; }
+      catch(e){ showToast(file.name + ': ' + e.message, 'danger'); continue; }
+    }
+    if(blob.size > HOR_SOP_MAX){ showToast(file.name + ' pesa más de 10 MB', 'warn'); continue; }
+    const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+    const path = `${nov.area_id || HOR.areaId}/${nov.id}/${id}.${ext}`;
+    const { error } = await supa.storage.from('horario-soportes').upload(path, blob, { contentType: tipo });
+    if(error){ showToast('No se pudo subir ' + file.name + ': ' + error.message, 'danger'); continue; }
+    nuevos.push({ path, nombre: file.name.slice(0, 120), tipo, subido_por: profile.name || session.user.email, at: new Date().toISOString() });
+  }
+  if(!nuevos.length) return false;
+  const lista = (nov.soportes || []).concat(nuevos);
+  const { error } = await supa.rpc('horario_novedad_soportes', { p_id: nov.id, p_soportes: lista });
+  if(error){ showToast('El archivo se subió, pero no se pudo guardar en la novedad: ' + error.message, 'danger'); return false; }
+  nov.soportes = lista;
+  showToast(nuevos.length === 1 ? 'Soporte guardado' : nuevos.length + ' soportes guardados', 'ok');
+  return true;
+}
+document.getElementById('horSemana').addEventListener('change', async e => {
+  const id = e.target.dataset.horSop; if(!id) return;
+  const nov = HOR.nov.find(n => n.id === id), files = [...(e.target.files || [])];
+  if(!nov || !files.length) return;
+  e.target.disabled = true;
+  if(await horSubirSoportes(nov, files)) horPintarNovedades(); else e.target.disabled = false;
+});
+document.getElementById('horSemana').addEventListener('click', async e => {
+  const ver = e.target.closest('[data-hor-ver-sop]'), quitar = e.target.closest('[data-hor-quitar-sop]');
+  if(!ver && !quitar) return;
+  const [id, i] = (ver || quitar).dataset[ver ? 'horVerSop' : 'horQuitarSop'].split('|');
+  const nov = HOR.nov.find(n => n.id === id), sop = nov && (nov.soportes || [])[Number(i)];
+  if(!sop) return;
+  if(ver){
+    const w = window.open('', '_blank'); // se abre ya para que el celular no lo bloquee
+    const { data, error } = await supa.storage.from('horario-soportes').createSignedUrl(sop.path, 300);
+    if(error || !data){ if(w) w.close(); showToast('No se pudo abrir el soporte' + (error ? ': ' + error.message : ''), 'danger'); return; }
+    if(w) w.location.href = data.signedUrl; else window.location.href = data.signedUrl;
+    return;
+  }
+  quitar.disabled = true;
+  const lista = nov.soportes.filter((_, j) => j !== Number(i));
+  const { error } = await supa.rpc('horario_novedad_soportes', { p_id: nov.id, p_soportes: lista });
+  if(error){ showToast('No se pudo quitar: ' + error.message, 'danger'); quitar.disabled = false; return; }
+  await supa.storage.from('horario-soportes').remove([sop.path]);
+  nov.soportes = lista; horPintarNovedades(); showToast('Soporte quitado', 'ok');
 });
 
 /* --- Registro del día (admin y líderes): quién vino, tarde o faltó, y horas reales. Cerrar bloquea; solo un admin reabre. --- */
@@ -4337,10 +4453,11 @@ function horPintarRegistro(){
         ${extras.map(p => `<li class="hor-issue">${escapeHtml(p.nombre)} vino sin estar en el horario</li>`).join('')}
       </ul>
       <span class="field-help">Cerrado${cerrado.cerrado_por ? ' por ' + escapeHtml(cerrado.cerrado_por) : ''} · ${escapeHtml(at)}${horEsAdmin() ? '' : ' · Solo un admin puede reabrirlo.'}</span>
-      ${horEsAdmin() ? '<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="reabrir">Reabrir el día</button></div>' : ''}
+      ${HOR.bloqueadas[fecha] && !horEsAdmin() ? `<span class="field-help" style="display:block">Este día está en la quincena cerrada por ${escapeHtml(HOR.bloqueadas[fecha].cerrado_por || 'el líder')}: si hay que corregir algo, pídeselo a un admin.</span>`
+        : horEsAdmin() ? '<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="reabrir">Reabrir el día</button></div>' : ''}
     </div></div>`;
   }
-  const ed = !cerrado;
+  const ed = !cerrado && !(HOR.bloqueadas[fecha] && !horEsAdmin());
   h += `<div class="hor-grid-wrap"><table class="hor-reg"><thead><tr><th>Persona</th><th>Turno</th><th>Llegó</th><th>Horas reales</th><th>Nota</th></tr></thead><tbody>`;
   if(!gente.length) h += '<tr><td colspan="5" class="field-help">Nadie tiene turno este día.</td></tr>';
   gente.forEach(p => {
@@ -4521,6 +4638,8 @@ async function prenCargar(per){
     supa.from('horario_festivos').select('*').gte('fecha', lunes1).lte('fecha', prenSumarDias(domingoN, 1)),
     supa.from('horario_salarios').select('*').eq('area_id', a),
   ]);
+  const cerrada = await supa.from('horario_quincenas_cerradas').select('*').eq('area_id', a).eq('desde', desde).maybeSingle();
+  const cambios = await supa.from('horario_cambios_cierre').select('*').eq('area_id', a).gte('fecha', desde).lte('fecha', hasta).order('at', { ascending: false });
   const err = [sem, nov, reg, cer, fes, sal].find(r => r.error);
   if(err) return { error: /horario_(festivos|salarios)|recargo|remunerado/.test(err.error.message) ? 'La pre-nómina todavía no está lista en la base de datos (falta correr sql/horarios_5_prenomina.sql).' : 'No se pudo cargar: ' + err.error.message };
   const semanas = sem.data || [];
@@ -4536,7 +4655,8 @@ async function prenCargar(per){
   const cerrados = {}; (cer.data || []).forEach(x => { cerrados[x.fecha] = x; });
   const festivos = {}; (fes.data || []).forEach(x => { festivos[x.fecha] = x.nombre; });
   const salarios = {}; (sal.data || []).forEach(x => { salarios[x.personal_id] = Number(x.salario); });
-  return { lunes1, lunesN, semPorLunes, asigPor, regPor, cerrados, festivos, salarios, nov: nov.data || [], desde, hasta };
+  return { lunes1, lunesN, semPorLunes, asigPor, regPor, cerrados, festivos, salarios, nov: nov.data || [], desde, hasta, cerrada: cerrada.error ? null : cerrada.data,
+    cambios: cambios.error || !cerrada.data ? [] : (cambios.data || []).filter(c => c.at > cerrada.data.cerrado_at) };
 }
 
 // Un día de una persona: tramos en minutos desde las 00:00 de ese día (ajustados con el registro) o la razón de no trabajar.
@@ -4622,6 +4742,10 @@ function prenRender(){
   let html = prenControlesHtml(periodos, per);
   // Avisos
   const avisos = [];
+  const q = PREN.datos.cerrada;
+  if(q) avisos.push(['ok', `<b>Quincena verificada y cerrada</b> por ${escapeHtml(q.cerrado_por || 'el líder')} · ${escapeHtml(new Date(q.cerrado_at).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))} · Los líderes ya no pueden cambiar estos datos; si un admin corrige algo, se avisa aquí.`]);
+  if(q && PREN.datos.cambios.length) avisos.push(['warn', `<b>Hubo ${PREN.datos.cambios.length} cambio${PREN.datos.cambios.length > 1 ? 's' : ''} después del cierre</b>: ${prenCambiosTexto(PREN.datos.cambios)}. Si ya le mandaste el archivo al contador, descárgalo otra vez.`]);
+  else if(!q && horIso(per.hasta) <= horHoy()) avisos.push(['warn', '<b>El líder todavía no ha cerrado esta quincena</b>: los datos todavía pueden cambiar. Espera a que la cierre en Horarios → Quincena antes de mandar el archivo.']);
   const sinPublicar = [];
   for(let l = lunes1; l <= lunesN; l = prenSumarDias(l, 7)){ const s = semPorLunes[l]; if(!s || s.estado !== 'publicada') sinPublicar.push(l); }
   if(sinPublicar.length) avisos.push(['warn', `<b>${sinPublicar.length === 1 ? 'Una semana' : sinPublicar.length + ' semanas'} sin publicar</b> (${sinPublicar.map(l => 'desde el ' + new Date(l + 'T12:00:00').getDate() + ' ' + HOR_MESES[new Date(l + 'T12:00:00').getMonth()].slice(0, 3)).join(', ')}). Se cuenta lo que haya en el borrador.`]);
@@ -4657,6 +4781,10 @@ function prenRender(){
   html += `<tr class="pren-total"><td>Total</td><td></td>${cols.map(c => `<td>${h2(tot(c[0]))}</td>`).join('')}<td></td>${PREN.pesos ? `<td>${prenPesos(res.reduce((s, r) => s + r.valor, 0))}</td>` : ''}</tr></tbody></table></div>`;
   html += prenSalariosHtml(res) + prenParametrosHtml();
   box.innerHTML = html;
+}
+function prenCambiosTexto(lista){
+  const f = iso => { const d = new Date(iso + 'T12:00:00'); return HOR_DC[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate(); };
+  return lista.slice(0, 6).map(c => `${escapeHtml(c.que)} (${f(c.fecha)}, ${escapeHtml(c.por || '?')})`).join('; ') + (lista.length > 6 ? ` y ${lista.length - 6} más` : '');
 }
 function prenPesos(n){ return '$' + Math.round(n).toLocaleString('es-CO'); }
 function prenDiaHtml(x){
@@ -4775,6 +4903,134 @@ document.getElementById('horSemana').addEventListener('change', async e => {
     }
   }
 });
+
+/* --- Quincena (admin y líderes): verificar y cerrar antes de la nómina. Cerrada, nadie cambia horario, registro ni
+   novedades de esos días (RLS con horario_fecha_bloqueada). Solo un admin la reabre, con motivo (horario_quincenas_historial). --- */
+const QUIN = { periodo: null, carga: 0 };
+async function horPintarQuincena(){
+  const box = document.getElementById('horSemana');
+  const periodos = prenPeriodos();
+  if(!QUIN.periodo) QUIN.periodo = periodos[1].id;
+  const per = periodos.find(p => p.id === QUIN.periodo) || periodos[1];
+  const sel = `<div class="hor-bar"><div class="field" style="margin:0"><label class="field-label" for="quinPeriodo">Quincena</label>
+    <select id="quinPeriodo">${periodos.map(p => `<option value="${p.id}"${p.id === per.id ? ' selected' : ''}>${prenTextoPeriodo(p)}${p.actual ? ' (en curso)' : ''}</option>`).join('')}</select></div></div>`;
+  box.innerHTML = sel + '<div class="empty-note">Revisando...</div>';
+  const carga = ++QUIN.carga;
+  const [datos, hist] = await Promise.all([
+    prenCargar(per),
+    supa.from('horario_quincenas_historial').select('*').eq('area_id', HOR.areaId).eq('desde', horIso(per.desde)).order('at', { ascending: false }),
+  ]);
+  if(carga !== QUIN.carga) return;
+  if(datos.error){ box.innerHTML = sel + `<div class="empty-note">${escapeHtml(datos.error)}</div>`; return; }
+  const res = prenCalcular(datos, per);
+  const desde = horIso(per.desde), hasta = horIso(per.hasta), hoy = horHoy();
+  const h2 = m => horNum(Math.round(m / 60 * 100) / 100);
+  const f = iso => { const d = new Date(iso + 'T12:00:00'); return HOR_DC[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate(); };
+  // Chequeos
+  const terminada = hasta <= hoy;
+  const sinPublicar = [];
+  for(let l = datos.lunes1; l <= datos.lunesN; l = prenSumarDias(l, 7)){ const s = datos.semPorLunes[l]; if(s && s.estado !== 'publicada') sinPublicar.push(l); }
+  const sinCerrar = [];
+  for(let d = desde; d <= hasta && d <= hoy; d = prenSumarDias(d, 1))
+    if(!datos.cerrados[d] && res.some(r => r.det.some(x => x.iso === d && x.tipo === 'turno' && !x.x.sinHorario))) sinCerrar.push(d);
+  const sinHorario = [];
+  for(let d = desde; d <= hasta; d = prenSumarDias(d, 1)){ const l = horIso(horLunesDe(new Date(d + 'T12:00:00'))); if(!datos.semPorLunes[l] && !sinHorario.includes(l)) sinHorario.push(l); }
+  const novs = datos.nov.filter(n => n.desde <= hasta && n.hasta >= desde);
+  const faltas = res.filter(r => r.falta).map(r => r.p.nombre + (r.falta > 1 ? ' (' + r.falta + ')' : ''));
+  const listo = terminada && !sinPublicar.length && !sinCerrar.length;
+  const item = (ok, txt, tipo) => `<li><span class="ic ${tipo || (ok ? 'ok' : 'no')}" aria-hidden="true">${tipo === 'info' ? 'i' : ok ? '✓' : '!'}</span><span>${txt}</span></li>`;
+  let html = sel;
+  const q = datos.cerrada;
+  if(q){
+    html += `<div class="hor-checks"><div class="hor-check ok"><h3><span class="badge ok">Cerrada</span> Quincena verificada</h3>
+      <span class="field-help">Cerrada por ${escapeHtml(q.cerrado_por || '')} · ${escapeHtml(new Date(q.cerrado_at).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}. Los líderes ya no pueden cambiar el horario, el registro ni las novedades de estos días; un admin sí, y cada cambio queda registrado.</span>
+      ${datos.cambios.length ? `<span class="field-help" style="display:block;margin-top:6px;color:var(--warn)"><b>Cambios después del cierre:</b> ${prenCambiosTexto(datos.cambios)}.</span>` : ''}
+      ${horEsAdmin() ? `<div class="hor-form" style="margin-top:10px"><div class="field full"><label class="field-label" for="quinMotivo">Motivo para reabrir</label><input type="text" id="quinMotivo" maxlength="300" placeholder="Ej.: corregir las horas de Omar del día 12"></div><div class="full"><button type="button" class="btn btn-danger-outline btn-small" data-quin="reabrir">Reabrir la quincena</button></div></div>` : '<span class="field-help" style="display:block;margin-top:6px">Si hay que corregir algo, pídele a un admin que la reabra.</span>'}
+    </div></div>`;
+  } else {
+    html += `<div class="hor-checks"><div class="hor-check${listo ? ' ok' : ''}"><h3>${listo ? '<span class="badge ok">Lista para cerrar</span>' : '<span class="badge warn">Falta</span>'} Revisión antes de la nómina</h3>
+      <ul class="quin-lista">
+        ${item(terminada, terminada ? 'La quincena ya terminó.' : `La quincena termina el ${per.hasta.getDate()} de ${HOR_MESES[per.hasta.getMonth()]}: podrás cerrarla ese día, después de cerrar el registro.`)}
+        ${item(!sinPublicar.length, sinPublicar.length ? `Semanas sin publicar: ${sinPublicar.map(l => 'desde el ' + f(l)).join(', ')}.` : 'Todas las semanas están publicadas.')}
+        ${item(!sinCerrar.length, sinCerrar.length ? `Días sin cerrar en el registro: ${sinCerrar.map(f).join(', ')}.` : 'Todos los días con turnos están cerrados en el registro.')}
+        ${sinHorario.length ? item(true, `Semanas sin horario en la app: ${sinHorario.map(l => 'desde el ' + f(l)).join(', ')}. No suman horas.`, 'info') : ''}
+        ${item(true, novs.length ? `Novedades: ${novs.map(n => { const p = HOR.personal.find(x => x.id === n.personal_id); return escapeHtml(p ? horCorto(p) : '?') + ' ' + HOR_TIPOS[n.tipo].toLowerCase() + (n.tipo === 'permiso' && n.remunerado === false ? ' no remunerado' : ''); }).join(', ')}. Revisa que estén todas.` : 'Sin novedades en la quincena. Si alguien faltó o tuvo incapacidad, anótalo antes de cerrar.', 'info')}
+        ${faltas.length ? item(true, `Faltas sin novedad: ${faltas.map(escapeHtml).join(', ')}.`, 'info') : ''}
+        ${(sinSop => sinSop.length ? item(true, `Incapacidades sin soporte: ${sinSop.join(', ')}. Adjúntalo en Novedades.`, 'info') : '')(novs.filter(n => n.tipo === 'incapacidad' && !(n.soportes || []).length).map(n => { const p = HOR.personal.find(x => x.id === n.personal_id); return escapeHtml(p ? horCorto(p) : '?'); }))}
+      </ul>
+    </div></div>`;
+  }
+  // Resumen de horas (sin pesos)
+  html += `<div class="hor-grid-wrap"><table class="pren-tabla" style="min-width:760px"><thead><tr><th>Persona</th><th>Días</th><th>Horas</th><th>Extra</th><th>Nocturnas</th><th>Dom/fest</th><th>Novedades</th></tr></thead><tbody>
+    ${res.map(r => { const m = r.min, ext = m.hed + m.hen + m.hedf + m.henf, noc = m.rn + m.dfn + m.hen + m.henf, df = m.dfd + m.dfn + m.hedf + m.henf;
+      const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
+      return `<tr><td>${escapeHtml(r.p.nombre)}</td><td>${r.dias}</td><td>${h2(m.h)}</td><td>${ext ? h2(ext) : '<span class="pren-cero">·</span>'}</td><td>${noc ? h2(noc) : '<span class="pren-cero">·</span>'}</td><td>${df ? h2(df) : '<span class="pren-cero">·</span>'}</td><td><div class="pren-chips">${chips || '<span class="pren-cero">·</span>'}</div></td></tr>`; }).join('')}
+  </tbody></table></div>`;
+  if(!q) html += `<div class="hor-publicar" style="margin-top:12px">
+      <label class="quin-confirmar"><input type="checkbox" id="quinOk"${listo ? '' : ' disabled'}>Revisé y la información es correcta</label>
+      <button type="button" class="btn btn-ok" data-quin="cerrar" disabled>Cerrar quincena</button>
+    </div>
+    <p class="field-help">Al cerrarla, los líderes ya no podrán cambiar el horario, el registro ni las novedades del ${per.desde.getDate()} al ${per.hasta.getDate()} de ${HOR_MESES[per.hasta.getMonth()]}. Un admin sí podrá corregir y cada cambio quedará registrado. El admin la verá lista para la pre-nómina.</p>`;
+  if((hist.data || []).length) html += `<div class="pren-sec" style="padding:12px 14px"><span class="field-label">Historial</span><ul class="quin-hist">${hist.data.map(x => `<li>${x.accion === 'cerrar' ? 'Cerrada' : 'Reabierta'} por ${escapeHtml(x.por || '?')} · ${escapeHtml(new Date(x.at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}${x.motivo ? ' · ' + escapeHtml(x.motivo) : ''}</li>`).join('')}</ul></div>`;
+  box.innerHTML = html;
+  QUIN.per = per;
+}
+document.getElementById('horSemana').addEventListener('change', e => {
+  if(HOR.sub !== 'quincena') return;
+  if(e.target.id === 'quinPeriodo'){ QUIN.periodo = e.target.value; horPintarQuincena(); }
+  if(e.target.id === 'quinOk') document.querySelector('[data-quin="cerrar"]').disabled = !e.target.checked;
+});
+document.getElementById('horSemana').addEventListener('click', async e => {
+  if(HOR.sub !== 'quincena') return;
+  const b = e.target.closest('[data-quin]'); if(!b || b.disabled) return;
+  const per = QUIN.per;
+  if(b.dataset.quin === 'cerrar'){
+    b.disabled = true;
+    const { error } = await supa.rpc('horario_cerrar_quincena', { p_area: HOR.areaId, p_desde: horIso(per.desde), p_hasta: horIso(per.hasta) });
+    if(error){ showToast('No se pudo cerrar: ' + error.message, 'danger'); horPintarQuincena(); return; }
+    showToast('Quincena cerrada. El admin ya la ve lista para la nómina.', 'ok');
+  } else if(b.dataset.quin === 'reabrir'){
+    const motivo = (document.getElementById('quinMotivo').value || '').trim();
+    if(!motivo){ showToast('Escribe el motivo para reabrir', 'warn'); document.getElementById('quinMotivo').focus(); return; }
+    b.disabled = true;
+    const { error } = await supa.rpc('horario_reabrir_quincena', { p_area: HOR.areaId, p_desde: horIso(per.desde), p_motivo: motivo });
+    if(error){ showToast('No se pudo reabrir: ' + error.message, 'danger'); b.disabled = false; return; }
+    showToast('Quincena reabierta', 'ok');
+  }
+  horCargarSemana().then(() => {});
+});
+
+// Avisos al abrir la app: al líder, cerrar la última quincena; al admin, que ya quedó cerrada (una vez por dispositivo).
+const HOR_AVISO_QUIN = new Set();
+async function avisarQuincena(){
+  if(!currentArea || !(currentArea.modules || []).includes('horarios') || HOR_AVISO_QUIN.has(currentArea.id)) return;
+  HOR_AVISO_QUIN.add(currentArea.id);
+  const per = prenPeriodos()[1], desde = horIso(per.desde), hasta = horIso(per.hasta);
+  const [ed, q, sem] = await Promise.all([
+    supa.rpc('horario_puede_editar', { p_area: currentArea.id }),
+    supa.from('horario_quincenas_cerradas').select('*').eq('area_id', currentArea.id).eq('desde', desde).maybeSingle(),
+    supa.from('horario_semanas').select('id').eq('area_id', currentArea.id).lte('lunes', hasta).gte('lunes', horIso(horLunesDe(per.desde))).limit(1),
+  ]);
+  if(!ed.data || q.error || sem.error || !(sem.data || []).length) return;
+  const texto = prenTextoPeriodo(per);
+  const ir = sub => { cerrarAviso('horQuinModal'); HOR.subPedida = sub; if(HOR.areaId === currentArea.id){ HOR.sub = sub; HOR.subPedida = null; } switchTab('horarios'); };
+  if(!q.data){
+    document.getElementById('horQuinTit').textContent = 'Cierra la quincena ' + texto;
+    document.getElementById('horQuinTxt').textContent = 'Antes de la nómina, revisa que el registro de cada día esté cerrado y las novedades completas, y cierra la quincena de ' + currentArea.name + '. Así nadie la puede cambiar después.';
+    document.getElementById('horQuinIr').textContent = 'Ir a cerrarla';
+    document.getElementById('horQuinIr').onclick = () => ir('quincena');
+    abrirAviso('horQuinModal');
+  } else if(horEsAdmin()){
+    const clave = 'horQuinVista:' + currentArea.id + ':' + desde;
+    try { if(localStorage.getItem(clave)) return; localStorage.setItem(clave, '1'); } catch(_){}
+    document.getElementById('horQuinTit').textContent = 'Quincena ' + texto + ' cerrada';
+    document.getElementById('horQuinTxt').textContent = `${currentArea.name}: la cerró ${q.data.cerrado_por || 'el líder'} el ${new Date(q.data.cerrado_at).toLocaleString('es-CO', { weekday: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · Ya puedes revisar la pre-nómina.`;
+    document.getElementById('horQuinIr').textContent = 'Ver pre-nómina';
+    document.getElementById('horQuinIr').onclick = () => ir('prenomina');
+    abrirAviso('horQuinModal');
+  }
+}
+document.getElementById('horQuinCerrar').addEventListener('click', () => cerrarAviso('horQuinModal'));
 
 /* --- Configuración (admin y líderes): reglas, estaciones, turnos, personal, tareas. Se desactiva, no se borra. --- */
 function horPintarConfig(){
