@@ -64,5 +64,5 @@ Fila "Bunker" (préstamo de personal a otro punto) en el horario original — pr
 ## Orden de fases
 1. Tablas + configuración + grilla manual con validaciones + publicar/WhatsApp + tarea Bunker.
 2. Novedades + registro del día.
-3. Asistente IA.
+3. Proponer semana SIN IA (reglas en la app, sin costo). Miguel decidió el 23 oct no pagar la API de Anthropic por ahora; el asistente con IA queda opcional para después.
 4. Demanda desde Toteat (bloqueada hasta resolver ventas en 0 de Dos Santos).

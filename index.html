@@ -1002,6 +1002,11 @@ nav.tabs button{position:relative;}
 .hor-cell .h{font:500 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim);}
 .hor-cell.desc, .hor-cell.desc:hover{background:var(--surface-2);} .hor-cell.desc .c{color:var(--text-muted); font-size:11.5px; letter-spacing:1px;}
 .hor-cell.otro{border-style:dashed; border-color:var(--border-strong);}
+.hor-prop{background:var(--info-bg); border:1px solid var(--info); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:var(--space-3);}
+.hor-prop h3{margin:0 0 6px; font-size:15px; color:var(--info); display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+.hor-prop ul{margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.5;}
+.hor-prop .riesgo{color:var(--warn); font-weight:600;}
+.hor-btn-prop{color:var(--info); border-color:var(--info);}
 .hor-cell.nov, .hor-cell.nov:hover{background:var(--warn-bg);} .hor-cell.nov .c{color:var(--warn); font-size:11px; letter-spacing:.6px;}
 .hor-novs{display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-4);}
 .hor-nov{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--warn); border-radius:var(--radius-md); padding:12px 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;}
@@ -3326,7 +3331,7 @@ const HOR_EXTRA_MAX = 12; // tope legal de horas extra a la semana (solo aviso)
 const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], turnos:[], tareas:[], lunes:null, semana:null,
   asig:{}, tareaAsig:{}, domPasadoTemprano:new Set(), haySemanaAnterior:false, sub:'semana', confirmar:false, verTexto:false,
   imgBlob:null, carga:0, error:null,
-  nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false };
+  nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false, propuesta:null, pedirReemplazo:false };
 const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', vacante:'Vacante', retardo:'Retardo' };
 const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', vacante:'VACANTE', retardo:'RETARDO' };
 const HOR_AYUDA_NOV = {
@@ -3552,6 +3557,7 @@ const HOR_ICO = {
   der: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>',
   imagen: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',
   enviar: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>',
+  chispa: '<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15v4M17 17h4"/></svg>',
   copiar: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
 };
 
@@ -3566,6 +3572,7 @@ function horPintarSemana(){
       ${s ? (s.estado === 'publicada' ? '<span class="badge ok">Publicada</span>' : '<span class="badge warn">Borrador</span>') : ''}
     </div>
     ${HOR.editor && s && s.estado === 'publicada' ? `<button type="button" class="btn btn-secondary btn-small" data-hor-act="borrador">Volver a borrador</button>` : ''}
+    ${HOR.editor && s && s.estado === 'borrador' ? `<button type="button" class="btn btn-secondary btn-small hor-btn-prop" data-hor-act="proponer">${HOR_ICO.chispa}Proponer semana</button>` : ''}
   </div>`;
   if(!s){
     html += HOR.editor
@@ -3573,12 +3580,17 @@ function horPintarSemana(){
           <span>${HOR.personal.some(p => p.activo) ? 'Empieza con los descansos fijos de cada persona o copia la semana anterior.' : 'Primero carga el personal, las estaciones y los turnos en Configuración.'}</span>
           <div class="hor-acciones" style="justify-content:center">
             ${HOR.haySemanaAnterior ? `<button type="button" class="btn btn-secondary" data-hor-act="copiar">${HOR_ICO.copiar}Copiar semana anterior</button>` : ''}
-            <button type="button" class="btn btn-accent" data-hor-act="crear"${HOR.personal.some(p => p.activo) ? '' : ' disabled'}>Empezar con los descansos fijos</button>
+            <button type="button" class="btn btn-secondary" data-hor-act="crear"${HOR.personal.some(p => p.activo) ? '' : ' disabled'}>Empezar con los descansos fijos</button>
+            <button type="button" class="btn btn-accent" data-hor-act="proponer"${HOR.personal.some(p => p.activo) && HOR.turnos.some(t => t.activo) ? '' : ' disabled'}>${HOR_ICO.chispa}Proponer semana</button>
           </div></div>`
       : `<div class="hor-vacio"><b>El horario de esta semana todavía no está publicado</b><span>Cuando el líder lo publique, lo verás aquí.</span></div>`;
     box.innerHTML = html; return;
   }
   const v = horValidar();
+  if(HOR.pedirReemplazo && horEditable()) html += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">Proponer semana</span> ¿Reemplazar lo que ya hay?</h3>
+    <span class="field-help">La propuesta reemplaza todos los turnos y el Bunker de esta semana. Después puedes editar lo que quieras antes de publicar.</span>
+    <div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-accent btn-small" data-hor-act="proponer">Reemplazar con la propuesta</button><button type="button" class="btn btn-secondary btn-small" data-hor-act="noreemplazar">Cancelar</button></div></div></div>`;
+  if(HOR.propuesta && horEditable()) html += horPropuestaHtml();
   if(horEditable()) html += horChecksHtml(v);
   if(HOR.editor && s.estado === 'publicada') html += horCambiosHtml(v);
   html += horGrillaHtml(v);
@@ -3734,7 +3746,13 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   }
   const btn = e.target.closest('[data-hor-act]'); if(!btn || btn.disabled) return;
   const act = btn.dataset.horAct;
-  if(act === 'ant' || act === 'sig'){ HOR.lunes.setDate(HOR.lunes.getDate() + (act === 'ant' ? -7 : 7)); HOR.verTexto = false; HOR.diaReg = null; HOR.agregar = false; horCargarSemana(); }
+  if(act === 'ant' || act === 'sig'){ HOR.lunes.setDate(HOR.lunes.getDate() + (act === 'ant' ? -7 : 7)); HOR.verTexto = false; HOR.diaReg = null; HOR.agregar = false; HOR.propuesta = null; HOR.pedirReemplazo = false; horCargarSemana(); }
+  else if(act === 'proponer'){
+    if(HOR.semana && Object.values(HOR.asig).some(a => a.tipo !== 'descanso') && !HOR.pedirReemplazo){ HOR.pedirReemplazo = true; horPintarSemana(); return; }
+    btn.disabled = true; await horProponerSemana();
+  }
+  else if(act === 'noreemplazar'){ HOR.pedirReemplazo = false; horPintarSemana(); }
+  else if(act === 'cerrarprop'){ HOR.propuesta = null; horPintarSemana(); }
   else if(act === 'crear' || act === 'copiar'){ btn.disabled = true; await horCrearSemana(act === 'copiar'); }
   else if(act === 'publicar'){
     btn.disabled = true;
@@ -3802,6 +3820,147 @@ async function horCrearSemana(copiar){
   if(tareas.length) await supa.from('horario_tarea_asignaciones').insert(tareas);
   showToast(copiar ? 'Semana copiada como borrador' : 'Semana creada con los descansos fijos', 'ok');
   horCargarSemana();
+}
+
+/* --- Proponer semana (sin IA, sin costo): reglas fijas en la app ---
+   1) Descanso = día fijo de cada persona.  2) Turnos = los de la semana pasada para esa persona y ese día;
+   sin semana pasada: producción → turno de mañana más largo; el resto alterna turno partido / turno de cierre.
+   3) Domingo por estación: rota quién sale temprano y quién cierra respecto al domingo pasado.
+   4) Tareas (Bunker): se reparten entre quienes trabajan ese día, primero quien menos lleva (máx. 2), sin producción si hay otros.
+   5) Huecos de cobertura por novedades y horas sobre la jornada se dejan como riesgos para que decida el líder. */
+async function horProponerSemana(){
+  let sem = HOR.semana;
+  if(!sem){
+    const { data, error } = await supa.from('horario_semanas').insert({ area_id: HOR.areaId, lunes: horIso(HOR.lunes) }).select().single();
+    if(error){ showToast('No se pudo crear la semana: ' + error.message, 'danger'); horCargarSemana(); return; }
+    sem = data;
+  }
+  const prev = new Date(HOR.lunes); prev.setDate(prev.getDate() - 7);
+  const { data: ant } = await supa.from('horario_semanas').select('id').eq('area_id', HOR.areaId).eq('lunes', horIso(prev)).maybeSingle();
+  const hist = {}, histTareas = {};
+  if(ant){
+    const [a, t] = await Promise.all([
+      supa.from('horario_asignaciones').select('*').eq('semana_id', ant.id),
+      supa.from('horario_tarea_asignaciones').select('*').eq('semana_id', ant.id),
+    ]);
+    (a.data || []).forEach(x => { hist[x.personal_id + '|' + x.dia] = x; });
+    (t.data || []).forEach(x => { histTareas[x.tarea_id + '|' + x.dia] = x.personal_id; });
+  }
+  const prop = horCalcularPropuesta(hist, histTareas);
+  const del1 = await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id);
+  const del2 = await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', sem.id);
+  if(del1.error || del2.error){ showToast('No se pudo preparar la semana: ' + (del1.error || del2.error).message, 'danger'); horCargarSemana(); return; }
+  if(prop.filas.length){
+    const { error } = await supa.from('horario_asignaciones').insert(prop.filas.map(x => ({ semana_id: sem.id, ...x })));
+    if(error){ showToast('No se pudo guardar la propuesta: ' + error.message, 'danger'); horCargarSemana(); return; }
+  }
+  if(prop.tareas.length) await supa.from('horario_tarea_asignaciones').insert(prop.tareas.map(x => ({ semana_id: sem.id, ...x })));
+  HOR.pedirReemplazo = false;
+  await horCargarSemana();
+  // Los riesgos se calculan con la grilla ya guardada (cobertura con novedades, horas).
+  const v = horValidar();
+  const cobertura = v.err.filter(i => i.k.startsWith('cov|')).map(i => i.t);
+  const horas = horPersonasSemana().filter(p => p.activo && horHoras(p.id) > horJornada());
+  HOR.propuesta = {
+    notas: prop.notas,
+    riesgos: prop.riesgos.concat(cobertura.map(t => t + prop.sugerencias(t)),
+      horas.length ? [`${horas.length} persona${horas.length > 1 ? 's quedan' : ' queda'} sobre ${horNum(horJornada())} h (${horas.map(p => horCorto(p) + ' ' + horNum(horHoras(p.id))).join(', ')}). Para bajarlo, acorta turnos los días de menos movimiento.`] : []),
+  };
+  horPintarSemana();
+  showToast('Propuesta cargada como borrador', 'ok');
+}
+
+function horCalcularPropuesta(hist, histTareas){
+  const turnos = HOR.turnos.filter(t => t.activo).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+  const porId = id => turnos.find(t => t.id === id);
+  const manana = turnos.filter(t => t.cubre_manana && !t.cubre_cierre);
+  const cierre = turnos.filter(t => t.cubre_cierre && !t.cubre_manana);
+  const ambos = turnos.filter(t => t.cubre_manana && t.cubre_cierre);
+  const tProd = [...manana].sort((a, b) => b.horas - a.horas)[0] || turnos[0];
+  const tPartido = ambos[0] || cierre[0] || turnos[0];
+  const tCierre = cierre[Math.floor(cierre.length / 2)] || cierre[0] || turnos[0];
+  // Domingo: los turnos que se usaron el domingo pasado; si no hay, mañana más corto y el último de cierre.
+  const masUsado = lista => { const c = {}; lista.forEach(id => { c[id] = (c[id] || 0) + 1; }); return Object.keys(c).sort((a, b) => c[b] - c[a])[0]; };
+  const domHist = Object.values(hist).filter(a => a.dia === 7 && a.tipo === 'turno' && porId(a.turno_id));
+  const tTemprano = porId(masUsado(domHist.filter(a => a.cubre_manana && !a.cubre_cierre).map(a => a.turno_id))) || [...manana].sort((a, b) => a.horas - b.horas)[0] || tPartido;
+  const tCierreDom = porId(masUsado(domHist.filter(a => a.cubre_cierre && !a.cubre_manana).map(a => a.turno_id))) || cierre[cierre.length - 1] || tCierre;
+  const fila = (p, dia, t) => ({ personal_id: p.id, dia, tipo: 'turno', turno_id: t.id, codigo: t.codigo, horas: t.horas, cubre_manana: t.cubre_manana, cubre_cierre: t.cubre_cierre });
+  const filas = [], notas = [], riesgos = [];
+  const activos = HOR.personal.filter(p => p.activo);
+  let deHistoria = 0, porDefecto = 0;
+  const grupos = horGrupos();
+  for(const { e, gente } of grupos){
+    const miembros = gente.filter(p => p.activo);
+    miembros.forEach((p, i) => {
+      for(let d = 1; d <= 7; d++){
+        if(p.descanso_dia === d){ filas.push({ personal_id: p.id, dia: d, tipo: 'descanso', horas: 0 }); continue; }
+        if(d === 7 && !p.es_produccion && e.id && Number((e.minimo_por_dia || [])[6]) > 0) continue; // se reparte abajo
+        const h = hist[p.id + '|' + d], t = h && h.tipo === 'turno' && porId(h.turno_id);
+        if(t){ filas.push(fila(p, d, t)); deHistoria++; continue; }
+        filas.push(fila(p, d, p.es_produccion ? tProd : (i % 2 === 0 ? tPartido : tCierre))); porDefecto++;
+      }
+    });
+    // Domingo: quien salió temprano el domingo pasado ahora cierra; los demás salen temprano. Al menos uno de cada uno.
+    if(e.id && Number((e.minimo_por_dia || [])[6]) > 0){
+      const dom = miembros.filter(p => !p.es_produccion && p.descanso_dia !== 7);
+      if(dom.length){
+        let cierran = dom.filter(p => HOR.domPasadoTemprano.has(p.id));
+        let temprano = dom.filter(p => !HOR.domPasadoTemprano.has(p.id));
+        if(!cierran.length && temprano.length > 1){ cierran = temprano.filter((_, i) => i % 2 === 0); temprano = temprano.filter((_, i) => i % 2 === 1); }
+        if(!temprano.length && cierran.length > 1){ temprano = [cierran.pop()]; }
+        temprano.forEach(p => filas.push(fila(p, 7, tTemprano)));
+        cierran.forEach(p => filas.push(fila(p, 7, tCierreDom)));
+        if(dom.length > 1) notas.push(`Domingo en ${e.nombre}: salen temprano ${temprano.map(horCorto).join(', ')} (${tTemprano.codigo}); cierran ${cierran.map(horCorto).join(', ')} (${tCierreDom.codigo}).`);
+      }
+    }
+  }
+  notas.unshift('Descansos: el día fijo de cada persona; de viernes a domingo solo descansa producción.');
+  notas.unshift(deHistoria && !porDefecto ? 'Turnos: los mismos de la semana pasada para cada persona y día.'
+    : deHistoria ? `Turnos: los de la semana pasada; donde no había (${porDefecto} casillas) se usó el turno por defecto de la estación.`
+    : `No hay semana anterior: producción en ${tProd.codigo} y el resto alternando ${tPartido.codigo} y ${tCierre.codigo}. Ajusta y la próxima semana se copia de esta.`);
+  activos.filter(p => !p.descanso_dia).forEach(p => riesgos.push(`${p.nombre} no tiene descanso fijo: quedó trabajando toda la semana. Ponle su día en Configuración.`));
+  const ausentes = activos.filter(p => [1,2,3,4,5,6,7].some(d => horNovedad(p.id, d)));
+  if(ausentes.length) notas.push(`Novedades: ${ausentes.map(horCorto).join(', ')} no viene${ausentes.length > 1 ? 'n' : ''} algún día; sus casillas quedan tapadas y no cuentan.`);
+
+  // Tareas diarias
+  const trabajaProp = (pid, d) => filas.some(x => x.personal_id === pid && x.dia === d && x.tipo !== 'descanso') && !horNovedad(pid, d);
+  const tareas = [];
+  for(const t of HOR.tareas.filter(t => t.activa)){
+    const cuenta = {}, vacios = [];
+    for(let d = 1; d <= 7; d++){
+      const cand = activos.filter(p => trabajaProp(p.id, d));
+      const sinProd = cand.filter(p => !p.es_produccion);
+      const lista = (sinProd.length ? sinProd : cand).filter(p => (cuenta[p.id] || 0) < 2);
+      if(!lista.length){ vacios.push(d); continue; }
+      lista.sort((a, b) => (cuenta[a.id] || 0) - (cuenta[b.id] || 0)
+        || (histTareas[t.id + '|' + d] === a.id) - (histTareas[t.id + '|' + d] === b.id)
+        || (a.orden || 0) - (b.orden || 0));
+      const elegido = lista[0];
+      cuenta[elegido.id] = (cuenta[elegido.id] || 0) + 1;
+      tareas.push({ tarea_id: t.id, dia: d, personal_id: elegido.id });
+    }
+    notas.push(`${t.nombre}: repartido entre quienes trabajan cada día, máximo 2 veces por persona, sin repetir el mismo día de la semana pasada.`);
+    if(vacios.length) riesgos.push(`${t.nombre} sin asignar: ${vacios.map(d => HOR_DIAS[d - 1].toLowerCase()).join(', ')}.`);
+  }
+  // Sugerencia para huecos: quién de esa estación descansa ese día.
+  const sugerencias = texto => {
+    const m = texto.match(/^(.+) el (\S+): hay/); if(!m) return '';
+    const e = HOR.estaciones.find(x => x.nombre === m[1]), d = HOR_DIAS.findIndex(x => x.toLowerCase() === m[2]) + 1;
+    if(!e || !d) return '';
+    const libres = activos.filter(p => p.estacion_id === e.id && p.descanso_dia === d && !horNovedad(p.id, d));
+    return libres.length ? ` Podría cubrir ${libres.map(horCorto).join(' o ')} (ese día descansa), o alguien de otra estación.` : ' Hay que pedir apoyo de otra estación.';
+  };
+  return { filas, tareas, notas, riesgos, sugerencias };
+}
+function horPropuestaHtml(){
+  const p = HOR.propuesta;
+  return `<div class="hor-prop">
+    <h3>${HOR_ICO.chispa}Propuesta de la semana <span class="badge info">Borrador</span></h3>
+    <ul>${p.notas.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    ${p.riesgos.length ? `<ul>${p.riesgos.map(r => `<li class="riesgo">${escapeHtml(r)}</li>`).join('')}</ul>` : ''}
+    <span class="field-help">Revisa la grilla y cambia lo que quieras antes de publicar.</span>
+    <div class="hor-acciones" style="margin-top:6px"><button type="button" class="btn btn-ghost btn-small" data-hor-act="cerrarprop">Ocultar explicación</button></div>
+  </div>`;
 }
 
 /* --- Elegir turno de una casilla --- */
