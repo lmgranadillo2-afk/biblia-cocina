@@ -1012,6 +1012,12 @@ nav.tabs button{position:relative;}
 .hor-marca.noct{background:var(--info-bg); color:var(--info);}
 .hor-otro-prev{font-size:13px; color:var(--text-muted); margin:0 0 8px;}
 .pren-controles{align-items:flex-end;}
+.hor-reg tr.cerrado td{background:var(--surface-2);}
+.hor-reg tr.habilitado td{background:var(--warn-bg);}
+.hor-reg .acc{white-space:nowrap; text-align:right;}
+.hor-reg .acc .btn{min-height:36px;}
+.hor-hab-form{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+.hor-hab-form input{flex:1; min-width:200px;}
 .hor-soportes{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;}
 .hor-sop{display:inline-flex; align-items:center; border:1px solid var(--border-strong); border-radius:var(--radius-md); background:var(--surface); overflow:hidden; max-width:100%;}
 .hor-sop button{border:none; background:none; cursor:pointer; font:500 13px 'Inter',sans-serif; color:var(--text); min-height:36px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; min-width:0;}
@@ -3417,13 +3423,14 @@ const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], t
   asig:{}, tareaAsig:{}, domPasadoTemprano:new Set(), haySemanaAnterior:false, sub:'semana', confirmar:false, verTexto:false,
   imgBlob:null, carga:0, error:null,
   nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false, propuesta:null, pedirReemplazo:false,
-  quincenas:[], bloqueadas:{}, habilitados:{}, subPedida:null };
+  quincenas:[], bloqueadas:{}, habilitados:{}, habilitando:null, subPedida:null };
 // Días de la semana que están en una quincena cerrada (nadie los puede cambiar).
 function horBloqueado(dia){ return !!HOR.bloqueadas[horIso(horFecha(dia))]; }
-// Un día de quincena cerrada solo se corrige si un admin lo habilitó (horario_dias_habilitados); lo corrige el líder.
-function horBloqueadoParaMi(dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !HOR.habilitados[f]; }
-function horRangoBloqueadoParaMi(desde, hasta){
-  for(let f = desde; f <= hasta; f = prenSumarDias(f, 1)) if(HOR.quincenas.some(q => f >= q.desde && f <= q.hasta) && !HOR.habilitados[f]) return true;
+// Un turno de quincena cerrada solo se corrige si un admin lo habilitó (horario_turnos_habilitados, persona + día); lo corrige el líder.
+function horBloqueadoPersona(pid, dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !HOR.habilitados[pid + '|' + f]; }
+function horBloqueadoDia(dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !Object.keys(HOR.habilitados).some(k => k.endsWith('|' + f)); }
+function horRangoBloqueadoPersona(pid, desde, hasta){
+  for(let f = desde; f <= hasta; f = prenSumarDias(f, 1)) if(HOR.quincenas.some(q => f >= q.desde && f <= q.hasta) && !HOR.habilitados[pid + '|' + f]) return true;
   return false;
 }
 const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', vacante:'Vacante', retardo:'Retardo' };
@@ -3562,8 +3569,8 @@ async function horCargarSemana(){
   consultas.push(supa.from('horario_quincenas_cerradas').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes)
     .then(r => { quincenas = r.error ? [] : (r.data || []); }));
   if(HOR.editor){
-    consultas.push(supa.from('horario_dias_habilitados').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
-      .then(r => { (r.error ? [] : (r.data || [])).forEach(x => { habilitados[x.fecha] = x; }); }));
+    consultas.push(supa.from('horario_turnos_habilitados').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
+      .then(r => { (r.error ? [] : (r.data || [])).forEach(x => { habilitados[x.personal_id + '|' + x.fecha] = x; }); }));
     consultas.push(supa.from('horario_novedades').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes).order('desde')
       .then(r => { nov = r.data || []; }));
     consultas.push(supa.from('horario_registro_dia').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
@@ -3721,7 +3728,7 @@ function horPintarSemana(){
   }
   const v = horValidar();
   const bloq = [1,2,3,4,5,6,7].filter(horBloqueado);
-  if(bloq.length && HOR.editor) html += `<div class="pren-aviso info">${bloq.length === 7 ? 'Toda esta semana está' : 'Del ' + horFecha(bloq[0]).getDate() + ' al ' + horFecha(bloq[bloq.length - 1]).getDate() + ' la semana está'} en una quincena cerrada: esos días no se pueden cambiar. ${horEsAdmin() ? 'Si hay que corregir algo, habilita el día en Registro del día y el líder hace la corrección.' : 'Si hay que corregir algo, pídele a un admin que habilite el día.'}${Object.keys(HOR.habilitados).length ? ' <b>Habilitado para corrección: ' + Object.keys(HOR.habilitados).sort().map(f => HOR_DC[(new Date(f + "T12:00:00").getDay() + 6) % 7].toLowerCase() + ' ' + Number(f.slice(8))).join(', ') + '.</b>' : ''}</div>`;
+  if(bloq.length && HOR.editor) html += `<div class="pren-aviso info">${bloq.length === 7 ? 'Toda esta semana está' : 'Del ' + horFecha(bloq[0]).getDate() + ' al ' + horFecha(bloq[bloq.length - 1]).getDate() + ' la semana está'} en una quincena cerrada: esos días no se pueden cambiar. ${horEsAdmin() ? 'Si hay que corregir un turno, habilítalo en Registro del día y el líder hace la corrección.' : 'Si hay que corregir un turno, pídele a un admin que lo habilite.'}${Object.keys(HOR.habilitados).length ? ' <b>Habilitado para corrección: ' + Object.values(HOR.habilitados).map(x => { const p = HOR.personal.find(y => y.id === x.personal_id); return (p ? horCorto(p) : '?') + ' ' + HOR_DC[(new Date(x.fecha + "T12:00:00").getDay() + 6) % 7].toLowerCase() + ' ' + Number(x.fecha.slice(8)); }).join(', ') + '.</b>' : ''}</div>`;
   if(HOR.pedirReemplazo && horEditable()) html += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">Proponer semana</span> ¿Reemplazar lo que ya hay?</h3>
     <span class="field-help">La propuesta reemplaza todos los turnos y el Bunker de esta semana. Después puedes editar lo que quieras antes de publicar.</span>
     <div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-accent btn-small" data-hor-act="proponer">Reemplazar con la propuesta</button><button type="button" class="btn btn-secondary btn-small" data-hor-act="noreemplazar">Cancelar</button></div></div></div>`;
@@ -3830,7 +3837,7 @@ function horGrillaHtml(v){
           sub = `<span class="h">${horNum(a.horas)} h${a.cubre_manana ? '<span class="hor-marca">M</span>' : ''}${a.cubre_cierre ? '<span class="hor-marca">C</span>' : ''}${noc ? `<span class="hor-marca noct" title="${horNum(noc)} h nocturnas">N${horNum(noc)}</span>` : ''}${a.tipo === 'otro' ? '<span class="hor-marca">OTRO</span>' : ''}</span>`;
         }
         if(lvl) cls += ' ' + lvl;
-        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed && !horBloqueadoParaMi(d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
+        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed && !horBloqueadoPersona(p.id, d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
       }
       const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
       const nn = horNocDe(p.id);
@@ -3853,7 +3860,7 @@ function horGrillaHtml(v){
     h += `<tr class="hor-tarea"><td class="hor-first"><span class="hor-pname">${escapeHtml(t.nombre)}</span><span class="hor-pmeta">${escapeHtml(t.detalle || 'tarea del día')}</span></td>`;
     for(let d = 1; d <= 7; d++){
       const pid = HOR.tareaAsig[t.id + '|' + d], lvl = v.tar[t.id + '|' + d] || '';
-      if(ed && !horBloqueadoParaMi(d)){
+      if(ed && !horBloqueadoDia(d)){
         const ops = horPersonasSemana().filter(p => horTrabaja(p.id, d) || p.id === pid)
           .map(p => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>${escapeHtml(horCorto(p))}${horTrabaja(p.id, d) ? '' : ' (no trabaja)'}</option>`).join('');
         h += `<td class="hor-cw"><select id="horc-tar-${t.id}-${d}" class="${lvl}" data-hor-tarea="${t.id}|${d}" aria-label="${escapeHtml(t.nombre + ' del ' + HOR_DIAS[d - 1].toLowerCase())}"><option value="">Sin asignar</option>${ops}</select></td>`;
@@ -3870,7 +3877,7 @@ function horGrillaHtml(v){
 /* --- Acciones de la semana --- */
 document.getElementById('horSemana').addEventListener('click', async e => {
   const cell = e.target.closest('[data-hor-cell]');
-  if(cell){ if(horEditable() && !horBloqueadoParaMi(Number(cell.dataset.horCell.split('|')[1]))) horAbrirCelda(cell.dataset.horCell); return; }
+  if(cell){ const [cp, cd] = cell.dataset.horCell.split('|'); if(horEditable() && !horBloqueadoPersona(cp, Number(cd))) horAbrirCelda(cell.dataset.horCell); return; }
   const irSub = e.target.closest('[data-hor-ir-sub]');
   if(irSub){ HOR.sub = irSub.dataset.horIrSub; horPintarSub(); horPintar(); return; }
   const ir = e.target.closest('[data-hor-ir]');
@@ -4318,7 +4325,7 @@ function horPintarNovedades(){
         <div class="m">${horRangoNov(n)}${n.creado_por ? ' · por ' + escapeHtml(n.creado_por) : ''}</div>
         ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}
         ${horSoportesHtml(n)}</div>
-      ${horRangoBloqueadoParaMi(n.desde, n.hasta) ? '<span class="badge neutral">Quincena cerrada</span>' : `<button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>`}
+      ${horRangoBloqueadoPersona(n.personal_id, n.desde, n.hasta) ? '<span class="badge neutral">Quincena cerrada</span>' : `<button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>`}
     </div>`).join('') : '<div class="empty-note">Sin novedades esta semana.</div>'}</div>`;
   h += `<form class="hor-form" id="horNovForm">
     <div class="field"><label class="field-label" for="horNovP">Persona</label><select id="horNovP" required>${HOR.personal.filter(p => p.activo).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
@@ -4432,7 +4439,7 @@ function horPintarRegistro(){
   if(!HOR.semana){ box.innerHTML = h + '<div class="empty-note">Esta semana todavía no tiene horario. Ármalo en Semana para poder llevar el registro.</div>'; return; }
   const hoy = horHoy();
   if(!HOR.diaReg){ let d = 1; for(let i = 1; i <= 7; i++) if(horIso(horFecha(i)) <= hoy) d = i; HOR.diaReg = d; }
-  const d = HOR.diaReg, fecha = horIso(horFecha(d)), cerrado = HOR.cerrados[fecha];
+  const d = HOR.diaReg, fecha = horIso(horFecha(d)), diaCerrado = HOR.cerrados[fecha], enQuincena = HOR.bloqueadas[fecha];
   h += `<div class="hor-dias" role="tablist" aria-label="Día">${HOR_DC.map((n, i) => {
     const f = horIso(horFecha(i + 1));
     return `<button type="button" data-hor-dia="${i + 1}" class="${i + 1 === d ? 'active' : ''}"${f > hoy ? ' disabled' : ''}>${n} ${horFecha(i + 1).getDate()}${HOR.cerrados[f] ? ' ✓' : f === hoy ? ' · hoy' : ''}</button>`;
@@ -4444,13 +4451,17 @@ function horPintarRegistro(){
     .map(r => HOR.personal.find(p => p.id === r.personal_id)).filter(Boolean);
   const gente = programados.concat(extras);
   const ausentes = personas.filter(p => horNovedad(p.id, d));
-  h += `<div class="hor-bar" style="margin-top:0"><div class="hor-nav"><span class="hor-rango">${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}</span>${cerrado ? '<span class="badge ok">Día cerrado</span>' : '<span class="badge warn">Abierto</span>'}</div></div>`;
+  const cerradosN = gente.filter(p => (HOR.reg[p.id + '|' + fecha] || {}).cerrado).length;
+  h += `<div class="hor-bar" style="margin-top:0"><div class="hor-nav"><span class="hor-rango">${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}</span>
+    ${diaCerrado ? '<span class="badge ok">Día cerrado</span>' : `<span class="badge ${cerradosN ? 'info' : 'warn'}">${cerradosN} de ${gente.length} turnos cerrados</span>`}
+    ${enQuincena ? '<span class="badge neutral">Quincena cerrada</span>' : ''}</div></div>`;
   if(ausentes.length) h += `<p class="field-help" style="margin:0 0 10px"><b>No vienen:</b> ${ausentes.map(p => escapeHtml(p.nombre) + ' (' + HOR_TIPOS[horNovedad(p.id, d).tipo].toLowerCase() + ')').join(', ')}.</p>`;
-  if(cerrado){
+  const habHoy = Object.values(HOR.habilitados).filter(x => x.fecha === fecha);
+  habHoy.forEach(x => { const p = HOR.personal.find(y => y.id === x.personal_id); h += `<div class="pren-aviso warn"><b>Turno de ${escapeHtml(p ? p.nombre : '?')} habilitado para corrección</b> por ${escapeHtml(x.habilitado_por || 'un admin')}: ${escapeHtml(x.motivo)}. Corrígelo y vuelve a cerrarlo; al cerrarlo queda bloqueado otra vez.</div>`; });
+  if(diaCerrado){
     const filas = gente.map(p => ({ p, r: horFilaReg(p.id, fecha, d) }));
     const tarde = filas.filter(x => x.r.estado === 'tarde'), falto = filas.filter(x => x.r.estado === 'falto');
     const prog = programados.reduce((a, p) => a + (Number(HOR.asig[p.id + '|' + d].horas) || 0), 0), real = filas.reduce((a, x) => a + (Number(x.r.horas_reales) || 0), 0);
-    const at = new Date(cerrado.cerrado_at).toLocaleString('es-CO', { weekday:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
     h += `<div class="hor-checks"><div class="hor-check ok">
       <h3><span class="badge ok">Resumen</span> ${filas.length - falto.length} de ${filas.length} vinieron</h3>
       <ul>
@@ -4458,38 +4469,46 @@ function horPintarRegistro(){
         ${tarde.map(x => `<li class="hor-issue">${escapeHtml(x.p.nombre)} llegó ${x.r.minutos_tarde || '?'} min tarde (quedó como novedad)</li>`).join('')}
         ${falto.map(x => `<li class="hor-issue" style="color:var(--danger);font-weight:600">${escapeHtml(x.p.nombre)} faltó sin novedad${x.r.nota ? ': ' + escapeHtml(x.r.nota) : ''}</li>`).join('')}
         ${extras.map(p => `<li class="hor-issue">${escapeHtml(p.nombre)} vino sin estar en el horario</li>`).join('')}
-      </ul>
-      <span class="field-help">Cerrado${cerrado.cerrado_por ? ' por ' + escapeHtml(cerrado.cerrado_por) : ''} · ${escapeHtml(at)}${horEsAdmin() ? '' : ' · Solo un admin puede reabrirlo.'}</span>
-      ${HOR.bloqueadas[fecha] ? (horEsAdmin()
-          ? `<div class="hor-form" style="margin-top:10px"><span class="field-help full">Este día está en la quincena cerrada. Para corregirlo, habilítalo: el líder hace la corrección y lo vuelve a cerrar.</span><div class="field full"><label class="field-label" for="horHabMotivo">Qué hay que corregir</label><input type="text" id="horHabMotivo" maxlength="300" placeholder="Ej.: Omar sí vino, quedó como falta"></div><div class="full"><button type="button" class="btn btn-secondary btn-small" data-hor-act="habilitar">Habilitar corrección para el líder</button></div></div>`
-          : `<span class="field-help" style="display:block">Este día está en la quincena cerrada por ${escapeHtml(HOR.bloqueadas[fecha].cerrado_por || 'el líder')}: si hay que corregir algo, pídele a un admin que lo habilite.</span>`)
-        : horEsAdmin() ? '<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="reabrir">Reabrir el día</button></div>' : ''}
-    </div></div>`;
+      </ul></div></div>`;
   }
-  const ed = !cerrado && !(HOR.bloqueadas[fecha] && !HOR.habilitados[fecha]);
-  if(HOR.habilitados[fecha] && !cerrado) h += `<div class="pren-aviso warn"><b>Día habilitado para corrección</b> por ${escapeHtml(HOR.habilitados[fecha].habilitado_por || 'un admin')}: ${escapeHtml(HOR.habilitados[fecha].motivo)}. Corrige y vuelve a cerrar el día; al cerrarlo queda bloqueado otra vez.</div>`;
-  h += `<div class="hor-grid-wrap"><table class="hor-reg"><thead><tr><th>Persona</th><th>Turno</th><th>Llegó</th><th>Horas reales</th><th>Nota</th></tr></thead><tbody>`;
-  if(!gente.length) h += '<tr><td colspan="5" class="field-help">Nadie tiene turno este día.</td></tr>';
+  h += `<div class="hor-grid-wrap"><table class="hor-reg"><thead><tr><th>Persona</th><th>Turno</th><th>Llegó</th><th>Horas reales</th><th>Nota</th><th></th></tr></thead><tbody>`;
+  if(!gente.length) h += '<tr><td colspan="6" class="field-help">Nadie tiene turno este día.</td></tr>';
   gente.forEach(p => {
     const r = horFilaReg(p.id, fecha, d), a = HOR.asig[p.id + '|' + d], extra = !programados.includes(p);
-    const k = p.id + '|' + fecha;
+    const k = p.id + '|' + fecha, hab = HOR.habilitados[k];
+    const ed = !r.cerrado && !(enQuincena && !hab);
     const opciones = [['asistio', 'A tiempo'], ['tarde', 'Tarde'], ['falto', 'Faltó']];
-    h += `<tr><td><b>${escapeHtml(p.nombre)}</b>${extra ? ' <span class="badge info">Extra</span>' : ''}</td>
+    let acc = '';
+    if(ed) acc = `<button type="button" class="btn btn-ok btn-small" data-hor-cerrar-turno="${k}">Cerrar turno</button>`;
+    else if(r.cerrado || enQuincena){
+      const quien = r.cerrado ? `<span class="badge ok" title="${escapeHtml((r.cerrado_por || '') + (r.cerrado_at ? ' · ' + new Date(r.cerrado_at).toLocaleString('es-CO', { hour: 'numeric', minute: '2-digit' }) : ''))}">Cerrado</span>` : '';
+      const btn = !horEsAdmin() ? '' : enQuincena
+        ? `<button type="button" class="btn btn-secondary btn-small" data-hor-habilitar="${k}">Habilitar corrección</button>`
+        : `<button type="button" class="btn btn-ghost btn-small" data-hor-reabrir-turno="${k}">Reabrir</button>`;
+      acc = quien + ' ' + btn;
+    }
+    h += `<tr class="${hab ? 'habilitado' : !ed ? 'cerrado' : ''}"><td><b>${escapeHtml(p.nombre)}</b>${extra ? ' <span class="badge info">Extra</span>' : ''}</td>
       <td style="font-family:'IBM Plex Mono',monospace">${a && a.tipo !== 'descanso' && !extra ? escapeHtml(a.codigo || '') : '—'}</td>
       <td>${ed ? `<span class="hor-llegada" role="group" aria-label="Llegada de ${escapeHtml(p.nombre)}">${opciones.map(([v, l]) => `<button type="button" class="${v}${r.estado === v ? ' on' : ''}" aria-pressed="${r.estado === v}" data-hor-reg="${k}" data-estado="${v}">${l}</button>`).join('')}</span>${r.estado === 'tarde' ? `<input type="number" class="hor-min" min="1" max="600" step="5" value="${r.minutos_tarde || ''}" placeholder="min" data-hor-reg="${k}" data-campo="minutos_tarde" aria-label="Minutos tarde de ${escapeHtml(p.nombre)}">` : ''}`
         : `<span class="badge ${r.estado === 'asistio' ? 'ok' : r.estado === 'tarde' ? 'warn' : 'danger'}">${r.estado === 'asistio' ? 'A tiempo' : r.estado === 'tarde' ? (r.minutos_tarde || '?') + ' min tarde' : 'Faltó'}</span>`}</td>
       <td>${ed ? `<input type="number" step="0.5" min="0" max="24" value="${horNum(r.horas_reales || 0).replace(',', '.')}" data-hor-reg="${k}" data-campo="horas_reales" aria-label="Horas reales de ${escapeHtml(p.nombre)}">` : `<span style="font-family:'IBM Plex Mono',monospace">${horNum(r.horas_reales || 0)}</span>`}</td>
-      <td>${ed ? `<input type="text" maxlength="300" value="${escapeHtml(r.nota || '')}" placeholder="Opcional" data-hor-reg="${k}" data-campo="nota" aria-label="Nota de ${escapeHtml(p.nombre)}">` : escapeHtml(r.nota || '')}</td></tr>`;
+      <td>${ed ? `<input type="text" maxlength="300" value="${escapeHtml(r.nota || '')}" placeholder="Opcional" data-hor-reg="${k}" data-campo="nota" aria-label="Nota de ${escapeHtml(p.nombre)}">` : escapeHtml(r.nota || '')}</td>
+      <td class="acc">${acc}</td></tr>`;
+    if(HOR.habilitando === k) h += `<tr><td colspan="6"><div class="hor-hab-form"><label class="field-label" for="horHabMotivo" style="margin:0">Qué hay que corregir en el turno de ${escapeHtml(p.nombre)}</label>
+      <input type="text" id="horHabMotivo" maxlength="300" placeholder="Ej.: sí vino, quedó como falta">
+      <button type="button" class="btn btn-secondary btn-small" data-hor-act="habilitarturno">Habilitar para el líder</button>
+      <button type="button" class="btn btn-ghost btn-small" data-hor-act="nohabilitar">Cancelar</button></div></td></tr>`;
   });
   h += '</tbody></table></div>';
-  if(ed){
+  const abiertos = gente.filter(p => { const r = HOR.reg[p.id + '|' + fecha]; return !(r && r.cerrado) && !(enQuincena && !HOR.habilitados[p.id + '|' + fecha]); });
+  if(!enQuincena){
     const libres = personas.filter(p => p.activo && !gente.includes(p) && !horNovedad(p.id, d));
     h += `<div class="hor-acciones" style="margin:10px 0">${HOR.agregar
       ? `<select id="horRegExtra" aria-label="Quién vino sin estar en el horario"><option value="">Elige quién vino…</option>${libres.map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}${(HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso' ? ' (descansaba)' : ''}</option>`).join('')}</select>`
-      : `<button type="button" class="btn btn-secondary btn-small" data-hor-act="agregarextra">+ Alguien que vino sin estar en el horario</button>`}</div>
-    <div class="hor-publicar"><p>Las horas vienen del turno; cámbialas si alguien se quedó más o salió antes. Quien llegue tarde queda como novedad de retardo. Al cerrar, el día queda bloqueado.</p>
-      <button type="button" class="btn btn-ok" data-hor-act="cerrardia">Cerrar el día</button></div>`;
+      : `<button type="button" class="btn btn-secondary btn-small" data-hor-act="agregarextra">+ Alguien que vino sin estar en el horario</button>`}</div>`;
   }
+  if(abiertos.length) h += `<div class="hor-publicar"><p>Cierra cada turno cuando la persona termine; las horas vienen del turno y se cambian si se quedó más o salió antes. Quien llegue tarde queda como novedad de retardo. El día se cierra solo cuando se cierra el último turno.</p>
+      <button type="button" class="btn btn-ok" data-hor-act="cerrardia">Cerrar los ${abiertos.length} turno${abiertos.length > 1 ? 's' : ''} pendiente${abiertos.length > 1 ? 's' : ''}</button></div>`;
   h += horResumenSemanaHtml();
   box.innerHTML = h;
 }
@@ -4548,7 +4567,7 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   if(act.dataset.horAct === 'agregarextra'){ HOR.agregar = true; horPintarRegistro(); document.getElementById('horRegExtra')?.focus(); }
   else if(act.dataset.horAct === 'cerrardia'){
     act.disabled = true;
-    const pendientes = horPersonasSemana().filter(p => horTrabaja(p.id, HOR.diaReg) && !HOR.reg[p.id + '|' + fecha])
+    const pendientes = horPersonasSemana().filter(p => horTrabaja(p.id, HOR.diaReg) && !HOR.reg[p.id + '|' + fecha] && !horBloqueadoPersona(p.id, HOR.diaReg))
       .map(p => { const r = horFilaReg(p.id, fecha, HOR.diaReg); return { area_id: HOR.areaId, personal_id: p.id, fecha, estado: 'asistio', asistio: true, horas_reales: r.horas_reales, extra: false }; });
     if(pendientes.length){
       const { error } = await supa.from('horario_registro_dia').upsert(pendientes, { onConflict: 'personal_id,fecha' });
@@ -4556,22 +4575,38 @@ document.getElementById('horSemana').addEventListener('click', async e => {
     }
     const { error } = await supa.rpc('horario_cerrar_dia', { p_area: HOR.areaId, p_fecha: fecha });
     if(error){ showToast('No se pudo cerrar: ' + error.message, 'danger'); act.disabled = false; return; }
-    showToast('Día cerrado', 'ok'); await horCargarSemana();
+    showToast('Turnos cerrados', 'ok'); await horCargarSemana();
   }
-  else if(act.dataset.horAct === 'habilitar'){
+  else if(act.dataset.horAct === 'nohabilitar'){ HOR.habilitando = null; horPintarRegistro(); }
+  else if(act.dataset.horAct === 'habilitarturno'){
     const motivo = (document.getElementById('horHabMotivo').value || '').trim();
     if(!motivo){ showToast('Escribe qué hay que corregir', 'warn'); document.getElementById('horHabMotivo').focus(); return; }
+    const [pid, f] = HOR.habilitando.split('|');
     act.disabled = true;
-    const { error } = await supa.rpc('horario_habilitar_dia', { p_area: HOR.areaId, p_fecha: fecha, p_motivo: motivo });
+    const { error } = await supa.rpc('horario_habilitar_turno', { p_area: HOR.areaId, p_personal: pid, p_fecha: f, p_motivo: motivo });
     if(error){ showToast('No se pudo habilitar: ' + error.message, 'danger'); act.disabled = false; return; }
-    showToast('Día habilitado. Al líder le saldrá el aviso para corregirlo.', 'ok'); await horCargarSemana();
+    HOR.habilitando = null;
+    showToast('Turno habilitado. Al líder le saldrá el aviso para corregirlo.', 'ok'); await horCargarSemana();
   }
-  else if(act.dataset.horAct === 'reabrir'){
-    act.disabled = true;
-    const { error } = await supa.rpc('horario_reabrir_dia', { p_area: HOR.areaId, p_fecha: fecha });
-    if(error){ showToast('No se pudo reabrir: ' + error.message, 'danger'); act.disabled = false; return; }
-    showToast('Día reabierto', 'ok'); await horCargarSemana();
+});
+// Cerrar, reabrir o habilitar el turno de una persona.
+document.getElementById('horSemana').addEventListener('click', async e => {
+  const cerrar = e.target.closest('[data-hor-cerrar-turno]'), reabrir = e.target.closest('[data-hor-reabrir-turno]'), hab = e.target.closest('[data-hor-habilitar]');
+  if(hab){ HOR.habilitando = hab.dataset.horHabilitar; horPintarRegistro(); document.getElementById('horHabMotivo')?.focus(); return; }
+  const b = cerrar || reabrir; if(!b || b.disabled) return;
+  const [pid, fecha] = (cerrar ? b.dataset.horCerrarTurno : b.dataset.horReabrirTurno).split('|');
+  b.disabled = true;
+  if(cerrar){
+    if(!HOR.reg[pid + '|' + fecha] && !(await horGuardarReg(pid, fecha, {}))){ b.disabled = false; return; }
+    const { error } = await supa.rpc('horario_cerrar_turno', { p_area: HOR.areaId, p_personal: pid, p_fecha: fecha });
+    if(error){ showToast('No se pudo cerrar: ' + error.message, 'danger'); b.disabled = false; return; }
+    showToast('Turno cerrado', 'ok');
+  } else {
+    const { error } = await supa.rpc('horario_reabrir_turno', { p_area: HOR.areaId, p_personal: pid, p_fecha: fecha });
+    if(error){ showToast('No se pudo reabrir: ' + error.message, 'danger'); b.disabled = false; return; }
+    showToast('Turno reabierto', 'ok');
   }
+  await horCargarSemana();
 });
 document.getElementById('horSemana').addEventListener('change', async e => {
   if(e.target.id === 'horNovT'){ document.getElementById('horNovAyuda').textContent = HOR_AYUDA_NOV[e.target.value]; document.getElementById('horNovRemBox').hidden = e.target.value !== 'permiso'; return; }
@@ -4682,7 +4717,7 @@ function prenDia(d, p, iso, lunes, dia){
   const n = d.nov.find(x => x.personal_id === p.id && x.tipo !== 'retardo' && x.desde <= iso && x.hasta >= iso);
   if(n) return { tipo: 'nov', nov: n };
   const reg = d.regPor[p.id + '|' + iso], sem = d.semPorLunes[lunes], a = sem ? d.asigPor[sem.id + '|' + p.id + '|' + dia] : null;
-  const prog = !d.cerrados[iso];
+  const prog = !(reg && reg.cerrado) && !d.cerrados[iso];
   if(reg && reg.estado === 'falto') return { tipo: 'falta', reg };
   let tramos = a && a.tipo !== 'descanso' ? horTramosMin(horTramosDe(a)) : [];
   let sinHorario = false;
@@ -4961,7 +4996,7 @@ async function horPintarQuincena(){
   const q = datos.cerrada;
   if(q){
     html += `<div class="hor-checks"><div class="hor-check ok"><h3><span class="badge ok">Cerrada</span> Quincena verificada</h3>
-      <span class="field-help">Cerrada por ${escapeHtml(q.cerrado_por || '')} · ${escapeHtml(new Date(q.cerrado_at).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}. Nadie puede cambiar el horario, el registro ni las novedades de estos días. Para corregir uno, un admin lo habilita en Registro del día y el líder hace la corrección; cada cambio queda registrado.</span>
+      <span class="field-help">Cerrada por ${escapeHtml(q.cerrado_por || '')} · ${escapeHtml(new Date(q.cerrado_at).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}. Nadie puede cambiar el horario, el registro ni las novedades de estos días. Para corregir un turno, un admin lo habilita en Registro del día y el líder hace la corrección; cada cambio queda registrado.</span>
       ${datos.cambios.length ? `<span class="field-help" style="display:block;margin-top:6px;color:var(--warn)"><b>Cambios después del cierre:</b> ${prenCambiosTexto(datos.cambios)}.</span>` : ''}
       ${horEsAdmin() ? `<div class="hor-form" style="margin-top:10px"><div class="field full"><label class="field-label" for="quinMotivo">Motivo para reabrir</label><input type="text" id="quinMotivo" maxlength="300" placeholder="Ej.: corregir las horas de Omar del día 12"></div><div class="full"><button type="button" class="btn btn-danger-outline btn-small" data-quin="reabrir">Reabrir la quincena</button></div></div>` : '<span class="field-help" style="display:block;margin-top:6px">Si hay que corregir algo, pídele a un admin que la reabra.</span>'}
     </div></div>`;
@@ -4970,7 +5005,7 @@ async function horPintarQuincena(){
       <ul class="quin-lista">
         ${item(terminada, terminada ? 'La quincena ya terminó.' : `La quincena termina el ${per.hasta.getDate()} de ${HOR_MESES[per.hasta.getMonth()]}: podrás cerrarla ese día, después de cerrar el registro.`)}
         ${item(!sinPublicar.length, sinPublicar.length ? `Semanas sin publicar: ${sinPublicar.map(l => 'desde el ' + f(l)).join(', ')}.` : 'Todas las semanas están publicadas.')}
-        ${item(!sinCerrar.length, sinCerrar.length ? `Días sin cerrar en el registro: ${sinCerrar.map(f).join(', ')}.` : 'Todos los días con turnos están cerrados en el registro.')}
+        ${item(!sinCerrar.length, sinCerrar.length ? `Días con turnos sin cerrar en el registro: ${sinCerrar.map(f).join(', ')}.` : 'Todos los turnos están cerrados en el registro.')}
         ${sinHorario.length ? item(true, `Semanas sin horario en la app: ${sinHorario.map(l => 'desde el ' + f(l)).join(', ')}. No suman horas.`, 'info') : ''}
         ${item(true, novs.length ? `Novedades: ${novs.map(n => { const p = HOR.personal.find(x => x.id === n.personal_id); return escapeHtml(p ? horCorto(p) : '?') + ' ' + HOR_TIPOS[n.tipo].toLowerCase() + (n.tipo === 'permiso' && n.remunerado === false ? ' no remunerado' : ''); }).join(', ')}. Revisa que estén todas.` : 'Sin novedades en la quincena. Si alguien faltó o tuvo incapacidad, anótalo antes de cerrar.', 'info')}
         ${faltas.length ? item(true, `Faltas sin novedad: ${faltas.map(escapeHtml).join(', ')}.`, 'info') : ''}
@@ -4988,7 +5023,7 @@ async function horPintarQuincena(){
       <label class="quin-confirmar"><input type="checkbox" id="quinOk"${listo ? '' : ' disabled'}>Revisé y la información es correcta</label>
       <button type="button" class="btn btn-ok" data-quin="cerrar" disabled>Cerrar quincena</button>
     </div>
-    <p class="field-help">Al cerrarla, los líderes ya no podrán cambiar el horario, el registro ni las novedades del ${per.desde.getDate()} al ${per.hasta.getDate()} de ${HOR_MESES[per.hasta.getMonth()]}. Si algo hay que corregir, un admin habilita ese día y tú haces la corrección. El admin la verá lista para la pre-nómina.</p>`;
+    <p class="field-help">Al cerrarla, los líderes ya no podrán cambiar el horario, el registro ni las novedades del ${per.desde.getDate()} al ${per.hasta.getDate()} de ${HOR_MESES[per.hasta.getMonth()]}. Si algo hay que corregir, un admin habilita ese turno y tú haces la corrección. El admin la verá lista para la pre-nómina.</p>`;
   if((hist.data || []).length) html += `<div class="pren-sec" style="padding:12px 14px"><span class="field-label">Historial</span><ul class="quin-hist">${hist.data.map(x => `<li>${x.accion === 'cerrar' ? 'Cerrada' : 'Reabierta'} por ${escapeHtml(x.por || '?')} · ${escapeHtml(new Date(x.at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}${x.motivo ? ' · ' + escapeHtml(x.motivo) : ''}</li>`).join('')}</ul></div>`;
   box.innerHTML = html;
   QUIN.per = per;
@@ -5028,15 +5063,16 @@ async function avisarQuincena(){
     supa.rpc('horario_puede_editar', { p_area: currentArea.id }),
     supa.from('horario_quincenas_cerradas').select('*').eq('area_id', currentArea.id).eq('desde', desde).maybeSingle(),
     supa.from('horario_semanas').select('id').eq('area_id', currentArea.id).lte('lunes', hasta).gte('lunes', horIso(horLunesDe(per.desde))).limit(1),
-    supa.from('horario_dias_habilitados').select('*').eq('area_id', currentArea.id).order('fecha'),
+    supa.from('horario_turnos_habilitados').select('*').eq('area_id', currentArea.id).order('fecha'),
   ]);
   if(!ed.data) return;
   const ir = sub => { cerrarAviso('horQuinModal'); HOR.subPedida = sub; if(HOR.areaId === currentArea.id){ HOR.sub = sub; HOR.subPedida = null; } switchTab('horarios'); };
   const pend = hab.error ? [] : (hab.data || []);
   if(pend.length){
     const x = pend[0], d = new Date(x.fecha + 'T12:00:00');
-    document.getElementById('horQuinTit').textContent = pend.length === 1 ? 'Hay un día para corregir' : 'Hay ' + pend.length + ' días para corregir';
-    document.getElementById('horQuinTxt').textContent = `${x.habilitado_por || 'Un admin'} habilitó el ${HOR_DIAS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()} de ${HOR_MESES[d.getMonth()]}: ${x.motivo}. Corrígelo en Registro del día y vuelve a cerrarlo.`;
+    const persona = (HOR.personal.find(y => y.id === x.personal_id) || {}).nombre;
+    document.getElementById('horQuinTit').textContent = pend.length === 1 ? 'Hay un turno para corregir' : 'Hay ' + pend.length + ' turnos para corregir';
+    document.getElementById('horQuinTxt').textContent = `${x.habilitado_por || 'Un admin'} habilitó el turno ${persona ? 'de ' + persona + ' ' : ''}del ${HOR_DIAS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()} de ${HOR_MESES[d.getMonth()]}: ${x.motivo}. Corrígelo en Registro del día y vuelve a cerrarlo.`;
     document.getElementById('horQuinIr').textContent = 'Ir a corregir';
     document.getElementById('horQuinIr').onclick = () => { HOR.lunesPedido = horLunesDe(d); HOR.diaRegPedido = (d.getDay() + 6) % 7 + 1; ir('registro'); };
     abrirAviso('horQuinModal');
@@ -5046,7 +5082,7 @@ async function avisarQuincena(){
   const texto = prenTextoPeriodo(per);
   if(!q.data){
     document.getElementById('horQuinTit').textContent = 'Cierra la quincena ' + texto;
-    document.getElementById('horQuinTxt').textContent = 'Antes de la nómina, revisa que el registro de cada día esté cerrado y las novedades completas, y cierra la quincena de ' + currentArea.name + '. Así nadie la puede cambiar después.';
+    document.getElementById('horQuinTxt').textContent = 'Antes de la nómina, revisa que todos los turnos del registro estén cerrados y las novedades completas, y cierra la quincena de ' + currentArea.name + '. Así nadie la puede cambiar después.';
     document.getElementById('horQuinIr').textContent = 'Ir a cerrarla';
     document.getElementById('horQuinIr').onclick = () => ir('quincena');
     abrirAviso('horQuinModal');
