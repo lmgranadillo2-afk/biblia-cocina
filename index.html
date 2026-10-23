@@ -1030,6 +1030,67 @@ nav.tabs button{position:relative;}
 .hor-marca.noct{background:var(--info-bg); color:var(--info);}
 .hor-otro-prev{font-size:13px; color:var(--text-muted); margin:0 0 8px;}
 .pren-controles{align-items:flex-end;}
+.kio{position:fixed; inset:0; z-index:300; background:var(--text); color:var(--bg); display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);}
+.kio[hidden]{display:none;}
+.kio-cam{position:relative; overflow:hidden; background:#000;}
+.kio-cam video{width:100%; height:100%; object-fit:cover; transform:scaleX(-1);}
+.kio-marco{position:absolute; left:50%; top:46%; width:min(46vh, 70%); aspect-ratio:3/4; transform:translate(-50%, -50%); border-radius:50% / 42%; border:3px dashed rgba(247,242,232,.55); pointer-events:none; transition:border-color .2s ease-out;}
+.kio-marco.ok{border:4px solid var(--ok-on-dark);} .kio-marco.warn{border:4px solid var(--warn-on-dark);} .kio-marco.no{border:4px solid var(--danger-on-dark);}
+.kio-vivo{position:absolute; top:16px; left:16px; font:600 11px 'IBM Plex Mono',monospace; letter-spacing:1px; text-transform:uppercase; color:var(--surface-3); display:flex; gap:6px; align-items:center;}
+.kio-vivo::before{content:""; width:8px; height:8px; border-radius:50%; background:var(--danger-on-dark);}
+.kio-estado{position:absolute; left:0; right:0; bottom:22px; text-align:center; font:700 20px 'Inter',sans-serif; text-shadow:0 1px 4px rgba(0,0,0,.6);}
+.kio-panel{padding:32px; display:flex; flex-direction:column; justify-content:center; gap:16px; overflow-y:auto;}
+.kio-lugar{font:600 12px 'IBM Plex Mono',monospace; letter-spacing:1.2px; text-transform:uppercase; color:var(--surface-3);}
+.kio-hora{font:600 64px 'IBM Plex Mono',monospace; line-height:1; letter-spacing:-1px;}
+.kio-fecha{font-size:17px; color:var(--surface-3); text-transform:capitalize;}
+.kio-panel h2{font-family:'Playfair Display',serif; font-size:40px; margin:0; line-height:1.1;}
+.kio-panel p{margin:0; font-size:18px; line-height:1.45; color:var(--surface-3);}
+.kio-peq{font-size:14px !important;}
+.kio-info{background:rgba(247,242,232,.08); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:4px; font-size:17px;}
+.kio-info b{font-family:'IBM Plex Mono',monospace;}
+.kio-tarde{color:var(--warn-on-dark); font-weight:600;}
+.kio-grande{min-height:80px; border:none; border-radius:16px; font:700 22px 'Inter',sans-serif; cursor:pointer; color:var(--text);}
+.kio-grande.entrada{background:var(--ok-on-dark);} .kio-grande.salida{background:var(--warn-on-dark);}
+.kio-sec{min-height:54px; border-radius:14px; border:1px solid rgba(247,242,232,.35); background:transparent; color:var(--bg); font:600 16px 'Inter',sans-serif; cursor:pointer;}
+.kio-plano{border:none; min-height:44px; color:var(--surface-3); font-weight:500; font-size:14px;}
+.kio-grande:focus-visible, .kio-sec:focus-visible{outline:none; box-shadow:0 0 0 4px rgba(247,242,232,.6);}
+.kio-grande:disabled{opacity:.6;}
+.kio-pie{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+.kio-check{width:92px; height:92px; border-radius:50%; background:var(--ok-on-dark); color:var(--text); display:grid; place-items:center; font-size:48px; font-weight:700;}
+.kio-check.tarde{background:var(--warn-on-dark);}
+.kio-cuenta{height:4px; background:rgba(247,242,232,.12); border-radius:4px; overflow:hidden;}
+.kio-cuenta i{display:block; height:100%; background:var(--accent); animation:kio-cuenta 5s linear forwards;}
+@keyframes kio-cuenta{from{width:100%;} to{width:0;}}
+.kio-campo{display:flex; flex-direction:column; gap:6px; font-size:14px; color:var(--surface-3);}
+.kio-campo input, .kio-campo select{min-height:52px; font-size:18px; border-radius:12px; border:1px solid rgba(247,242,232,.35); background:rgba(247,242,232,.08); color:var(--bg); padding:0 14px;}
+.kio-campo select option{color:var(--text);}
+@media(max-width:860px){ .kio{grid-template-columns:1fr; grid-template-rows:minmax(0, 46vh) auto; overflow-y:auto;} .kio-hora{font-size:44px;} .kio-panel{padding:20px;} .kio-panel h2{font-size:30px;} }
+@media (prefers-reduced-motion: reduce){ .kio-cuenta i{animation:none;} }
+.ros-cam{position:relative; background:#000; border-radius:var(--radius-md); overflow:hidden; aspect-ratio:4/3; margin:var(--space-3) 0;}
+.ros-cam video{width:100%; height:100%; object-fit:cover; transform:scaleX(-1);}
+.ros-estado{position:absolute; left:0; right:0; bottom:0; padding:10px; text-align:center; font-weight:600; color:var(--surface); background:linear-gradient(transparent, rgba(0,0,0,.65));}
+.ros-consent{display:flex; gap:10px; align-items:flex-start; font-size:14px; line-height:1.45; margin-bottom:var(--space-3);}
+.ros-consent input{width:20px; height:20px; margin-top:2px; accent-color:var(--accent); flex-shrink:0;}
+.ros-puntos{display:flex; gap:6px; align-items:center; margin-bottom:var(--space-3); font:600 13px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ros-puntos i{width:18px; height:18px; border-radius:50%; background:var(--surface-3);} .ros-puntos i.on{background:var(--ok);}
+.pren-tot.ent{border-left:4px solid var(--border-strong);}
+.pren-tot.ent.ok{border-left-color:var(--ok);} .pren-tot.ent.danger{border-left-color:var(--danger);} .pren-tot.ent.info{border-left-color:var(--info);} .pren-tot.ent.warn{border-left-color:var(--warn);}
+.ent-est{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; margin-bottom:var(--space-3);}
+.ent-est h3{margin:0; padding:8px 12px; background:var(--surface-2); font:600 11px 'IBM Plex Mono',monospace; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center;}
+.ent-fila{display:grid; grid-template-columns:40px minmax(0, 1fr) auto; gap:12px; align-items:center; padding:10px 12px; border-top:1px solid var(--border);}
+.ent-fila:first-of-type{border-top:none;}
+.ent-fila.flash{animation:ent-flash 1.6s ease-out;}
+@keyframes ent-flash{0%,30%{background:var(--ok-bg);} 100%{background:transparent;}}
+.ent-av{width:40px; height:40px; border-radius:50%; background:var(--surface-3); display:grid; place-items:center; font-weight:700; color:var(--text-muted); position:relative;}
+.ent-av.ok::after{content:""; position:absolute; right:-1px; bottom:-1px; width:12px; height:12px; border-radius:50%; background:var(--ok); border:2px solid var(--surface);}
+.ent-cod{font:500 12.5px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ent-txt{font:500 13px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ent-dudosas{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+.ent-dudosas li{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+.ent-dudosas li span{flex:1; min-width:180px; font-size:14px;}
+.ent-lista{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; font-size:14px;}
+.ent-lista li.rech{color:var(--text-dim); text-decoration:line-through;}
+.hor-marc{font:500 11.5px 'IBM Plex Mono',monospace; color:var(--info); margin-top:2px;}
 .hor-reg tr.cerrado td{background:var(--surface-2);}
 .hor-reg tr.habilitado td{background:var(--warn-bg);}
 .hor-reg .acc{white-space:nowrap; text-align:right;}
@@ -1621,6 +1682,7 @@ nav.tabs button{position:relative;}
         <h2>Horarios</h2>
         <div class="admin-subtabs hor-subtabs" id="horSubtabs" hidden>
           <button type="button" data-hor-sub="semana" class="active">Semana</button>
+          <button type="button" data-hor-sub="enturno">En turno</button>
           <button type="button" data-hor-sub="novedades">Novedades</button>
           <button type="button" data-hor-sub="registro">Registro del día</button>
           <button type="button" data-hor-sub="quincena">Quincena</button>
@@ -2094,6 +2156,15 @@ nav.tabs button{position:relative;}
 
 <div class="modal-overlay" id="horCeldaModal">
   <div class="modal-box" id="horCeldaBox" role="dialog" aria-modal="true"></div>
+</div>
+
+<div id="horKiosco" class="kio" hidden role="dialog" aria-modal="true" aria-label="Marcación de turnos">
+  <div class="kio-cam"><video id="kioVideo" playsinline muted></video><div class="kio-marco" id="kioMarco"></div><span class="kio-vivo">Cámara</span><div class="kio-estado" id="kioEstado" aria-live="polite"></div></div>
+  <div class="kio-panel" id="kioPanel" aria-live="polite"></div>
+</div>
+
+<div class="modal-overlay" id="horRostroModal">
+  <div class="modal-box" id="horRostroBox" role="dialog" aria-modal="true" aria-labelledby="horRostroTit" style="max-width:560px"></div>
 </div>
 
 <div class="modal-overlay" id="horQuinModal">
@@ -2669,6 +2740,7 @@ function enterArea(loc, area){
   avisarEventosProximos();
   avisarQuincena();
   chatIniciar();
+  if(new URLSearchParams(location.search).has('marcacion') && (area.modules || []).includes('horarios')) setTimeout(kioscoAbrir, 300);
 }
 
 // Avisos al abrir la app (pedidos atrasados, eventos sin estado, eventos próximos):
@@ -3529,6 +3601,7 @@ function horPintar(){
   else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
   else if(HOR.sub === 'prenomina' && horEsAdmin()) horPintarPrenomina();
   else if(HOR.sub === 'quincena' && HOR.editor) horPintarQuincena();
+  else if(HOR.sub === 'enturno' && HOR.editor) horPintarEnTurno();
   else horPintarSemana();
 }
 
@@ -3546,6 +3619,7 @@ async function horCargarConfig(){
   HOR.editor = !!ed.data;
   HOR.cfg = cfg.data || { area_id: a, jornada_max: 42, dias_sin_descanso: [5,6,7] };
   HOR.estaciones = est.data || []; HOR.personal = per.data || []; HOR.turnos = tur.data || []; HOR.tareas = tar.data || [];
+  if(HOR.editor) await horCargarRostros();
 }
 
 function horPintarSub(){
@@ -3583,10 +3657,12 @@ async function horCargarSemana(){
   }
   const domingo = horIso(horFecha(7));
   let nov = [], reg = {}, cerrados = {}, regError = null;
-  let quincenas = [], habilitados = {};
+  let quincenas = [], habilitados = {}, marcas = {};
   consultas.push(supa.from('horario_quincenas_cerradas').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes)
     .then(r => { quincenas = r.error ? [] : (r.data || []); }));
   if(HOR.editor){
+    consultas.push(supa.from('horario_marcaciones').select('personal_id, tipo, at, fecha_turno, manual').eq('area_id', HOR.areaId).eq('estado', 'valida').gte('fecha_turno', lunes).lte('fecha_turno', domingo).order('at')
+      .then(r => { (r.error ? [] : (r.data || [])).forEach(x => { (marcas[x.personal_id + '|' + x.fecha_turno] ||= []).push(x); }); }));
     consultas.push(supa.from('horario_turnos_habilitados').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
       .then(r => { (r.error ? [] : (r.data || [])).forEach(x => { habilitados[x.personal_id + '|' + x.fecha] = x; }); }));
     consultas.push(supa.from('horario_novedades').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes).order('desde')
@@ -3605,7 +3681,7 @@ async function horCargarSemana(){
   }
   await Promise.all(consultas);
   if(carga !== HOR.carga) return;
-  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError, quincenas, habilitados });
+  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError, quincenas, habilitados, marcas });
   HOR.bloqueadas = {};
   quincenas.forEach(q => { for(let d = 1; d <= 7; d++){ const f = horIso(horFecha(d)); if(f >= q.desde && f <= q.hasta) HOR.bloqueadas[f] = q; } });
   horPintar();
@@ -4505,7 +4581,8 @@ function horPintarRegistro(){
         : `<button type="button" class="btn btn-ghost btn-small" data-hor-reabrir-turno="${k}">Reabrir</button>`;
       acc = quien + ' ' + btn;
     }
-    h += `<tr class="${hab ? 'habilitado' : !ed ? 'cerrado' : ''}"><td><b>${escapeHtml(p.nombre)}</b>${extra ? ' <span class="badge info">Extra</span>' : ''}</td>
+    const mk = (HOR.marcas || {})[k] || [];
+    h += `<tr class="${hab ? 'habilitado' : !ed ? 'cerrado' : ''}"><td><b>${escapeHtml(p.nombre)}</b>${extra ? ' <span class="badge info">Extra</span>' : ''}${mk.length ? `<div class="hor-marc">Marcó ${mk.map(m => (m.tipo === 'entrada' ? '↘ ' : '↗ ') + new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) + (m.manual ? ' (líder)' : '')).join(' · ')}</div>` : ''}</td>
       <td style="font-family:'IBM Plex Mono',monospace">${a && a.tipo !== 'descanso' && !extra ? escapeHtml(a.codigo || '') : '—'}</td>
       <td>${ed ? `<span class="hor-llegada" role="group" aria-label="Llegada de ${escapeHtml(p.nombre)}">${opciones.map(([v, l]) => `<button type="button" class="${v}${r.estado === v ? ' on' : ''}" aria-pressed="${r.estado === v}" data-hor-reg="${k}" data-estado="${v}">${l}</button>`).join('')}</span>${r.estado === 'tarde' ? `<input type="number" class="hor-min" min="1" max="600" step="5" value="${r.minutos_tarde || ''}" placeholder="min" data-hor-reg="${k}" data-campo="minutos_tarde" aria-label="Minutos tarde de ${escapeHtml(p.nombre)}">` : ''}`
         : `<span class="badge ${r.estado === 'asistio' ? 'ok' : r.estado === 'tarde' ? 'warn' : 'danger'}">${r.estado === 'asistio' ? 'A tiempo' : r.estado === 'tarde' ? (r.minutos_tarde || '?') + ' min tarde' : 'Faltó'}</span>`}</td>
@@ -5116,6 +5193,421 @@ async function avisarQuincena(){
 }
 document.getElementById('horQuinCerrar').addEventListener('click', () => cerrarAviso('horQuinModal'));
 
+/* --- Marcación facial (sql/horarios_10_marcacion.sql). PC fijo de la cocina abierto con la cuenta del líder.
+   Reconocimiento en el navegador con face-api (vendor/face-api, modelos propios, nada sale a servicios externos):
+   se guarda una huella de 128 números por foto (horario_rostros), no las fotos. Sin parpadeo (decisión de Miguel):
+   reconocimiento dudoso → aviso al líder para revisar. Cada marcación guarda una foto pequeña de evidencia (60 días). --- */
+const FACE_RUTA = 'vendor/face-api/';
+const FACE_OK = 0.45, FACE_DUDA = 0.55;   // distancia: ≤0.45 seguro, ≤0.55 dudoso, más es desconocido
+let FACE_LISTO = null;
+function faceCargar(){
+  if(FACE_LISTO) return FACE_LISTO;
+  FACE_LISTO = new Promise((resolve, reject) => {
+    const listo = async () => {
+      try {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_RUTA + 'model');
+        await faceapi.nets.faceLandmark68Net.loadFromUri(FACE_RUTA + 'model');
+        await faceapi.nets.faceRecognitionNet.loadFromUri(FACE_RUTA + 'model');
+        resolve(faceapi);
+      } catch(e){ FACE_LISTO = null; reject(new Error('No se pudo cargar el reconocimiento facial: ' + e.message)); }
+    };
+    if(window.faceapi) return listo();
+    const s = document.createElement('script');
+    s.src = FACE_RUTA + 'face-api.js';
+    s.onload = listo;
+    s.onerror = () => { FACE_LISTO = null; reject(new Error('No se pudo cargar el reconocimiento facial')); };
+    document.head.appendChild(s);
+  });
+  return FACE_LISTO;
+}
+async function faceCamara(video){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Este navegador no permite usar la cámara. Usa Chrome o Edge.');
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
+  catch(e){ throw new Error(e.name === 'NotAllowedError' ? 'La cámara está bloqueada: dale permiso en el candado de la barra de direcciones y recarga.' : e.name === 'NotFoundError' ? 'No encontré ninguna cámara conectada.' : 'No se pudo abrir la cámara: ' + e.message); }
+  video.srcObject = stream; video.muted = true; video.playsInline = true;
+  await video.play();
+  return stream;
+}
+function faceApagar(stream){ (stream && stream.getTracks ? stream.getTracks() : []).forEach(t => t.stop()); }
+// La cara más grande de la imagen (la más cercana); null si no hay.
+async function faceDetectar(video){
+  const caras = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptors();
+  if(!caras.length) return null;
+  caras.sort((a, b) => b.detection.box.area - a.detection.box.area);
+  const c = caras[0], ancho = c.detection.box.width / (video.videoWidth || 1);
+  return { descriptor: Array.from(c.descriptor), ancho, varias: caras.length > 1 };
+}
+function faceDistancia(a, b){ let s = 0; for(let i = 0; i < 128; i++){ const d = a[i] - b[i]; s += d * d; } return Math.sqrt(s); }
+// Persona más parecida: { pid, d, segundo }
+function faceBuscar(desc, rostros){
+  let mejor = null, segundo = Infinity;
+  rostros.forEach(r => {
+    const d = Math.min(...(r.descriptores || []).map(x => faceDistancia(desc, x)));
+    if(!mejor || d < mejor.d){ if(mejor) segundo = Math.min(segundo, mejor.d); mejor = { pid: r.personal_id, d }; }
+    else segundo = Math.min(segundo, d);
+  });
+  return mejor ? { ...mejor, segundo } : null;
+}
+function faceFoto(video, ancho){
+  const w = ancho || 320, h = Math.round(w * (video.videoHeight || 3) / (video.videoWidth || 4));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const x = cv.getContext('2d'); x.translate(w, 0); x.scale(-1, 1); x.drawImage(video, 0, 0, w, h);
+  return new Promise(r => cv.toBlob(r, 'image/jpeg', 0.7));
+}
+
+/* ---------- Pantalla de marcación (quiosco) ---------- */
+const KIO = { stream: null, timer: null, estado: 'apagado', datos: null, ultimo: null, racha: 0, persona: null, match: null, wake: null, recarga: null, ocupado: false };
+async function kioscoAbrir(){
+  const k = document.getElementById('horKiosco');
+  k.hidden = false; document.body.style.overflow = 'hidden'; document.getElementById('app').inert = true;
+  kioscoPintar('cargando');
+  try {
+    await Promise.all([faceCargar(), kioscoCargarDatos()]);
+    KIO.stream = await faceCamara(document.getElementById('kioVideo'));
+  } catch(e){ kioscoPintar('error', e.message); return; }
+  try { KIO.wake = await navigator.wakeLock?.request('screen'); } catch(_){}
+  if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  kioscoPintar('espera');
+  kioscoBucle();
+  clearInterval(KIO.recarga); KIO.recarga = setInterval(() => { if(KIO.estado === 'espera') kioscoCargarDatos().catch(() => {}); }, 5 * 60 * 1000);
+  kioscoLimpiarFotos();
+}
+function kioscoCerrar(){
+  clearTimeout(KIO.timer); clearInterval(KIO.recarga); faceApagar(KIO.stream); KIO.stream = null; KIO.estado = 'apagado';
+  try { KIO.wake && KIO.wake.release(); } catch(_){}
+  if(document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  document.getElementById('horKiosco').hidden = true; document.body.style.overflow = ''; document.getElementById('app').inert = false;
+}
+async function kioscoCargarDatos(){
+  const a = currentArea.id, hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
+  const [per, ros, sem, cfg, mar, nov] = await Promise.all([
+    supa.from('horario_personal').select('*').eq('area_id', a).eq('activo', true).order('orden'),
+    supa.from('horario_rostros').select('personal_id, descriptores').eq('area_id', a),
+    supa.from('horario_semanas').select('id').eq('area_id', a).eq('lunes', lunes).maybeSingle(),
+    supa.from('horario_config').select('*').eq('area_id', a).maybeSingle(),
+    supa.from('horario_marcaciones').select('personal_id, tipo, at, fecha_turno').eq('area_id', a).eq('estado', 'valida').gte('at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).order('at'),
+    supa.from('horario_novedades').select('personal_id, tipo, desde, hasta').eq('area_id', a).lte('desde', hoy).gte('hasta', hoy),
+  ]);
+  const err = [per, ros, sem, cfg, mar, nov].find(r => r.error);
+  if(err) throw new Error(/horario_(rostros|marcaciones)/.test(err.error.message) ? 'La marcación todavía no está lista en la base de datos (falta correr sql/horarios_10_marcacion.sql).' : 'No se pudo cargar: ' + err.error.message);
+  let asig = [];
+  if(sem.data){ const r = await supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).eq('dia', dia); asig = r.data || []; }
+  KIO.datos = { personal: per.data || [], rostros: ros.data || [], asig, cfg: cfg.data || {}, marc: mar.data || [], nov: nov.data || [], hoy };
+}
+function kioscoUltima(pid){ const m = KIO.datos.marc.filter(x => x.personal_id === pid); return m[m.length - 1] || null; }
+function kioscoTurno(pid){ return KIO.datos.asig.find(a => a.personal_id === pid && a.tipo !== 'descanso') || null; }
+function kioscoAtraso(pid){
+  const a = kioscoTurno(pid), tr = a && (horTramosDe(a) || [])[0]; if(!tr) return null;
+  const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes(), ini = horMin(tr.desde);
+  return m - ini;
+}
+async function kioscoBucle(){
+  clearTimeout(KIO.timer);
+  if(KIO.estado !== 'espera' && KIO.estado !== 'acercate' && KIO.estado !== 'desconocido-auto') return;
+  const v = document.getElementById('kioVideo');
+  try {
+    const c = v.readyState >= 2 ? await faceDetectar(v) : null;
+    if(KIO.estado === 'apagado') return;
+    if(!c){ KIO.racha = 0; if(KIO.estado !== 'espera') kioscoPintar('espera'); }
+    else if(c.ancho < 0.14){ KIO.racha = 0; if(KIO.estado !== 'acercate') kioscoPintar('acercate'); }
+    else {
+      const m = faceBuscar(c.descriptor, KIO.datos.rostros);
+      if(!m || m.d > FACE_DUDA){ KIO.racha = 0; kioscoPintar('desconocido-auto'); }
+      else {
+        KIO.racha = KIO.ultimo === m.pid ? KIO.racha + 1 : 1; KIO.ultimo = m.pid;
+        if(KIO.racha >= 2){
+          KIO.persona = KIO.datos.personal.find(p => p.id === m.pid);
+          KIO.match = { d: m.d, dudosa: m.d > FACE_OK || m.segundo - m.d < 0.05 };
+          if(KIO.persona){ kioscoPintar('reconocido'); return; }
+        }
+      }
+    }
+  } catch(e){ console.warn(e); }
+  KIO.timer = setTimeout(kioscoBucle, 500);
+}
+function kioscoReloj(){ const d = new Date(); return { hora: d.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), fecha: d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }) }; }
+function kioscoPintar(estado, extra){
+  KIO.estado = estado;
+  const panel = document.getElementById('kioPanel'), marco = document.getElementById('kioMarco'), est = document.getElementById('kioEstado');
+  const r = kioscoReloj();
+  const cab = `<div class="kio-lugar">${escapeHtml(currentLocation.name)} · ${escapeHtml(currentArea.name)}</div><div class="kio-hora">${escapeHtml(r.hora)}</div><div class="kio-fecha">${escapeHtml(r.fecha)}</div>`;
+  marco.className = 'kio-marco';
+  clearTimeout(KIO.volver);
+  if(estado === 'cargando'){ est.textContent = 'Preparando la cámara…'; panel.innerHTML = cab + '<p>Cargando el reconocimiento facial. La primera vez tarda un poco.</p>'; }
+  else if(estado === 'error'){ est.textContent = ''; marco.classList.add('no'); panel.innerHTML = cab + `<h2>No se pudo iniciar</h2><p>${escapeHtml(extra || '')}</p><button type="button" class="kio-sec" data-kio="reintentar">Reintentar</button><button type="button" class="kio-sec" data-kio="salir">Salir de la marcación</button>`; }
+  else if(estado === 'espera'){ est.textContent = 'Párate frente a la cámara'; panel.innerHTML = cab + '<p>Para marcar tu entrada o salida, mira a la cámara. La pantalla te reconoce sola.</p><p class="kio-peq">Bájate el tapabocas un momento. Si no te reconoce, llama al líder.</p>' + kioscoPie(); }
+  else if(estado === 'acercate'){ marco.classList.add('warn'); est.textContent = 'Acércate un poco'; }
+  else if(estado === 'desconocido-auto'){
+    marco.classList.add('no'); est.textContent = 'No te reconozco';
+    panel.innerHTML = cab + '<h2>No te reconozco</h2><p>Acércate, quítate el tapabocas y mira de frente. Si sigue sin reconocerte, llama al líder.</p>' + kioscoPie();
+  }
+  else if(estado === 'reconocido'){
+    const p = KIO.persona, ult = kioscoUltima(p.id), dentro = ult && ult.tipo === 'entrada', turno = kioscoTurno(p.id), atraso = kioscoAtraso(p.id), tol = Number(KIO.datos.cfg.tolerancia_min ?? 5);
+    marco.classList.add(KIO.match.dudosa ? 'warn' : 'ok'); est.textContent = KIO.match.dudosa ? 'Reconocido (con duda)' : 'Reconocido';
+    panel.innerHTML = `<div class="kio-lugar">${escapeHtml(r.hora)}</div><h2>Hola, ${escapeHtml(p.nombre.split(' ')[0])}</h2>
+      <div class="kio-info">${turno ? `<span>Tu turno de hoy: <b>${escapeHtml(turno.codigo || '')}</b></span>` : '<span>Hoy no tienes turno en el horario.</span>'}
+        ${!dentro && turno && atraso !== null ? `<span>${atraso > tol ? `<span class="kio-tarde">Llegas ${atraso} min tarde</span>` : atraso > 0 ? 'Llegas a tiempo' : 'Llegas temprano'}</span>` : ''}
+        ${dentro ? `<span>Entraste a las ${escapeHtml(new Date(ult.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))}</span>` : ''}
+        ${KIO.match.dudosa ? '<span class="kio-peq">El líder revisará esta marcación.</span>' : ''}</div>
+      <button type="button" class="kio-grande ${dentro ? 'salida' : 'entrada'}" data-kio-marcar="${dentro ? 'salida' : 'entrada'}">Marcar ${dentro ? 'salida' : 'entrada'}</button>
+      <button type="button" class="kio-sec" data-kio-marcar="${dentro ? 'entrada' : 'salida'}">Marcar ${dentro ? 'entrada' : 'salida'}</button>
+      <button type="button" class="kio-sec kio-plano" data-kio="nosoy">No soy ${escapeHtml(p.nombre.split(' ')[0])}</button>`;
+    KIO.volver = setTimeout(() => { if(KIO.estado === 'reconocido') kioscoReiniciar(); }, 12000);
+  }
+  else if(estado === 'hecho'){
+    marco.classList.add('ok'); est.textContent = extra.foto ? 'Foto de evidencia guardada' : '';
+    panel.innerHTML = `<div class="kio-check${extra.tarde ? ' tarde' : ''}" aria-hidden="true">✓</div><h2>${extra.tipo === 'entrada' ? 'Entrada' : 'Salida'} marcada</h2>
+      <div class="kio-info"><span>${escapeHtml(extra.nombre)} · <b>${escapeHtml(extra.hora)}</b></span><span>${extra.tipo === 'entrada' ? (extra.tarde ? `<span class="kio-tarde">${extra.tarde} min tarde: queda anotado en el registro del día</span>` : 'A tiempo') : 'Que descanses'}</span></div>
+      <div class="kio-cuenta"><i></i></div>`;
+    KIO.volver = setTimeout(kioscoReiniciar, 5000);
+  }
+  else if(estado === 'clave'){
+    est.textContent = '';
+    const manual = extra === 'manual';
+    panel.innerHTML = `<h2>${manual ? 'Marcación por el líder' : 'Salir de la marcación'}</h2>
+      <p>${manual ? 'El líder elige a la persona y escribe su contraseña de la app. Queda anotado que la marcó él, con la foto.' : 'Escribe la contraseña de la cuenta que está abierta en este equipo.'}</p>
+      ${manual ? `<label class="kio-campo"><span>Persona</span><select id="kioPersona">${KIO.datos.personal.map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></label>
+        <label class="kio-campo"><span>Tipo</span><select id="kioTipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></label>` : ''}
+      <label class="kio-campo"><span>Contraseña</span><input type="password" id="kioClave" autocomplete="current-password"></label>
+      <button type="button" class="kio-grande entrada" data-kio="${manual ? 'confirmarmanual' : 'confirmarsalir'}">${manual ? 'Marcar' : 'Salir'}</button>
+      <button type="button" class="kio-sec" data-kio="volver">Cancelar</button>`;
+    setTimeout(() => document.getElementById(manual ? 'kioPersona' : 'kioClave')?.focus(), 50);
+  }
+}
+function kioscoPie(){ return '<div class="kio-pie"><button type="button" class="kio-sec kio-plano" data-kio="manual">Marcar con la clave del líder</button><button type="button" class="kio-sec kio-plano" data-kio="salirclave">Salir</button></div>'; }
+function kioscoReiniciar(){ KIO.persona = null; KIO.match = null; KIO.racha = 0; KIO.ultimo = null; kioscoPintar('espera'); kioscoBucle(); }
+async function kioscoVerificarClave(){
+  const clave = document.getElementById('kioClave').value;
+  if(!clave){ showToast('Escribe la contraseña', 'warn'); return false; }
+  const { error } = await supa.auth.signInWithPassword({ email: session.user.email, password: clave });
+  if(error){ showToast('Contraseña incorrecta', 'danger'); return false; }
+  return true;
+}
+async function kioscoMarcar(pid, tipo, opciones){
+  if(KIO.ocupado) return; KIO.ocupado = true;
+  try {
+    const v = document.getElementById('kioVideo'), hoy = horHoy();
+    let foto_path = null;
+    try {
+      const blob = await faceFoto(v, 320);
+      const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+      const path = `${currentArea.id}/${hoy}/${id}.jpg`;
+      const up = await supa.storage.from('horario-marcaciones').upload(path, blob, { contentType: 'image/jpeg' });
+      if(!up.error) foto_path = path;
+    } catch(_){}
+    const fila = { area_id: currentArea.id, personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual };
+    const { data, error } = await supa.from('horario_marcaciones').insert(fila).select().single();
+    if(error){ showToast('No se pudo marcar: ' + error.message, 'danger'); kioscoReiniciar(); return; }
+    KIO.datos.marc.push({ personal_id: pid, tipo, at: data.at, fecha_turno: data.fecha_turno });
+    const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(KIO.datos.cfg.tolerancia_min ?? 5);
+    kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path });
+  } finally { KIO.ocupado = false; }
+}
+// Borra las fotos de evidencia de más de 60 días (carpetas por fecha).
+async function kioscoLimpiarFotos(){
+  try {
+    const limite = prenSumarDias(horHoy(), -60);
+    const { data } = await supa.storage.from('horario-marcaciones').list(currentArea.id, { limit: 1000 });
+    for(const carpeta of (data || []).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.name) && x.name < limite)){
+      const { data: fotos } = await supa.storage.from('horario-marcaciones').list(currentArea.id + '/' + carpeta.name, { limit: 1000 });
+      const rutas = (fotos || []).map(f => currentArea.id + '/' + carpeta.name + '/' + f.name);
+      if(rutas.length) await supa.storage.from('horario-marcaciones').remove(rutas);
+    }
+  } catch(_){}
+}
+document.getElementById('horKiosco').addEventListener('click', async e => {
+  const m = e.target.closest('[data-kio-marcar]');
+  if(m && KIO.persona){ clearTimeout(KIO.volver); m.disabled = true; await kioscoMarcar(KIO.persona.id, m.dataset.kioMarcar, { distancia: KIO.match.d, dudosa: KIO.match.dudosa }); return; }
+  const b = e.target.closest('[data-kio]'); if(!b) return;
+  const a = b.dataset.kio;
+  if(a === 'nosoy' || a === 'volver') kioscoReiniciar();
+  else if(a === 'manual'){ clearTimeout(KIO.timer); kioscoPintar('clave', 'manual'); }
+  else if(a === 'salirclave'){ clearTimeout(KIO.timer); kioscoPintar('clave', 'salir'); }
+  else if(a === 'reintentar'){ kioscoCerrar(); kioscoAbrir(); }
+  else if(a === 'salir') kioscoCerrar();
+  else if(a === 'confirmarsalir'){ b.disabled = true; if(await kioscoVerificarClave()) kioscoCerrar(); else b.disabled = false; }
+  else if(a === 'confirmarmanual'){
+    b.disabled = true;
+    if(!(await kioscoVerificarClave())){ b.disabled = false; return; }
+    await kioscoMarcar(document.getElementById('kioPersona').value, document.getElementById('kioTipo').value, { manual: true });
+  }
+});
+document.getElementById('horKiosco').addEventListener('keydown', e => { if(e.key === 'Enter' && e.target.id === 'kioClave') document.querySelector('#kioPanel [data-kio^="confirmar"]')?.click(); });
+setInterval(() => { if(KIO.estado === 'espera'){ const h = document.querySelector('#kioPanel .kio-hora'); if(h) h.textContent = kioscoReloj().hora; } }, 15000);
+
+/* ---------- Registro de rostros (Configuración → Personal) ---------- */
+const ROS = { pid: null, stream: null, descs: [], ocupado: false };
+async function rostroAbrir(pid){
+  const p = HOR.personal.find(x => x.id === pid); if(!p) return;
+  ROS.pid = pid; ROS.descs = [];
+  const box = document.getElementById('horRostroBox');
+  box.innerHTML = `<h3 id="horRostroTit">Registrar el rostro de ${escapeHtml(p.nombre)}</h3>
+    <div class="ros-cam"><video id="rosVideo" playsinline muted></video><div class="ros-estado" id="rosEstado">Preparando la cámara…</div></div>
+    <p class="field-help">Se toman 5 fotos: de frente, un poco a la izquierda, a la derecha, arriba y abajo, a la distancia en que va a marcar. Se guarda una huella numérica del rostro, no las fotos.</p>
+    <div class="ros-puntos" id="rosPuntos" aria-live="polite"></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-ros="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-ros="foto" disabled>Tomar foto 1 de 5</button></div>`;
+  document.getElementById('horRostroModal').classList.add('open');
+  rostroPuntos();
+  try {
+    await faceCargar();
+    ROS.stream = await faceCamara(document.getElementById('rosVideo'));
+    document.getElementById('rosEstado').textContent = 'Mira a la cámara';
+    rostroPuntos();
+  } catch(e){ document.getElementById('rosEstado').textContent = e.message; }
+}
+function rostroPuntos(){
+  document.getElementById('rosPuntos').innerHTML = [0,1,2,3,4].map(i => `<i class="${i < ROS.descs.length ? 'on' : ''}"></i>`).join('') + `<span>${ROS.descs.length} de 5</span>`;
+  const b = document.querySelector('[data-ros="foto"], [data-ros="guardar"]');
+  if(!b) return;
+  if(ROS.descs.length >= 5){ b.dataset.ros = 'guardar'; b.textContent = 'Guardar rostro'; b.className = 'btn btn-ok'; }
+  else { b.dataset.ros = 'foto'; b.textContent = `Tomar foto ${ROS.descs.length + 1} de 5`; }
+  b.disabled = !ROS.stream;
+}
+function rostroCerrar(){ faceApagar(ROS.stream); ROS.stream = null; ROS.pid = null; document.getElementById('horRostroModal').classList.remove('open'); }
+document.getElementById('horRostroModal').addEventListener('click', async e => {
+  if(e.target.id === 'horRostroModal'){ rostroCerrar(); return; }
+  const b = e.target.closest('[data-ros]'); if(!b || ROS.ocupado) return;
+  if(b.dataset.ros === 'cerrar'){ rostroCerrar(); return; }
+  if(b.dataset.ros === 'foto'){
+    ROS.ocupado = true; b.disabled = true;
+    const est = document.getElementById('rosEstado');
+    try {
+      const c = await faceDetectar(document.getElementById('rosVideo'));
+      if(!c) est.textContent = 'No veo ninguna cara. Mira a la cámara.';
+      else if(c.varias) est.textContent = 'Hay más de una cara: que quede solo la persona.';
+      else if(c.ancho < 0.14) est.textContent = 'Acércate un poco a la cámara.';
+      else if(ROS.descs.length && Math.min(...ROS.descs.map(x => faceDistancia(x, c.descriptor))) > 0.6) est.textContent = 'Esa foto no parece de la misma persona. Inténtalo otra vez.';
+      else { ROS.descs.push(c.descriptor); est.textContent = ROS.descs.length < 5 ? 'Bien. Gira un poco la cabeza para la siguiente.' : 'Listo: ya puedes guardar.'; }
+    } catch(err){ est.textContent = 'No se pudo tomar: ' + err.message; }
+    ROS.ocupado = false; rostroPuntos(); return;
+  }
+  if(b.dataset.ros === 'guardar'){
+    // ¿Se parece demasiado a alguien ya registrado?
+    const { data: otros } = await supa.from('horario_rostros').select('personal_id, descriptores').eq('area_id', HOR.areaId).neq('personal_id', ROS.pid);
+    const parecido = (otros || []).map(r => ({ r, d: Math.min(...ROS.descs.flatMap(a => (r.descriptores || []).map(x => faceDistancia(a, x)))) })).sort((a, b) => a.d - b.d)[0];
+    if(parecido && parecido.d < FACE_OK){ const p = HOR.personal.find(x => x.id === parecido.r.personal_id); showToast(`Este rostro se parece mucho al de ${p ? p.nombre : 'otra persona'}. Revisa que sea la persona correcta.`, 'danger'); return; }
+    ROS.ocupado = true; b.disabled = true;
+    const { error } = await supa.from('horario_rostros').upsert({ personal_id: ROS.pid, area_id: HOR.areaId, descriptores: ROS.descs, registrado_por: profile.name || session.user.email, updated_at: new Date().toISOString() }, { onConflict: 'personal_id' });
+    ROS.ocupado = false;
+    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
+    showToast('Rostro guardado', 'ok'); rostroCerrar(); horCargarRostros().then(horPintarConfigQuieto);
+  }
+});
+async function horCargarRostros(){
+  const { data, error } = await supa.from('horario_rostros').select('personal_id, updated_at').eq('area_id', HOR.areaId);
+  HOR.rostros = {}; if(!error) (data || []).forEach(r => { HOR.rostros[r.personal_id] = r; });
+}
+async function rostroBorrar(pid){
+  const { error } = await supa.from('horario_rostros').delete().eq('personal_id', pid);
+  if(error){ showToast('No se pudo borrar: ' + error.message, 'danger'); return; }
+  delete HOR.rostros[pid]; showToast('Rostro borrado', 'ok'); horPintarConfigQuieto();
+}
+
+/* ---------- En turno ahora (admin y líderes), en tiempo real ---------- */
+const ENT = { canal: null, timer: null, datos: null, carga: 0 };
+async function horPintarEnTurno(){
+  const box = document.getElementById('horSemana');
+  if(!ENT.datos) box.innerHTML = '<div class="empty-note">Cargando...</div>';
+  const carga = ++ENT.carga, a = HOR.areaId, hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
+  const [sem, mar, nov] = await Promise.all([
+    supa.from('horario_semanas').select('id').eq('area_id', a).eq('lunes', lunes).maybeSingle(),
+    supa.from('horario_marcaciones').select('*').eq('area_id', a).gte('at', new Date(Date.now() - 20 * 3600 * 1000).toISOString()).order('at'),
+    supa.from('horario_novedades').select('personal_id, tipo, desde, hasta').eq('area_id', a).lte('desde', hoy).gte('hasta', hoy),
+  ]);
+  if(carga !== ENT.carga || HOR.sub !== 'enturno') return;
+  if(mar.error){ box.innerHTML = `<div class="empty-note">${/horario_marcaciones/.test(mar.error.message) ? 'La marcación todavía no está lista en la base de datos (falta correr sql/horarios_10_marcacion.sql).' : escapeHtml(mar.error.message)}</div>`; return; }
+  let asig = [];
+  if(sem.data){ const r = await supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).eq('dia', dia); asig = r.data || []; }
+  ENT.datos = { asig, marc: mar.data || [], nov: nov.data || [] };
+  entPintar();
+  entSuscribir();
+  clearInterval(ENT.timer); ENT.timer = setInterval(() => { if(HOR.sub === 'enturno' && document.getElementById('view-horarios').classList.contains('active')) entPintar(); else { clearInterval(ENT.timer); } }, 60000);
+}
+function entSuscribir(){
+  if(ENT.canal && ENT.canal.area === HOR.areaId) return;
+  if(ENT.canal) supa.removeChannel(ENT.canal);
+  ENT.canal = supa.channel('marcaciones-' + HOR.areaId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'horario_marcaciones', filter: 'area_id=eq.' + HOR.areaId }, p => {
+      if(HOR.sub === 'enturno'){ ENT.flash = p.new && p.new.personal_id; horPintarEnTurno(); }
+    }).subscribe();
+  ENT.canal.area = HOR.areaId;
+}
+function entEstado(p){
+  const D = ENT.datos, hhmm = iso => new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+  const ahora = new Date(), mAhora = ahora.getHours() * 60 + ahora.getMinutes();
+  const marc = D.marc.filter(m => m.personal_id === p.id && m.estado === 'valida'), ult = marc[marc.length - 1];
+  const nov = D.nov.find(n => n.personal_id === p.id && n.tipo !== 'retardo');
+  const a = D.asig.find(x => x.personal_id === p.id);
+  const tramos = a && a.tipo !== 'descanso' ? horTramosMin(horTramosDe(a)) : [];
+  const tol = Number((HOR.cfg && HOR.cfg.tolerancia_min) ?? 5);
+  if(ult && ult.tipo === 'entrada'){ const min = Math.round((ahora - new Date(ult.at)) / 60000); return { k: 'dentro', o: 1, txt: `Entró ${hhmm(ult.at)} · lleva ${min >= 60 ? Math.floor(min / 60) + ' h ' + (min % 60) + ' min' : min + ' min'}`, badge: 'ok', lbl: 'En turno' }; }
+  if(nov) return { k: 'nov', o: 6, txt: 'No viene hoy (' + HOR_TIPOS[nov.tipo].toLowerCase() + ')', badge: 'neutral', lbl: 'Novedad' };
+  if(!a || a.tipo === 'descanso') return { k: 'desc', o: 7, txt: a ? 'Descansa hoy' : 'Sin turno hoy', badge: 'neutral', lbl: '' };
+  const actual = tramos.find(([i, f]) => mAhora >= i - 30 && mAhora < f), prox = tramos.find(([i]) => i > mAhora);
+  if(actual){
+    const atraso = mAhora - actual[0];
+    if(atraso > tol) return { k: 'tarde', o: 0, txt: `Entraba ${horHoraCorta(String(Math.floor(actual[0] / 60) % 24).padStart(2, '0') + ':' + String(actual[0] % 60).padStart(2, '0'))} · ${atraso} min tarde y no ha marcado`, badge: 'danger', lbl: 'No ha llegado' };
+    return { k: 'llega', o: 2, txt: `Entra ${horHoraCorta(String(Math.floor(actual[0] / 60) % 24).padStart(2, '0') + ':' + String(actual[0] % 60).padStart(2, '0'))}${atraso < 0 ? ' · faltan ' + (-atraso) + ' min' : ''}`, badge: 'info', lbl: 'Por llegar' };
+  }
+  if(ult && ult.tipo === 'salida' && prox) return { k: 'pausa', o: 3, txt: `Salió ${hhmm(ult.at)} · vuelve ${horHoraCorta(String(Math.floor(prox[0] / 60) % 24).padStart(2, '0') + ':' + String(prox[0] % 60).padStart(2, '0'))}`, badge: 'warn', lbl: 'En pausa' };
+  if(ult && ult.tipo === 'salida') return { k: 'salio', o: 4, txt: `Salió ${hhmm(ult.at)}`, badge: 'neutral', lbl: 'Salió' };
+  if(prox) return { k: 'llega', o: 2, txt: `Entra ${horHoraCorta(String(Math.floor(prox[0] / 60) % 24).padStart(2, '0') + ':' + String(prox[0] % 60).padStart(2, '0'))}`, badge: 'info', lbl: 'Más tarde' };
+  return { k: 'salio', o: 5, txt: 'Ya terminó su turno y no marcó salida', badge: 'warn', lbl: 'Sin salida' };
+}
+function entPintar(){
+  const box = document.getElementById('horSemana'), D = ENT.datos; if(!D) return;
+  const personas = HOR.personal.filter(p => p.activo).map(p => ({ p, e: entEstado(p) }));
+  const n = k => personas.filter(x => x.e.k === k).length;
+  const dudosas = D.marc.filter(m => m.dudosa && m.estado === 'valida');
+  let h = `<div class="hor-bar"><div class="hor-nav"><span class="hor-rango">En turno ahora</span><span class="badge ok">En vivo</span></div>
+    <button type="button" class="btn btn-accent btn-small" data-ent="kiosco">Abrir pantalla de marcación</button></div>
+    <div class="pren-totales">
+      <div class="pren-tot ent ok"><span class="field-label">En turno</span><b>${n('dentro')}</b></div>
+      <div class="pren-tot ent danger"><span class="field-label">No han llegado</span><b>${n('tarde')}</b></div>
+      <div class="pren-tot ent info"><span class="field-label">Por llegar</span><b>${n('llega')}</b></div>
+      <div class="pren-tot ent warn"><span class="field-label">En pausa</span><b>${n('pausa')}</b></div>
+      <div class="pren-tot ent"><span class="field-label">Salieron</span><b>${n('salio')}</b></div>
+    </div>`;
+  if(dudosas.length) h += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">${dudosas.length} por revisar</span> Reconocimiento dudoso</h3>
+    <ul class="ent-dudosas">${dudosas.map(m => { const p = HOR.personal.find(x => x.id === m.personal_id); return `<li><span>${escapeHtml(p ? p.nombre : '?')} · ${m.tipo} ${escapeHtml(new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))}</span>
+      ${m.foto_path ? `<button type="button" class="btn btn-ghost btn-small" data-ent-foto="${escapeHtml(m.foto_path)}">Ver foto</button>` : ''}
+      <button type="button" class="btn btn-ok btn-small" data-ent-revisar="${m.id}|1">Sí es</button><button type="button" class="btn btn-danger-outline btn-small" data-ent-revisar="${m.id}|0">No es</button></li>`; }).join('')}</ul>
+    <span class="field-help">Si no es la persona, la marcación se anula y no cuenta en el registro.</span></div></div>`;
+  horGrupos().forEach(({ e, gente }) => {
+    const filas = personas.filter(x => gente.some(g => g.id === x.p.id)).sort((a, b) => a.e.o - b.e.o);
+    if(!filas.length) return;
+    h += `<div class="ent-est"><h3><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</h3>${filas.map(({ p, e: s }) => `
+      <div class="ent-fila${ENT.flash === p.id ? ' flash' : ''}"><span class="ent-av${s.k === 'dentro' ? ' ok' : ''}" aria-hidden="true">${escapeHtml(p.nombre[0] || '?')}</span>
+        <div><b>${escapeHtml(p.nombre)}</b>${(() => { const a = D.asig.find(x => x.personal_id === p.id && x.tipo !== 'descanso'); return a ? ` <span class="ent-cod">· ${escapeHtml(a.codigo || '')}</span>` : ''; })()}<div class="ent-txt">${escapeHtml(s.txt)}</div></div>
+        ${s.lbl ? `<span class="badge ${s.badge}">${s.lbl}</span>` : '<span></span>'}</div>`).join('')}</div>`;
+  });
+  const hoyM = D.marc.slice().reverse();
+  h += `<details class="pren-sec"><summary>Marcaciones de hoy (${hoyM.length})</summary><div class="pren-cuerpo"><ul class="ent-lista">${hoyM.map(m => { const p = HOR.personal.find(x => x.id === m.personal_id); return `<li class="${m.estado === 'rechazada' ? 'rech' : ''}"><b>${escapeHtml(new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))}</b> ${escapeHtml(p ? p.nombre : '?')} · ${m.tipo}${m.manual ? ' · marcada por ' + escapeHtml(m.marcado_por || 'el líder') : ''}${m.estado === 'rechazada' ? ' · anulada' : ''}${m.foto_path ? ` <button type="button" class="btn btn-ghost btn-small" data-ent-foto="${escapeHtml(m.foto_path)}">Foto</button>` : ''}</li>`; }).join('') || '<li>Todavía no hay marcaciones.</li>'}</ul></div></details>
+    <p class="field-help">Las marcaciones llenan solas el registro del día (llegada a tiempo o tarde y horas reales). Tú revisas y cierras cada turno, como siempre. Tolerancia de llegada: ${Number((HOR.cfg && HOR.cfg.tolerancia_min) ?? 5)} min.</p>`;
+  box.innerHTML = h;
+  ENT.flash = null;
+}
+document.getElementById('horSemana').addEventListener('click', async e => {
+  if(HOR.sub !== 'enturno') return;
+  if(e.target.closest('[data-ent="kiosco"]')){ kioscoAbrir(); return; }
+  const f = e.target.closest('[data-ent-foto]');
+  if(f){
+    const w = window.open('', '_blank');
+    const { data, error } = await supa.storage.from('horario-marcaciones').createSignedUrl(f.dataset.entFoto, 300);
+    if(error || !data){ if(w) w.close(); showToast('No se pudo abrir la foto', 'danger'); return; }
+    if(w) w.location.href = data.signedUrl; else window.location.href = data.signedUrl;
+    return;
+  }
+  const r = e.target.closest('[data-ent-revisar]');
+  if(r){
+    const [id, ok] = r.dataset.entRevisar.split('|'); r.disabled = true;
+    const { error } = await supa.rpc('horario_revisar_marcacion', { p_id: id, p_valida: ok === '1' });
+    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); r.disabled = false; return; }
+    showToast(ok === '1' ? 'Marcación confirmada' : 'Marcación anulada', 'ok'); horPintarEnTurno();
+  }
+});
+
 /* --- Configuración (admin y líderes): reglas, estaciones, turnos, personal, tareas. Se desactiva, no se borra. --- */
 function horPintarConfig(){
   const box = document.getElementById('horConfig');
@@ -5127,6 +5619,7 @@ function horPintarConfig(){
     <section><h3>Reglas</h3>
       <div class="hor-cfg-row">
         ${inp('horario_config', HOR.areaId, 'jornada_max', HOR.cfg.jornada_max, 'Jornada máxima (h)', 'number', ' min="1" max="80" step="0.5"')}
+        ${inp('horario_config', HOR.areaId, 'tolerancia_min', HOR.cfg.tolerancia_min ?? 5, 'Tolerancia de llegada (min)', 'number', ' min="0" max="60" step="1"')}
         ${inp('horario_config', HOR.areaId, 'nocturno_desde', ((HOR.cfg && HOR.cfg.nocturno_desde) || '19:00').slice(0, 5), 'Nocturno desde', 'time')}
         ${inp('horario_config', HOR.areaId, 'nocturno_hasta', ((HOR.cfg && HOR.cfg.nocturno_hasta) || '06:00').slice(0, 5), 'Nocturno hasta', 'time')}
         <div><span class="field-label">Días en que solo descansa producción</span><div class="mins">${HOR_DC.map((d, i) => `<label class="cb"><input type="checkbox" data-hc-sindesc="${i + 1}"${sinDesc.includes(i + 1) ? ' checked' : ''}>${d}</label>`).join('')}</div></div>
@@ -5170,6 +5663,8 @@ function horPintarConfig(){
         <label><span class="field-label">Descanso fijo</span><select data-hc="horario_personal|${p.id}|descanso_dia"><option value="">Ninguno</option>${HOR_DIAS.map((d, i) => `<option value="${i + 1}"${i + 1 === p.descanso_dia ? ' selected' : ''}>${d}</option>`).join('')}</select></label>
         ${cb('horario_personal', p.id, 'es_produccion', p.es_produccion, 'Producción')}
         ${cb('horario_personal', p.id, 'activo', p.activo, 'Activo')}
+        ${(HOR.rostros || {})[p.id] ? `<span class="badge ok" style="align-self:center">Rostro registrado</span><button type="button" class="btn btn-ghost btn-small" data-hc-rostro="${p.id}">Volver a tomar</button><button type="button" class="btn btn-ghost btn-small" data-hc-rostro-borrar="${p.id}">Borrar rostro</button>`
+          : `<button type="button" class="btn btn-secondary btn-small" data-hc-rostro="${p.id}">Registrar rostro</button>`}
       </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay personal.</p>'}
       <p class="hor-cfg-nota">"Producción" puede descansar los días marcados arriba. Quien sale del equipo se desactiva: deja de aparecer en las semanas nuevas y su historial queda.</p>
     </section>
@@ -5223,7 +5718,7 @@ document.getElementById('horConfig').addEventListener('change', async e => {
   if(el.type === 'checkbox') val = el.checked;
   else if(el.type === 'number'){
     val = Number(String(el.value).replace(',', '.'));
-    if(!(val > 0)){ showToast('Escribe un número mayor que cero', 'warn'); horPintarConfig(); return; }
+    if(!(val > 0) && !(campo === 'tolerancia_min' && val === 0)){ showToast('Escribe un número mayor que cero', 'warn'); horPintarConfig(); return; }
   }
   else if(campo === 'estacion_id') val = el.value || null;
   else if(campo === 'descanso_dia' || campo === 'color') val = el.value ? Number(el.value) : null;
@@ -5324,6 +5819,14 @@ async function horGuardarTramos(id, tramos){
   if(await horGuardarConfig('horario_turnos', id, cambios)) horPintarConfigQuieto();
 }
 document.getElementById('horConfig').addEventListener('click', async e => {
+  const ros = e.target.closest('[data-hc-rostro]'), rosB = e.target.closest('[data-hc-rostro-borrar]');
+  if(ros){ rostroAbrir(ros.dataset.hcRostro); return; }
+  if(rosB){
+    if(rosB.dataset.armado){ rosB.disabled = true; await rostroBorrar(rosB.dataset.hcRostroBorrar); return; }
+    rosB.dataset.armado = '1'; rosB.textContent = 'Toca otra vez para borrar'; rosB.classList.add('btn-danger-outline');
+    setTimeout(() => { if(rosB.isConnected){ delete rosB.dataset.armado; rosB.textContent = 'Borrar rostro'; rosB.classList.remove('btn-danger-outline'); } }, 4000);
+    return;
+  }
   const celda = e.target.closest('[data-hc-celda]');
   if(celda){
     if(HOR_ARRASTRE && HOR_ARRASTRE.movio) return;
