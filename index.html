@@ -1002,6 +1002,36 @@ nav.tabs button{position:relative;}
 .hor-cell .h{font:500 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim);}
 .hor-cell.desc, .hor-cell.desc:hover{background:var(--surface-2);} .hor-cell.desc .c{color:var(--text-muted); font-size:11.5px; letter-spacing:1px;}
 .hor-cell.otro{border-style:dashed; border-color:var(--border-strong);}
+.hor-cell.nov, .hor-cell.nov:hover{background:var(--warn-bg);} .hor-cell.nov .c{color:var(--warn); font-size:11px; letter-spacing:.6px;}
+.hor-novs{display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-4);}
+.hor-nov{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--warn); border-radius:var(--radius-md); padding:12px 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;}
+.hor-nov.incapacidad{border-left-color:var(--danger);} .hor-nov.vacante{border-left-color:var(--info);} .hor-nov.retardo{border-left-color:var(--border-strong);}
+.hor-nov b{font-size:15px;} .hor-nov .m{font:500 12.5px 'IBM Plex Mono',monospace; color:var(--text-muted); margin-top:2px;}
+.hor-nov p{margin:4px 0 0; font-size:13.5px; color:var(--text-muted);}
+.hor-form{background:var(--surface-2); border-radius:var(--radius-md); padding:14px; display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap:10px 12px; align-items:end;}
+.hor-form .field{margin:0;} .hor-form .full{grid-column:1 / -1;}
+.hor-dias{display:flex; gap:4px; padding:4px; background:var(--surface-2); border-radius:var(--radius-md); overflow-x:auto; max-width:100%; margin-bottom:var(--space-3);}
+.hor-dias button{font:600 13px 'Inter',sans-serif; border:none; background:transparent; color:var(--text-muted); border-radius:8px; min-height:40px; padding:0 12px; cursor:pointer; white-space:nowrap;}
+.hor-dias button.active{background:var(--surface); color:var(--text); box-shadow:var(--shadow-1);}
+.hor-dias button:disabled{opacity:.45; cursor:not-allowed;}
+.hor-dias button:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.hor-reg{width:100%; border-collapse:collapse; min-width:680px;}
+.hor-reg th{font:600 10.5px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); text-align:left; padding:8px; background:var(--surface-2);}
+.hor-reg td{padding:6px 8px; border-bottom:1px solid var(--border); font-size:14px;}
+.hor-reg input[type=number]{width:84px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+.hor-reg input[type=text]{width:100%; min-width:140px;}
+.hor-llegada{display:inline-flex; border:1px solid var(--border-strong); border-radius:var(--radius-md); overflow:hidden; vertical-align:middle;}
+.hor-llegada button{border:none; background:var(--surface); cursor:pointer; padding:0 12px; min-height:40px; font:600 13px 'Inter',sans-serif; color:var(--text-muted);}
+.hor-llegada button + button{border-left:1px solid var(--border);}
+.hor-llegada button.on.asistio{background:var(--ok); color:var(--on-state);}
+.hor-llegada button.on.tarde{background:var(--warn); color:var(--on-state);}
+.hor-llegada button.on.falto{background:var(--danger); color:var(--on-state);}
+.hor-llegada button:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.hor-min{width:72px !important; margin-left:6px;}
+.hor-tabla{width:100%; border-collapse:collapse; font-size:13.5px;}
+.hor-tabla th, .hor-tabla td{padding:8px 12px; border-bottom:1px solid var(--border); text-align:left;}
+.hor-tabla th{font:600 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim); text-transform:uppercase; background:var(--surface-2);}
+.hor-tabla .num{font-family:'IBM Plex Mono',monospace; text-align:right; font-variant-numeric:tabular-nums;}
 .hor-cell.vacia .c{color:var(--text-dim);}
 .hor-cell.err{border:2px solid var(--danger); background:var(--danger-bg);}
 .hor-cell.warn{border:2px solid var(--warn);}
@@ -1491,6 +1521,8 @@ nav.tabs button{position:relative;}
         <h2>Horarios</h2>
         <div class="admin-subtabs hor-subtabs" id="horSubtabs" hidden>
           <button type="button" data-hor-sub="semana" class="active">Semana</button>
+          <button type="button" data-hor-sub="novedades">Novedades</button>
+          <button type="button" data-hor-sub="registro">Registro del día</button>
           <button type="button" data-hor-sub="config">Configuración</button>
         </div>
       </div>
@@ -3293,7 +3325,25 @@ const HOR_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','ago
 const HOR_EXTRA_MAX = 12; // tope legal de horas extra a la semana (solo aviso)
 const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], turnos:[], tareas:[], lunes:null, semana:null,
   asig:{}, tareaAsig:{}, domPasadoTemprano:new Set(), haySemanaAnterior:false, sub:'semana', confirmar:false, verTexto:false,
-  imgBlob:null, carga:0, error:null };
+  imgBlob:null, carga:0, error:null,
+  nov:[], reg:{}, cerrados:{}, regError:null, diaReg:null, agregar:false };
+const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', vacante:'Vacante', retardo:'Retardo' };
+const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', vacante:'VACANTE', retardo:'RETARDO' };
+const HOR_AYUDA_NOV = {
+  incapacidad: 'No viene por enfermedad. Pide el soporte.',
+  vacaciones: 'No viene esos días.',
+  permiso: 'No viene, o viene solo parte del día (anótalo en la nota).',
+  vacante: 'El puesto no tiene a nadie (ej. el cocinero nuevo aún no empieza).',
+  retardo: 'Llegó tarde. Se crea solo al cerrar el día; también se puede anotar aquí.',
+};
+// Ausencia (novedad que no es retardo) de una persona un día de la semana. El equipo no recibe el tipo ni la nota.
+function horNovedad(pid, dia){
+  const f = horIso(horFecha(dia));
+  return HOR.nov.find(n => n.personal_id === pid && n.tipo !== 'retardo' && n.desde <= f && n.hasta >= f);
+}
+function horEtiquetaNov(n, paraGrupo){ return (paraGrupo || !HOR.editor || !n.tipo) ? 'NO VIENE' : HOR_TIPOS_CORTO[n.tipo]; }
+function horHoy(){ return horIso(new Date()); }
+function horEsAdmin(){ return profile && (profile.role === 'admin' || profile.is_super_admin); }
 
 function horIso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function horLunesDe(d){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
@@ -3322,6 +3372,11 @@ async function horAlEntrar(){
   horPintarSub();
   if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
 }
+function horPintar(){
+  if(HOR.sub === 'novedades' && HOR.editor) horPintarNovedades();
+  else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
+  else horPintarSemana();
+}
 
 async function horCargarConfig(){
   const a = HOR.areaId;
@@ -3343,13 +3398,13 @@ function horPintarSub(){
   const tabs = document.getElementById('horSubtabs');
   tabs.hidden = !HOR.editor;
   tabs.querySelectorAll('[data-hor-sub]').forEach(b => b.classList.toggle('active', b.dataset.horSub === HOR.sub));
-  document.getElementById('horSemana').hidden = HOR.sub !== 'semana';
+  document.getElementById('horSemana').hidden = HOR.sub === 'config';
   document.getElementById('horConfig').hidden = HOR.sub !== 'config';
 }
 document.getElementById('horSubtabs').addEventListener('click', e => {
   const b = e.target.closest('[data-hor-sub]'); if(!b) return;
-  HOR.sub = b.dataset.horSub; horPintarSub();
-  if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
+  HOR.sub = b.dataset.horSub; HOR.agregar = false; horPintarSub();
+  if(HOR.sub === 'config') horPintarConfig(); else horPintar();
 });
 
 async function horCargarSemana(){
@@ -3370,19 +3425,32 @@ async function horCargarSemana(){
     consultas.push(supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { asig[x.personal_id + '|' + x.dia] = x; })));
     consultas.push(supa.from('horario_tarea_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { tareaAsig[x.tarea_id + '|' + x.dia] = x.personal_id; })));
   }
+  const domingo = horIso(horFecha(7));
+  let nov = [], reg = {}, cerrados = {}, regError = null;
+  if(HOR.editor){
+    consultas.push(supa.from('horario_novedades').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes).order('desde')
+      .then(r => { nov = r.data || []; }));
+    consultas.push(supa.from('horario_registro_dia').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
+      .then(r => { if(r.error) regError = r.error.message; (r.data || []).forEach(x => { reg[x.personal_id + '|' + x.fecha] = x; }); }));
+    consultas.push(supa.from('horario_dias_cerrados').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
+      .then(r => { if(r.error) regError = r.error.message; (r.data || []).forEach(x => { cerrados[x.fecha] = x; }); }));
+  } else {
+    consultas.push(supa.rpc('horario_ausencias', { p_area: HOR.areaId, p_desde: lunes, p_hasta: domingo })
+      .then(r => { nov = (r.data || []).map(x => ({ ...x, tipo: null })); }));
+  }
   if(ant.data){
     consultas.push(supa.from('horario_asignaciones').select('personal_id, tipo, cubre_manana, cubre_cierre').eq('semana_id', ant.data.id).eq('dia', 7)
       .then(r => (r.data || []).forEach(x => { if(x.tipo !== 'descanso' && x.cubre_manana && !x.cubre_cierre) domPasado.add(x.personal_id); })));
   }
   await Promise.all(consultas);
   if(carga !== HOR.carga) return;
-  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false });
-  horPintarSemana();
+  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError });
+  horPintar();
 }
 
 function horEditable(){ return HOR.editor && HOR.semana && HOR.semana.estado === 'borrador'; }
-function horTrabaja(pid, dia){ const a = HOR.asig[pid + '|' + dia]; return !!a && a.tipo !== 'descanso'; }
-function horHoras(pid){ let h = 0; for(let d = 1; d <= 7; d++){ const a = HOR.asig[pid + '|' + d]; if(a && a.tipo !== 'descanso') h += Number(a.horas) || 0; } return h; }
+function horTrabaja(pid, dia){ const a = HOR.asig[pid + '|' + dia]; return !!a && a.tipo !== 'descanso' && !horNovedad(pid, dia); }
+function horHoras(pid){ let h = 0; for(let d = 1; d <= 7; d++){ if(horTrabaja(pid, d)) h += Number(HOR.asig[pid + '|' + d].horas) || 0; } return h; }
 // En la grilla: activos + los inactivos que tengan algo esta semana.
 function horPersonasSemana(){
   return HOR.personal.filter(p => p.activo || [1,2,3,4,5,6,7].some(d => HOR.asig[p.id + '|' + d]));
@@ -3405,6 +3473,7 @@ function horValidar(){
   for(const p of personas){
     for(let d = 1; d <= 7; d++){
       const a = HOR.asig[p.id + '|' + d];
+      if(horNovedad(p.id, d)) continue;
       if(!a){ vacias.push(p.id + '|' + d); marcar(p.id + '|' + d, 'warn'); continue; }
       if(a.tipo === 'descanso' && p.descanso_dia && d !== p.descanso_dia){
         marcar(p.id + '|' + d, 'err');
@@ -3416,7 +3485,7 @@ function horValidar(){
     }
     if(p.descanso_dia){
       const a = HOR.asig[p.id + '|' + p.descanso_dia];
-      if(a && a.tipo !== 'descanso'){
+      if(a && a.tipo !== 'descanso' && !horNovedad(p.id, p.descanso_dia)){
         marcar(p.id + '|' + p.descanso_dia, 'err');
         err.push({ k: p.id + '|' + p.descanso_dia, t: `${p.nombre} no tiene su descanso fijo (${dia(p.descanso_dia)}).` });
       }
@@ -3446,7 +3515,7 @@ function horValidar(){
     }
     // Domingo: por estación uno sale temprano (solo mañana) y otro recibe y cierra (solo cierre); se rota cada semana.
     if(Number(min[6]) > 0){
-      const dom = activos.map(p => ({ p, a: HOR.asig[p.id + '|7'] })).filter(x => x.a && x.a.tipo !== 'descanso');
+      const dom = activos.filter(p => horTrabaja(p.id, 7)).map(p => ({ p, a: HOR.asig[p.id + '|7'] }));
       if(dom.length){
         const temprano = dom.filter(x => x.a.cubre_manana && !x.a.cubre_cierre), cierre = dom.filter(x => x.a.cubre_cierre && !x.a.cubre_manana);
         if(!temprano.length) warn.push({ k: dom[0].p.id + '|7', t: `Domingo en ${e.nombre}: nadie sale temprano.` });
@@ -3511,10 +3580,12 @@ function horPintarSemana(){
   }
   const v = horValidar();
   if(horEditable()) html += horChecksHtml(v);
+  if(HOR.editor && s.estado === 'publicada') html += horCambiosHtml(v);
   html += horGrillaHtml(v);
   html += `<div class="hor-leyenda">
     <span><i class="hor-sw" style="background:var(--surface-2)"></i>Descanso</span>
     <span><i class="hor-sw" style="border-color:var(--border-strong);border-style:dashed"></i>Otro horario</span>
+    <span><i class="hor-sw" style="background:var(--warn-bg)"></i>No viene (no cuenta en la cobertura)</span>
     ${horEditable() ? `<span><i class="hor-sw" style="border-color:var(--danger);background:var(--danger-bg)"></i>Error</span><span><i class="hor-sw" style="border-color:var(--warn)"></i>Aviso</span>` : ''}
     <span><span class="hor-marca">M</span> cubre mañana · <span class="hor-marca">C</span> cubre cierre</span>
   </div>`;
@@ -3543,6 +3614,33 @@ function horPintarSemana(){
   }
   box.innerHTML = html;
   if(s.estado === 'publicada') horDibujarImagen();
+}
+
+// Novedades cargadas después de publicar + huecos de cobertura que dejan; botón para avisar al grupo.
+function horCambiosNov(){
+  const s = HOR.semana;
+  return HOR.nov.filter(n => n.tipo !== 'retardo' && s && s.publicada_at && n.created_at && n.created_at > s.publicada_at);
+}
+function horRangoNov(n, largo){
+  const f = iso => { const d = new Date(iso + 'T12:00:00'); return largo ? HOR_DIAS[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate() : HOR_DC[(d.getDay() + 6) % 7].toLowerCase() + ' ' + d.getDate() + ' ' + HOR_MESES[d.getMonth()].slice(0, 3); };
+  return n.desde === n.hasta ? 'el ' + f(n.desde) : 'del ' + f(n.desde) + ' al ' + f(n.hasta);
+}
+function horCambiosHtml(v){
+  const nov = horCambiosNov(), cobertura = v.err.filter(i => i.k.startsWith('cov|'));
+  if(!nov.length && !cobertura.length) return '';
+  const nombre = id => { const p = HOR.personal.find(x => x.id === id); return p ? p.nombre : '?'; };
+  return `<div class="hor-checks"><div class="hor-check${cobertura.length ? '' : ' warn'}">
+    <h3><span class="badge ${cobertura.length ? 'danger' : 'warn'}">Después de publicar</span> Novedades de esta semana</h3>
+    <ul>${nov.map(n => `<li><button type="button" class="hor-issue" data-hor-ir-sub="novedades">${escapeHtml(nombre(n.personal_id))}: ${HOR_TIPOS[n.tipo].toLowerCase()} ${horRangoNov(n)}</button></li>`).join('')}
+    ${cobertura.map(i => `<li><button type="button" class="hor-issue" data-hor-ir="${escapeHtml(i.k)}" style="color:var(--danger);font-weight:600">${escapeHtml(i.t)}</button></li>`).join('')}</ul>
+    <span class="field-help">${cobertura.length ? 'Hay que cubrir estos huecos: vuelve a borrador para mover turnos, o anota en el registro del día a quien lo cubra.' : 'La cobertura sigue completa.'}</span>
+    ${nov.length ? `<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="avisarcambios">${HOR_ICO.enviar}Avisar cambios al grupo</button></div>` : ''}
+  </div></div>`;
+}
+function horMensajeCambios(){
+  let m = `*Cambios en el horario de ${currentArea.name}*\n_Semana ${horRango(true)}_\n\n`;
+  horCambiosNov().forEach(n => { const p = HOR.personal.find(x => x.id === n.personal_id); m += `• ${p ? horCorto(p) : '?'} no viene ${horRangoNov(n, true)}\n`; });
+  return m.trim();
 }
 
 function horChecksHtml(v){
@@ -3574,7 +3672,9 @@ function horGrillaHtml(v){
       for(let d = 1; d <= 7; d++){
         const k = p.id + '|' + d, a = HOR.asig[k], lvl = ed ? (v.cel[k] || '') : '';
         let cls = 'hor-cell', c, sub = '', txt;
-        if(!a){ cls += ' vacia'; c = '—'; txt = 'sin turno'; }
+        const nov = horNovedad(p.id, d);
+        if(nov){ cls += ' nov'; c = horEtiquetaNov(nov); txt = nov.tipo && HOR.editor ? HOR_TIPOS[nov.tipo].toLowerCase() : 'no viene'; if(a && a.tipo !== 'descanso') sub = `<span class="h">era ${escapeHtml(a.codigo || '')}</span>`; }
+        else if(!a){ cls += ' vacia'; c = '—'; txt = 'sin turno'; }
         else if(a.tipo === 'descanso'){ cls += ' desc'; c = 'DESC'; txt = 'descanso'; }
         else {
           if(a.tipo === 'otro') cls += ' otro';
@@ -3622,6 +3722,8 @@ function horGrillaHtml(v){
 document.getElementById('horSemana').addEventListener('click', async e => {
   const cell = e.target.closest('[data-hor-cell]');
   if(cell){ if(horEditable()) horAbrirCelda(cell.dataset.horCell); return; }
+  const irSub = e.target.closest('[data-hor-ir-sub]');
+  if(irSub){ HOR.sub = irSub.dataset.horIrSub; horPintarSub(); horPintar(); return; }
   const ir = e.target.closest('[data-hor-ir]');
   if(ir){
     const k = ir.dataset.horIr;
@@ -3632,7 +3734,7 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   }
   const btn = e.target.closest('[data-hor-act]'); if(!btn || btn.disabled) return;
   const act = btn.dataset.horAct;
-  if(act === 'ant' || act === 'sig'){ HOR.lunes.setDate(HOR.lunes.getDate() + (act === 'ant' ? -7 : 7)); HOR.verTexto = false; horPintarSemana(); horCargarSemana(); }
+  if(act === 'ant' || act === 'sig'){ HOR.lunes.setDate(HOR.lunes.getDate() + (act === 'ant' ? -7 : 7)); HOR.verTexto = false; HOR.diaReg = null; HOR.agregar = false; horCargarSemana(); }
   else if(act === 'crear' || act === 'copiar'){ btn.disabled = true; await horCrearSemana(act === 'copiar'); }
   else if(act === 'publicar'){
     btn.disabled = true;
@@ -3647,6 +3749,7 @@ document.getElementById('horSemana').addEventListener('click', async e => {
     showToast('La semana volvió a borrador', 'ok'); horCargarSemana();
   }
   else if(act === 'img') horCompartirImagen();
+  else if(act === 'avisarcambios') window.open('https://wa.me/?text=' + encodeURIComponent(horMensajeCambios()), '_blank');
   else if(act === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(horMensaje()), '_blank');
   else if(act === 'texto'){ HOR.verTexto = !HOR.verTexto; horPintarSemana(); }
   else if(act === 'copiartexto'){
@@ -3710,7 +3813,7 @@ function horAbrirCelda(k){
   const box = document.getElementById('horCeldaBox');
   box.setAttribute('aria-labelledby', 'horCeldaTit');
   box.innerHTML = `<h3 id="horCeldaTit">${escapeHtml(p.nombre)} · ${HOR_DIAS[dia - 1]} ${horFecha(dia).getDate()}</h3>
-    <div class="modal-sub">${est ? escapeHtml(est.nombre) + ' · ' : ''}${p.descanso_dia ? 'descanso fijo: ' + HOR_DIAS[p.descanso_dia - 1].toLowerCase() + (p.descanso_dia === dia ? ' (hoy)' : '') : 'sin descanso fijo'}</div>
+    <div class="modal-sub">${est ? escapeHtml(est.nombre) + ' · ' : ''}${p.descanso_dia ? 'descanso fijo: ' + HOR_DIAS[p.descanso_dia - 1].toLowerCase() + (p.descanso_dia === dia ? ' (hoy)' : '') : 'sin descanso fijo'}${horNovedad(pid, dia) ? ' · tiene ' + HOR_TIPOS[horNovedad(pid, dia).tipo].toLowerCase() + ' este día' : ''}</div>
     <div class="hor-opts">
       ${HOR.turnos.filter(t => t.activo).map(t => `<button type="button" class="hor-opt${a && a.tipo === 'turno' && a.turno_id === t.id ? ' on' : ''}" data-hor-set="${t.id}"><span class="c">${escapeHtml(t.codigo)}</span><small>${horNum(t.horas)} h${t.cubre_manana || t.cubre_cierre ? ' · ' + [t.cubre_manana ? 'mañana' : '', t.cubre_cierre ? 'cierre' : ''].filter(Boolean).join(' y ') : ''}</small></button>`).join('')}
       <button type="button" class="hor-opt desc${a && a.tipo === 'descanso' ? ' on' : ''}" data-hor-set="descanso"><span class="c">DESC</span><small>Descanso</small></button>
@@ -3779,11 +3882,13 @@ function horMensaje(){
   for(let d = 1; d <= 7; d++){
     m += `\n*${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}*\n`;
     const porCodigo = new Map();
-    personas.forEach(p => { const a = HOR.asig[p.id + '|' + d]; if(a && a.tipo !== 'descanso'){ const c = a.codigo || '?'; if(!porCodigo.has(c)) porCodigo.set(c, []); porCodigo.get(c).push(horCorto(p)); } });
+    personas.forEach(p => { const a = HOR.asig[p.id + '|' + d]; if(horTrabaja(p.id, d)){ const c = a.codigo || '?'; if(!porCodigo.has(c)) porCodigo.set(c, []); porCodigo.get(c).push(horCorto(p)); } });
     const orden = HOR.turnos.map(t => t.codigo);
     [...porCodigo.keys()].sort((x, y) => (orden.indexOf(x) + 1 || 99) - (orden.indexOf(y) + 1 || 99)).forEach(c => { m += `${c}: ${porCodigo.get(c).join(', ')}\n`; });
-    const desc = personas.filter(p => (HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso').map(horCorto);
+    const desc = personas.filter(p => !horNovedad(p.id, d) && (HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso').map(horCorto);
     if(desc.length) m += `Descansan: ${desc.join(', ')}\n`;
+    const noVienen = personas.filter(p => horNovedad(p.id, d)).map(horCorto);
+    if(noVienen.length) m += `No viene: ${noVienen.join(', ')}\n`;
     HOR.tareas.forEach(t => { const p = HOR.personal.find(x => x.id === HOR.tareaAsig[t.id + '|' + d]); if(p) m += `🧹 ${t.nombre}: ${horCorto(p)}\n`; });
   }
   return m.trim();
@@ -3835,6 +3940,7 @@ async function horDibujarImagen(){
       for(let d = 1; d <= 7; d++){
         const a = HOR.asig[p.id + '|' + d];
         const X = M + NAME + COL * (d - 1) + 3, Y = y + 4, w = COL - 6, h = RH - 8, cx = X + w / 2;
+        if(horNovedad(p.id, d)){ rr(X, Y, w, h, 8, c('--warn-bg')); txt('NO VIENE', cx, Y + h / 2, '600 12px ' + MONO, c('--warn'), 'center', w - 8); continue; }
         if(!a) continue;
         if(a.tipo === 'descanso'){ rr(X, Y, w, h, 8, c('--surface-3')); txt('DESCANSO', cx, Y + h / 2, '600 12px ' + MONO, c('--text-muted'), 'center', w - 8); }
         else { rr(X, Y, w, h, 8, c('--surface'), a.tipo === 'otro' ? c('--border-strong') : c('--border')); txt(a.codigo || '?', cx, Y + h / 2, '600 17px ' + MONO, c('--text'), 'center', w - 10); }
@@ -3877,6 +3983,219 @@ async function horCompartirImagen(){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   showToast('Imagen descargada. Adjúntala en WhatsApp.', 'ok');
 }
+
+/* --- Novedades (admin y líderes): ausencias y retardos. Tapan la casilla y no cuentan en la cobertura. --- */
+function horBarraSemana(){
+  return `<div class="hor-bar"><div class="hor-nav">
+    <button type="button" class="btn btn-secondary" data-hor-act="ant" aria-label="Semana anterior">${HOR_ICO.izq}</button>
+    <span class="hor-rango">${horRango()}</span>
+    <button type="button" class="btn btn-secondary" data-hor-act="sig" aria-label="Semana siguiente">${HOR_ICO.der}</button>
+  </div></div>`;
+}
+function horPintarNovedades(){
+  const box = document.getElementById('horSemana');
+  const nombre = id => { const p = HOR.personal.find(x => x.id === id); return p ? p.nombre : '?'; };
+  const hoy = horHoy(), lunes = horIso(HOR.lunes), domingo = horIso(horFecha(7));
+  const def = hoy >= lunes && hoy <= domingo ? hoy : lunes;
+  const badge = t => t === 'incapacidad' ? 'danger' : t === 'vacante' ? 'info' : t === 'retardo' ? 'neutral' : 'warn';
+  let h = horBarraSemana();
+  h += `<div class="hor-novs">${HOR.nov.length ? HOR.nov.map(n => `
+    <div class="hor-nov ${n.tipo}">
+      <div><b>${escapeHtml(nombre(n.personal_id))}</b> <span class="badge ${badge(n.tipo)}">${HOR_TIPOS[n.tipo]}</span>
+        <div class="m">${horRangoNov(n)}${n.creado_por ? ' · por ' + escapeHtml(n.creado_por) : ''}</div>
+        ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}</div>
+      <button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>
+    </div>`).join('') : '<div class="empty-note">Sin novedades esta semana.</div>'}</div>`;
+  h += `<form class="hor-form" id="horNovForm">
+    <div class="field"><label class="field-label" for="horNovP">Persona</label><select id="horNovP" required>${HOR.personal.filter(p => p.activo).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label class="field-label" for="horNovT">Tipo</label><select id="horNovT">${Object.entries(HOR_TIPOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div class="field"><label class="field-label" for="horNovD">Desde</label><input type="date" id="horNovD" value="${def}" required></div>
+    <div class="field"><label class="field-label" for="horNovH">Hasta</label><input type="date" id="horNovH" value="${def}" required></div>
+    <span class="field-help full" id="horNovAyuda">${HOR_AYUDA_NOV.incapacidad}</span>
+    <div class="field full"><label class="field-label" for="horNovN">Nota</label><input type="text" id="horNovN" maxlength="300" placeholder="Ej.: incapacidad de 3 días, trae soporte"></div>
+    <div class="full"><button type="submit" class="btn btn-accent">Agregar novedad</button></div>
+  </form>
+  <p class="field-help">La novedad tapa la casilla en la grilla y no cuenta en la cobertura; si deja una estación corta, sale en rojo en Semana. El equipo solo ve "No viene", sin el motivo.</p>`;
+  box.innerHTML = h;
+}
+document.getElementById('horSemana').addEventListener('submit', async e => {
+  if(e.target.id !== 'horNovForm') return;
+  e.preventDefault();
+  let desde = document.getElementById('horNovD').value, hasta = document.getElementById('horNovH').value;
+  if(!desde || !hasta){ showToast('Elige las fechas', 'warn'); return; }
+  if(hasta < desde) [desde, hasta] = [hasta, desde];
+  const btn = e.target.querySelector('[type=submit]'); btn.disabled = true;
+  const antes = horValidar().err.filter(i => i.k.startsWith('cov|')).length;
+  const { error } = await supa.from('horario_novedades').insert({
+    area_id: HOR.areaId, personal_id: document.getElementById('horNovP').value, tipo: document.getElementById('horNovT').value,
+    desde, hasta, nota: document.getElementById('horNovN').value.trim() || null, creado_por: profile.name || session.user.email,
+  });
+  if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); btn.disabled = false; return; }
+  await horCargarSemana();
+  const despues = horValidar().err.filter(i => i.k.startsWith('cov|')).length;
+  showToast(despues > antes ? 'Novedad guardada. Deja una estación corta: míralo en Semana.' : 'Novedad guardada', despues > antes ? 'warn' : 'ok');
+});
+
+/* --- Registro del día (admin y líderes): quién vino, tarde o faltó, y horas reales. Cerrar bloquea; solo un admin reabre. --- */
+function horFilaReg(pid, fecha, dia){
+  const r = HOR.reg[pid + '|' + fecha];
+  if(r) return r;
+  const a = HOR.asig[pid + '|' + dia];
+  return { personal_id: pid, fecha, estado: 'asistio', horas_reales: a && a.tipo !== 'descanso' ? Number(a.horas) : 8, minutos_tarde: null, nota: '', extra: false, nuevo: true };
+}
+function horPintarRegistro(){
+  const box = document.getElementById('horSemana');
+  let h = horBarraSemana();
+  if(HOR.regError){ box.innerHTML = h + '<div class="empty-note">El registro del día todavía no está listo en la base de datos (falta correr sql/horarios_3_novedades_registro.sql).</div>'; return; }
+  if(!HOR.semana){ box.innerHTML = h + '<div class="empty-note">Esta semana todavía no tiene horario. Ármalo en Semana para poder llevar el registro.</div>'; return; }
+  const hoy = horHoy();
+  if(!HOR.diaReg){ let d = 1; for(let i = 1; i <= 7; i++) if(horIso(horFecha(i)) <= hoy) d = i; HOR.diaReg = d; }
+  const d = HOR.diaReg, fecha = horIso(horFecha(d)), cerrado = HOR.cerrados[fecha];
+  h += `<div class="hor-dias" role="tablist" aria-label="Día">${HOR_DC.map((n, i) => {
+    const f = horIso(horFecha(i + 1));
+    return `<button type="button" data-hor-dia="${i + 1}" class="${i + 1 === d ? 'active' : ''}"${f > hoy ? ' disabled' : ''}>${n} ${horFecha(i + 1).getDate()}${HOR.cerrados[f] ? ' ✓' : f === hoy ? ' · hoy' : ''}</button>`;
+  }).join('')}</div>`;
+  if(fecha > hoy){ box.innerHTML = h + '<div class="empty-note">Este día todavía no llega.</div>'; return; }
+  const personas = horPersonasSemana();
+  const programados = personas.filter(p => horTrabaja(p.id, d));
+  const extras = Object.values(HOR.reg).filter(r => r.fecha === fecha && !programados.some(p => p.id === r.personal_id))
+    .map(r => HOR.personal.find(p => p.id === r.personal_id)).filter(Boolean);
+  const gente = programados.concat(extras);
+  const ausentes = personas.filter(p => horNovedad(p.id, d));
+  h += `<div class="hor-bar" style="margin-top:0"><div class="hor-nav"><span class="hor-rango">${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}</span>${cerrado ? '<span class="badge ok">Día cerrado</span>' : '<span class="badge warn">Abierto</span>'}</div></div>`;
+  if(ausentes.length) h += `<p class="field-help" style="margin:0 0 10px"><b>No vienen:</b> ${ausentes.map(p => escapeHtml(p.nombre) + ' (' + HOR_TIPOS[horNovedad(p.id, d).tipo].toLowerCase() + ')').join(', ')}.</p>`;
+  if(cerrado){
+    const filas = gente.map(p => ({ p, r: horFilaReg(p.id, fecha, d) }));
+    const tarde = filas.filter(x => x.r.estado === 'tarde'), falto = filas.filter(x => x.r.estado === 'falto');
+    const prog = programados.reduce((a, p) => a + (Number(HOR.asig[p.id + '|' + d].horas) || 0), 0), real = filas.reduce((a, x) => a + (Number(x.r.horas_reales) || 0), 0);
+    const at = new Date(cerrado.cerrado_at).toLocaleString('es-CO', { weekday:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+    h += `<div class="hor-checks"><div class="hor-check ok">
+      <h3><span class="badge ok">Resumen</span> ${filas.length - falto.length} de ${filas.length} vinieron</h3>
+      <ul>
+        <li class="hor-issue">Horas programadas ${horNum(prog)} · reales ${horNum(real)}</li>
+        ${tarde.map(x => `<li class="hor-issue">${escapeHtml(x.p.nombre)} llegó ${x.r.minutos_tarde || '?'} min tarde (quedó como novedad)</li>`).join('')}
+        ${falto.map(x => `<li class="hor-issue" style="color:var(--danger);font-weight:600">${escapeHtml(x.p.nombre)} faltó sin novedad${x.r.nota ? ': ' + escapeHtml(x.r.nota) : ''}</li>`).join('')}
+        ${extras.map(p => `<li class="hor-issue">${escapeHtml(p.nombre)} vino sin estar en el horario</li>`).join('')}
+      </ul>
+      <span class="field-help">Cerrado${cerrado.cerrado_por ? ' por ' + escapeHtml(cerrado.cerrado_por) : ''} · ${escapeHtml(at)}${horEsAdmin() ? '' : ' · Solo un admin puede reabrirlo.'}</span>
+      ${horEsAdmin() ? '<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="reabrir">Reabrir el día</button></div>' : ''}
+    </div></div>`;
+  }
+  const ed = !cerrado;
+  h += `<div class="hor-grid-wrap"><table class="hor-reg"><thead><tr><th>Persona</th><th>Turno</th><th>Llegó</th><th>Horas reales</th><th>Nota</th></tr></thead><tbody>`;
+  if(!gente.length) h += '<tr><td colspan="5" class="field-help">Nadie tiene turno este día.</td></tr>';
+  gente.forEach(p => {
+    const r = horFilaReg(p.id, fecha, d), a = HOR.asig[p.id + '|' + d], extra = !programados.includes(p);
+    const k = p.id + '|' + fecha;
+    const opciones = [['asistio', 'A tiempo'], ['tarde', 'Tarde'], ['falto', 'Faltó']];
+    h += `<tr><td><b>${escapeHtml(p.nombre)}</b>${extra ? ' <span class="badge info">Extra</span>' : ''}</td>
+      <td style="font-family:'IBM Plex Mono',monospace">${a && a.tipo !== 'descanso' && !extra ? escapeHtml(a.codigo || '') : '—'}</td>
+      <td>${ed ? `<span class="hor-llegada" role="group" aria-label="Llegada de ${escapeHtml(p.nombre)}">${opciones.map(([v, l]) => `<button type="button" class="${v}${r.estado === v ? ' on' : ''}" aria-pressed="${r.estado === v}" data-hor-reg="${k}" data-estado="${v}">${l}</button>`).join('')}</span>${r.estado === 'tarde' ? `<input type="number" class="hor-min" min="1" max="600" step="5" value="${r.minutos_tarde || ''}" placeholder="min" data-hor-reg="${k}" data-campo="minutos_tarde" aria-label="Minutos tarde de ${escapeHtml(p.nombre)}">` : ''}`
+        : `<span class="badge ${r.estado === 'asistio' ? 'ok' : r.estado === 'tarde' ? 'warn' : 'danger'}">${r.estado === 'asistio' ? 'A tiempo' : r.estado === 'tarde' ? (r.minutos_tarde || '?') + ' min tarde' : 'Faltó'}</span>`}</td>
+      <td>${ed ? `<input type="number" step="0.5" min="0" max="24" value="${horNum(r.horas_reales || 0).replace(',', '.')}" data-hor-reg="${k}" data-campo="horas_reales" aria-label="Horas reales de ${escapeHtml(p.nombre)}">` : `<span style="font-family:'IBM Plex Mono',monospace">${horNum(r.horas_reales || 0)}</span>`}</td>
+      <td>${ed ? `<input type="text" maxlength="300" value="${escapeHtml(r.nota || '')}" placeholder="Opcional" data-hor-reg="${k}" data-campo="nota" aria-label="Nota de ${escapeHtml(p.nombre)}">` : escapeHtml(r.nota || '')}</td></tr>`;
+  });
+  h += '</tbody></table></div>';
+  if(ed){
+    const libres = personas.filter(p => p.activo && !gente.includes(p) && !horNovedad(p.id, d));
+    h += `<div class="hor-acciones" style="margin:10px 0">${HOR.agregar
+      ? `<select id="horRegExtra" aria-label="Quién vino sin estar en el horario"><option value="">Elige quién vino…</option>${libres.map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}${(HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso' ? ' (descansaba)' : ''}</option>`).join('')}</select>`
+      : `<button type="button" class="btn btn-secondary btn-small" data-hor-act="agregarextra">+ Alguien que vino sin estar en el horario</button>`}</div>
+    <div class="hor-publicar"><p>Las horas vienen del turno; cámbialas si alguien se quedó más o salió antes. Quien llegue tarde queda como novedad de retardo. Al cerrar, el día queda bloqueado.</p>
+      <button type="button" class="btn btn-ok" data-hor-act="cerrardia">Cerrar el día</button></div>`;
+  }
+  h += horResumenSemanaHtml();
+  box.innerHTML = h;
+}
+function horResumenSemanaHtml(){
+  const dias = [1,2,3,4,5,6,7].filter(d => HOR.cerrados[horIso(horFecha(d))]);
+  if(!dias.length) return '';
+  const filas = horPersonasSemana().map(p => {
+    let prog = 0, real = 0, tarde = 0, falta = 0;
+    dias.forEach(d => {
+      const fecha = horIso(horFecha(d));
+      if(horTrabaja(p.id, d)) prog += Number(HOR.asig[p.id + '|' + d].horas) || 0;
+      const r = HOR.reg[p.id + '|' + fecha]; if(!r) return;
+      real += Number(r.horas_reales) || 0; if(r.estado === 'tarde') tarde++; if(r.estado === 'falto') falta++;
+    });
+    return { p, prog, real, tarde, falta };
+  }).filter(x => x.prog || x.real);
+  return `<div class="hor-cfg"><section><h3>Semana hasta hoy · ${dias.length} día${dias.length > 1 ? 's' : ''} cerrado${dias.length > 1 ? 's' : ''}</h3><div class="hor-grid-wrap" style="border:none;border-radius:0"><table class="hor-tabla">
+    <thead><tr><th>Persona</th><th class="num">Programadas</th><th class="num">Reales</th><th class="num">Diferencia</th><th class="num">Tarde</th><th class="num">Faltas</th></tr></thead><tbody>
+    ${filas.map(x => { const dif = x.real - x.prog; return `<tr><td>${escapeHtml(x.p.nombre)}</td><td class="num">${horNum(x.prog)}</td><td class="num">${horNum(x.real)}</td><td class="num" style="color:${dif > 0 ? 'var(--warn)' : dif < 0 ? 'var(--danger)' : 'var(--text-muted)'}">${dif > 0 ? '+' : ''}${horNum(dif)}</td><td class="num">${x.tarde || ''}</td><td class="num" style="color:var(--danger)">${x.falta || ''}</td></tr>`; }).join('')}
+    </tbody></table></div></section></div>`;
+}
+async function horGuardarReg(pid, fecha, cambios){
+  const dia = [1,2,3,4,5,6,7].find(d => horIso(horFecha(d)) === fecha);
+  const base = horFilaReg(pid, fecha, dia);
+  const fila = { area_id: HOR.areaId, personal_id: pid, fecha, estado: base.estado, horas_reales: base.horas_reales, minutos_tarde: base.minutos_tarde, nota: base.nota || null, extra: !!base.extra, ...cambios };
+  fila.asistio = fila.estado !== 'falto';
+  const { data, error } = await supa.from('horario_registro_dia').upsert(fila, { onConflict: 'personal_id,fecha' }).select().single();
+  if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); return false; }
+  HOR.reg[pid + '|' + fecha] = data;
+  return true;
+}
+document.getElementById('horSemana').addEventListener('click', async e => {
+  const dia = e.target.closest('[data-hor-dia]');
+  if(dia && !dia.disabled){ HOR.diaReg = Number(dia.dataset.horDia); HOR.agregar = false; horPintarRegistro(); return; }
+  const est = e.target.closest('button[data-hor-reg]');
+  if(est){
+    const [pid, fecha] = est.dataset.horReg.split('|'), v = est.dataset.estado, actual = horFilaReg(pid, fecha, HOR.diaReg);
+    const a = HOR.asig[pid + '|' + HOR.diaReg];
+    const cambios = { estado: v };
+    if(v === 'falto') cambios.horas_reales = 0;
+    else if(!Number(actual.horas_reales)) cambios.horas_reales = a && a.tipo !== 'descanso' ? Number(a.horas) : 8;
+    if(v === 'tarde' && !actual.minutos_tarde) cambios.minutos_tarde = 15;
+    if(v !== 'tarde') cambios.minutos_tarde = null;
+    if(await horGuardarReg(pid, fecha, cambios)) horPintarRegistro();
+    return;
+  }
+  const borrar = e.target.closest('[data-hor-borrar-nov]');
+  if(borrar){
+    borrar.disabled = true;
+    const { error } = await supa.from('horario_novedades').delete().eq('id', borrar.dataset.horBorrarNov);
+    if(error){ showToast('No se pudo quitar: ' + error.message, 'danger'); borrar.disabled = false; return; }
+    showToast('Novedad quitada', 'ok'); horCargarSemana(); return;
+  }
+  const act = e.target.closest('[data-hor-act]'); if(!act || act.disabled) return;
+  const fecha = HOR.diaReg ? horIso(horFecha(HOR.diaReg)) : null;
+  if(act.dataset.horAct === 'agregarextra'){ HOR.agregar = true; horPintarRegistro(); document.getElementById('horRegExtra')?.focus(); }
+  else if(act.dataset.horAct === 'cerrardia'){
+    act.disabled = true;
+    const pendientes = horPersonasSemana().filter(p => horTrabaja(p.id, HOR.diaReg) && !HOR.reg[p.id + '|' + fecha])
+      .map(p => { const r = horFilaReg(p.id, fecha, HOR.diaReg); return { area_id: HOR.areaId, personal_id: p.id, fecha, estado: 'asistio', asistio: true, horas_reales: r.horas_reales, extra: false }; });
+    if(pendientes.length){
+      const { error } = await supa.from('horario_registro_dia').upsert(pendientes, { onConflict: 'personal_id,fecha' });
+      if(error){ showToast('No se pudo guardar el registro: ' + error.message, 'danger'); act.disabled = false; return; }
+    }
+    const { error } = await supa.rpc('horario_cerrar_dia', { p_area: HOR.areaId, p_fecha: fecha });
+    if(error){ showToast('No se pudo cerrar: ' + error.message, 'danger'); act.disabled = false; return; }
+    showToast('Día cerrado', 'ok'); await horCargarSemana();
+  }
+  else if(act.dataset.horAct === 'reabrir'){
+    act.disabled = true;
+    const { error } = await supa.rpc('horario_reabrir_dia', { p_area: HOR.areaId, p_fecha: fecha });
+    if(error){ showToast('No se pudo reabrir: ' + error.message, 'danger'); act.disabled = false; return; }
+    showToast('Día reabierto', 'ok'); await horCargarSemana();
+  }
+});
+document.getElementById('horSemana').addEventListener('change', async e => {
+  if(e.target.id === 'horNovT'){ document.getElementById('horNovAyuda').textContent = HOR_AYUDA_NOV[e.target.value]; return; }
+  if(e.target.id === 'horRegExtra' && e.target.value){
+    const fecha = horIso(horFecha(HOR.diaReg));
+    HOR.agregar = false;
+    if(await horGuardarReg(e.target.value, fecha, { extra: true, horas_reales: 8 })) horPintarRegistro();
+    return;
+  }
+  const k = e.target.dataset.horReg, campo = e.target.dataset.campo;
+  if(!k || !campo) return;
+  const [pid, fecha] = k.split('|');
+  let val = e.target.value;
+  if(campo === 'horas_reales'){ val = Number(String(val).replace(',', '.')); if(!(val >= 0 && val <= 24)){ showToast('Las horas van de 0 a 24', 'warn'); horPintarRegistro(); return; } }
+  else if(campo === 'minutos_tarde') val = parseInt(val, 10) || null;
+  else val = val.trim() || null;
+  if(await horGuardarReg(pid, fecha, { [campo]: val })) showToast('Guardado', 'ok');
+});
 
 /* --- Configuración (admin y líderes): reglas, estaciones, turnos, personal, tareas. Se desactiva, no se borra. --- */
 function horPintarConfig(){
