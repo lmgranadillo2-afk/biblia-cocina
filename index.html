@@ -1002,6 +1002,24 @@ nav.tabs button{position:relative;}
 .hor-cell .h{font:500 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim);}
 .hor-cell.desc, .hor-cell.desc:hover{background:var(--surface-2);} .hor-cell.desc .c{color:var(--text-muted); font-size:11.5px; letter-spacing:1px;}
 .hor-cell.otro{border-style:dashed; border-color:var(--border-strong);}
+.hor-cfg-row.hor-turno-cfg{flex-direction:column; align-items:stretch; flex-wrap:nowrap;}
+.hor-turno-cab{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end;}
+.hor-barra-wrap{overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;}
+.hor-barra, .hor-barra-horas{display:grid; grid-template-columns:repeat(48, minmax(20px, 1fr)); min-width:960px;}
+.hor-barra{user-select:none;}
+.hor-barra-horas{margin-bottom:4px;}
+.hor-barra-horas span{grid-column:span 2; font:500 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim); border-left:1px solid var(--border); padding-left:3px; white-space:nowrap;}
+.hor-barra-horas span.noc{color:var(--info);}
+.hor-hc{height:44px; border:none; border-left:1px solid var(--border); padding:0; cursor:pointer; background:var(--surface-2); touch-action:pan-x;}
+.hor-hc.hora{border-left-color:var(--border-strong);}
+.hor-hc.noc{background:var(--info-bg);}
+.hor-hc.on{background:var(--accent);}
+.hor-hc.on.noc{background:var(--info);}
+.hor-hc.ancla{box-shadow:inset 0 0 0 3px var(--text);}
+.hor-hc:first-child{border-radius:8px 0 0 8px;} .hor-hc:last-child{border-radius:0 8px 8px 0;}
+.hor-hc:focus-visible{outline:none; box-shadow:var(--focus-ring); position:relative; z-index:1;}
+.hor-tramos-txt{font-size:14px;}
+.hor-sug{font:600 12.5px 'IBM Plex Mono',monospace; border:1px dashed var(--border-strong); background:var(--surface); border-radius:6px; padding:2px 8px; cursor:pointer; color:var(--accent-strong); min-height:28px;}
 .hor-tramos{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
 .hor-tramo{display:inline-flex; align-items:center; gap:4px; font-size:13px; color:var(--text-muted);}
 .hor-tramo input[type=time]{width:148px; font-family:'IBM Plex Mono',monospace; padding:0 8px;}
@@ -3542,7 +3560,7 @@ function horPintarSub(){
 document.getElementById('horSubtabs').addEventListener('click', e => {
   const b = e.target.closest('[data-hor-sub]'); if(!b) return;
   HOR.sub = b.dataset.horSub; HOR.agregar = false; horPintarSub();
-  if(HOR.sub === 'config') horPintarConfig(); else horPintar();
+  if(HOR.sub === 'config'){ horPintarConfig(); horBarrasAlInicio(); } else horPintar();
 });
 
 async function horCargarSemana(){
@@ -5125,19 +5143,24 @@ function horPintarConfig(){
       </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay estaciones.</p>'}
     </section>
     <section><h3>Turnos <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_turnos">+ Turno</button></h3>
-      ${HOR.turnos.map(t => `<div class="hor-cfg-row${t.activo ? '' : ' inactivo'}">
-        ${inp('horario_turnos', t.id, 'codigo', t.codigo, 'Código', 'text', ' maxlength="20" style="font-family:\'IBM Plex Mono\',monospace"')}
-        <div><span class="field-label">Entra – sale</span><div class="hor-tramos">
-          ${(t.tramos || []).map((tr, i) => `<span class="hor-tramo"><input type="time" data-hc-tramo="${t.id}|${i}|desde" value="${escapeHtml(tr.desde)}" aria-label="Tramo ${i + 1}: entra">–<input type="time" data-hc-tramo="${t.id}|${i}|hasta" value="${escapeHtml(tr.hasta)}" aria-label="Tramo ${i + 1}: sale"><button type="button" class="btn btn-ghost btn-icon btn-small" data-hc-quitar-tramo="${t.id}|${i}" aria-label="Quitar tramo ${i + 1}">×</button></span>`).join('')}
-          ${(t.tramos || []).length < 3 ? `<button type="button" class="btn btn-secondary btn-small" data-hc-mas-tramo="${t.id}">+ ${(t.tramos || []).length ? 'Otro tramo (turno partido)' : 'Hora de entrada y salida'}</button>` : ''}
-        </div></div>
-        ${(t.tramos || []).length ? (d => `<div class="hor-desglose"><span class="field-label">Horas</span><b>${horNum(d.total)}</b><small>${horNum(d.diurnas)} diurnas · ${horNum(d.noct)} nocturnas</small></div>`)(horDesglose(t.tramos))
-          : inp('horario_turnos', t.id, 'horas', t.horas, 'Horas', 'number', ' min="0.5" max="16" step="0.5"') + '<span class="badge warn" style="align-self:center">Sin hora de entrada y salida</span>'}
-        ${cb('horario_turnos', t.id, 'cubre_manana', t.cubre_manana, 'Cubre mañana')}
-        ${cb('horario_turnos', t.id, 'cubre_cierre', t.cubre_cierre, 'Cubre cierre')}
-        ${cb('horario_turnos', t.id, 'activo', t.activo, 'Activo')}
-      </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay turnos.</p>'}
-      <p class="hor-cfg-nota">Las horas salen de la hora de entrada y salida. Un turno partido lleva dos tramos (ej. 11:30 a. m. – 4 p. m. y 7 – 11 p. m.); si sale después de medianoche, pon la hora de salida tal cual (ej. 1:00 a. m.). Si cambias un turno, las semanas ya armadas no cambian. Para un horario de un solo día, usa "Otro horario" en la casilla.</p>
+      ${HOR.turnos.map(t => {
+        const d = horDesglose(t.tramos || []), sug = (t.tramos || []).length ? horCodigoDeTramos(t.tramos) : '';
+        return `<div class="hor-cfg-row hor-turno-cfg${t.activo ? '' : ' inactivo'}" data-hc-turno="${t.id}">
+        <div class="hor-turno-cab">
+          ${inp('horario_turnos', t.id, 'codigo', t.codigo, 'Código', 'text', ' maxlength="20" style="font-family:\'IBM Plex Mono\',monospace"')}
+          ${(t.tramos || []).length ? `<div class="hor-desglose"><span class="field-label">Horas</span><b>${horNum(d.total)}</b><small>${horNum(d.diurnas)} diurnas · ${horNum(d.noct)} nocturnas</small></div>`
+            : inp('horario_turnos', t.id, 'horas', t.horas, 'Horas', 'number', ' min="0.5" max="16" step="0.5"') + '<span class="badge warn" style="align-self:center">Sin hora de entrada y salida</span>'}
+          ${cb('horario_turnos', t.id, 'cubre_manana', t.cubre_manana, 'Cubre mañana')}
+          ${cb('horario_turnos', t.id, 'cubre_cierre', t.cubre_cierre, 'Cubre cierre')}
+          ${cb('horario_turnos', t.id, 'activo', t.activo, 'Activo')}
+          ${(t.tramos || []).length ? `<button type="button" class="btn btn-ghost btn-small" data-hc-limpiar="${t.id}" style="margin-left:auto">Borrar horas</button>` : ''}
+        </div>
+        ${horBarraTurnoHtml(t)}
+        <div class="hor-tramos-txt">${(t.tramos || []).length ? 'Entra – sale: <b>' + escapeHtml(horTramosTexto(t.tramos)).replace(/ y /g, '</b> y <b>') + '</b>' : '<span class="field-help">Toca en la barra la hora de entrada y luego la de salida.</span>'}
+          ${HOR.turnoAncla && HOR.turnoAncla.id === t.id ? ` · <span style="color:var(--warn)">Entra a las ${horHoraCorta(horBarraHHMM(HOR.turnoAncla.i))}: ahora toca la hora de salida</span>` : ''}</div>
+        ${sug && sug !== t.codigo ? `<div class="field-help">Según las horas, el código sería <button type="button" class="hor-sug" data-hc-sug="${t.id}">${escapeHtml(sug)}</button></div>` : ''}
+      </div>`; }).join('') || '<p class="hor-cfg-nota">Aún no hay turnos.</p>'}
+      <p class="hor-cfg-nota">En la barra, toca la hora en que entra y luego la hora en que sale (en computador también puedes arrastrar). Si tocas una media hora marcada, la quitas: así ajustas la entrada o la salida, o partes el turno en dos (turno partido). La franja azul es la noche. Si cambias un turno, las semanas ya armadas no cambian. Para un horario de un solo día, usa "Otro horario" en la casilla.</p>
     </section>
     <section><h3>Personal <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_personal">+ Persona</button></h3>
       ${HOR.personal.map(p => `<div class="hor-cfg-row${p.activo ? '' : ' inactivo'}">
@@ -5212,6 +5235,83 @@ document.getElementById('horConfig').addEventListener('change', async e => {
   const ok = await horGuardarConfig(tabla, id, { [campo]: val });
   if(ok && (el.type === 'checkbox' || el.type === 'time' || el.tagName === 'SELECT')) horPintarConfig();
 });
+// Barra de 24 h por medias horas, de 5 a. m. a 5 a. m. del día siguiente.
+const HOR_BARRA_INI = 5 * 60, HOR_BARRA_N = 48;
+function horBarraMin(i){ return HOR_BARRA_INI + i * 30; }
+function horBarraHHMM(i){ const m = horBarraMin(i) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function horBarraCeldas(tramos){
+  const rangos = horTramosMin(tramos).map(([a, b]) => a < HOR_BARRA_INI ? [a + 1440, b + 1440] : [a, b]);
+  return Array.from({ length: HOR_BARRA_N }, (_, i) => rangos.some(([a, b]) => horBarraMin(i) < b && horBarraMin(i) + 30 > a));
+}
+function horBarraTramos(cel){
+  const out = []; let ini = null;
+  for(let i = 0; i <= HOR_BARRA_N; i++){
+    if(i < HOR_BARRA_N && cel[i]){ if(ini === null) ini = i; }
+    else if(ini !== null){ out.push({ desde: horBarraHHMM(ini), hasta: horBarraHHMM(i) }); ini = null; }
+  }
+  return out;
+}
+function horEsNocheMin(m){
+  const nd = horMin((HOR.cfg && HOR.cfg.nocturno_desde) || '19:00'), nh = horMin((HOR.cfg && HOR.cfg.nocturno_hasta) || '06:00'), h = m % 1440;
+  return nd > nh ? (h >= nd || h < nh) : (h >= nd && h < nh);
+}
+function horBarraTurnoHtml(t){
+  const cel = horBarraCeldas(t.tramos || []), ancla = HOR.turnoAncla && HOR.turnoAncla.id === t.id ? HOR.turnoAncla.i : null;
+  const etiqueta = m => horHoraCorta(String(Math.floor(m / 60) % 24).padStart(2, '0') + ':00').replace(' a. m.', 'a').replace(' p. m.', 'p');
+  return `<div class="hor-barra-wrap" data-hc-scroll="${t.id}">
+    <div class="hor-barra-horas" aria-hidden="true">${Array.from({ length: HOR_BARRA_N / 2 }, (_, k) => { const m = HOR_BARRA_INI + k * 60; return `<span class="${horEsNocheMin(m) ? 'noc' : ''}">${etiqueta(m)}</span>`; }).join('')}</div>
+    <div class="hor-barra" role="group" aria-label="Horas del turno ${escapeHtml(t.codigo)}">${cel.map((on, i) => {
+      const m = horBarraMin(i);
+      return `<button type="button" class="hor-hc${m % 60 === 0 ? ' hora' : ''}${horEsNocheMin(m) ? ' noc' : ''}${on ? ' on' : ''}${ancla === i ? ' ancla' : ''}" data-hc-celda="${t.id}|${i}" aria-pressed="${on}" aria-label="${horHoraCorta(horBarraHHMM(i))} a ${horHoraCorta(horBarraHHMM(i + 1))}${on ? ', marcada' : ''}"></button>`;
+    }).join('')}</div>
+  </div>`;
+}
+// Repinta Configuración sin perder dónde estaba la persona (scroll de la página y de cada barra).
+function horPintarConfigQuieto(){
+  const y = window.scrollY, view = document.getElementById('view-horarios'), vy = view ? view.scrollTop : 0, sc = {};
+  document.querySelectorAll('[data-hc-scroll]').forEach(w => { sc[w.dataset.hcScroll] = w.scrollLeft; });
+  horPintarConfig();
+  document.querySelectorAll('[data-hc-scroll]').forEach(w => { if(sc[w.dataset.hcScroll] !== undefined) w.scrollLeft = sc[w.dataset.hcScroll]; });
+  window.scrollTo(0, y); if(view) view.scrollTop = vy;
+}
+// Al abrir Configuración, cada barra arranca cerca de la hora de entrada (en celular no cabe completa).
+function horBarrasAlInicio(){
+  document.querySelectorAll('[data-hc-scroll]').forEach(w => {
+    const t = HOR.turnos.find(x => x.id === w.dataset.hcScroll); if(!t) return;
+    const i = horBarraCeldas(t.tramos || []).indexOf(true);
+    if(i > 2) w.scrollLeft = (i - 2) * (w.scrollWidth / HOR_BARRA_N);
+  });
+}
+async function horGuardarCeldas(id, cel){
+  const tramos = horBarraTramos(cel);
+  if(tramos.length > 3){ showToast('Máximo 3 tramos por turno', 'warn'); horPintarConfigQuieto(); return; }
+  await horGuardarTramos(id, tramos);
+}
+let HOR_ARRASTRE = null;
+document.getElementById('horConfig').addEventListener('pointerdown', e => {
+  const c = e.target.closest('[data-hc-celda]'); if(!c || e.pointerType !== 'mouse') return;
+  const [id, i] = c.dataset.hcCelda.split('|'), t = HOR.turnos.find(x => x.id === id); if(!t) return;
+  const base = horBarraCeldas(t.tramos || []);
+  HOR_ARRASTRE = { id, ini: Number(i), valor: !base[Number(i)], base, cel: [...base], movio: false };
+});
+document.getElementById('horConfig').addEventListener('pointerover', e => {
+  if(!HOR_ARRASTRE) return;
+  const c = e.target.closest('[data-hc-celda]'); if(!c) return;
+  const [id, i] = c.dataset.hcCelda.split('|'); if(id !== HOR_ARRASTRE.id) return;
+  const j = Number(i); if(j !== HOR_ARRASTRE.ini) HOR_ARRASTRE.movio = true;
+  if(!HOR_ARRASTRE.movio) return;
+  const [a, b] = j < HOR_ARRASTRE.ini ? [j, HOR_ARRASTRE.ini] : [HOR_ARRASTRE.ini, j];
+  HOR_ARRASTRE.cel = HOR_ARRASTRE.base.map((v, k) => k >= a && k <= b ? HOR_ARRASTRE.valor : v);
+  c.closest('.hor-barra').querySelectorAll('[data-hc-celda]').forEach((x, k) => x.classList.toggle('on', HOR_ARRASTRE.cel[k]));
+});
+document.addEventListener('pointerup', async () => {
+  const a = HOR_ARRASTRE; if(!a) return;
+  if(!a.movio){ HOR_ARRASTRE = null; return; } // fue un toque: lo maneja el click
+  HOR.turnoAncla = null;
+  setTimeout(() => { HOR_ARRASTRE = null; }, 0);
+  await horGuardarCeldas(a.id, a.cel);
+});
+
 async function horGuardarTramos(id, tramos){
   const validos = tramos.filter(t => horMin(t.desde) != null && horMin(t.hasta) != null && t.desde !== t.hasta);
   if(validos.length !== tramos.length){ showToast('Cada tramo necesita hora de entrada y de salida distintas', 'warn'); horPintarConfig(); return; }
@@ -5221,9 +5321,26 @@ async function horGuardarTramos(id, tramos){
   if(validos.length && !(horas > 0 && horas <= 16)){ showToast('El turno no puede pasar de 16 horas', 'warn'); horPintarConfig(); return; }
   const cambios = { tramos: validos };
   if(validos.length) cambios.horas = horas;
-  if(await horGuardarConfig('horario_turnos', id, cambios)) horPintarConfig();
+  if(await horGuardarConfig('horario_turnos', id, cambios)) horPintarConfigQuieto();
 }
 document.getElementById('horConfig').addEventListener('click', async e => {
+  const celda = e.target.closest('[data-hc-celda]');
+  if(celda){
+    if(HOR_ARRASTRE && HOR_ARRASTRE.movio) return;
+    const [id, si] = celda.dataset.hcCelda.split('|'), i = Number(si), t = HOR.turnos.find(x => x.id === id); if(!t) return;
+    const cel = horBarraCeldas(t.tramos || []);
+    if(HOR.turnoAncla && HOR.turnoAncla.id === id){
+      const a = HOR.turnoAncla.i; HOR.turnoAncla = null;
+      for(let k = Math.min(a, i); k <= Math.max(a, i); k++) cel[k] = true;
+      await horGuardarCeldas(id, cel); return;
+    }
+    if(cel[i]){ cel[i] = false; HOR.turnoAncla = null; await horGuardarCeldas(id, cel); return; }
+    HOR.turnoAncla = { id, i }; horPintarConfigQuieto(); return;
+  }
+  const limpiar = e.target.closest('[data-hc-limpiar]');
+  if(limpiar){ HOR.turnoAncla = null; await horGuardarTramos(limpiar.dataset.hcLimpiar, []); return; }
+  const sug = e.target.closest('[data-hc-sug]');
+  if(sug){ if(await horGuardarConfig('horario_turnos', sug.dataset.hcSug, { codigo: sug.textContent.trim() })) horPintarConfigQuieto(); return; }
   const mas = e.target.closest('[data-hc-mas-tramo]'), quitar = e.target.closest('[data-hc-quitar-tramo]');
   if(mas){
     const t = HOR.turnos.find(x => x.id === mas.dataset.hcMasTramo); if(!t) return;
