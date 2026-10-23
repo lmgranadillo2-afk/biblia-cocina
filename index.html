@@ -3814,12 +3814,18 @@ async function horCrearSemana(copiar){
     }
   });
   if(filas.length){
-    const { error: e1 } = await supa.from('horario_asignaciones').insert(filas);
+    const { error: e1 } = await supa.from('horario_asignaciones').insert(filas.map(x => ({ semana_id: x.semana_id, ...horFilaCompleta(x) })));
     if(e1) showToast('La semana se creó, pero no se pudieron copiar los turnos: ' + e1.message, 'danger');
   }
   if(tareas.length) await supa.from('horario_tarea_asignaciones').insert(tareas);
   showToast(copiar ? 'Semana copiada como borrador' : 'Semana creada con los descansos fijos', 'ok');
   horCargarSemana();
+}
+
+// Fila de asignación con todas las columnas: al insertar varias juntas, las que falten llegan como null (no como el valor por defecto).
+function horFilaCompleta(x){
+  return { personal_id: x.personal_id, dia: x.dia, tipo: x.tipo, turno_id: x.turno_id || null, codigo: x.codigo || null,
+    horas: Number(x.horas) || 0, cubre_manana: !!x.cubre_manana, cubre_cierre: !!x.cubre_cierre };
 }
 
 /* --- Proponer semana (sin IA, sin costo): reglas fijas en la app ---
@@ -3851,7 +3857,7 @@ async function horProponerSemana(){
   const del2 = await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', sem.id);
   if(del1.error || del2.error){ showToast('No se pudo preparar la semana: ' + (del1.error || del2.error).message, 'danger'); horCargarSemana(); return; }
   if(prop.filas.length){
-    const { error } = await supa.from('horario_asignaciones').insert(prop.filas.map(x => ({ semana_id: sem.id, ...x })));
+    const { error } = await supa.from('horario_asignaciones').insert(prop.filas.map(x => ({ semana_id: sem.id, ...horFilaCompleta(x) })));
     if(error){ showToast('No se pudo guardar la propuesta: ' + error.message, 'danger'); horCargarSemana(); return; }
   }
   if(prop.tareas.length) await supa.from('horario_tarea_asignaciones').insert(prop.tareas.map(x => ({ semana_id: sem.id, ...x })));
