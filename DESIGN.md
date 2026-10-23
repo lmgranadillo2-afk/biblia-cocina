@@ -53,6 +53,8 @@ Uso del acento: botón primario, pestaña activa, foco de inputs, elemento selec
 
 Texto sobre botón sólido de estado: `#FFFDF8` (`--on-state`).
 
+Colores de estación del módulo Horarios (fijos, solo para identificar estaciones; nunca para estados): `--est-1` #7A5C3E · `--est-2` #2D628C · `--est-3` #B0532A · `--est-4` #3F7A6B · `--est-5` #8A4F7D · `--est-6` #5E6B3A · `--est-7` #9A7B1F · `--est-8` #4F5D75.
+
 Íconos de estado sobre fondo oscuro (toasts), versión clara de cada estado: `--ok-on-dark: #7FC08F`, `--warn-on-dark: #E9B45C`, `--danger-on-dark: #EE8F82`.
 
 ### 2.4 Tipografía

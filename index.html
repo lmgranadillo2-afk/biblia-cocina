@@ -42,6 +42,9 @@
   --danger:#B0382A;  --danger-bg:#F6DDD8;
   --info:#2D628C;    --info-bg:#DDE7F0;
   --on-state:#FFFDF8;
+  /* Colores de estación del módulo Horarios (paleta fija; horario_estaciones.color = 1…8) */
+  --est-1:#7A5C3E; --est-2:#2D628C; --est-3:#B0532A; --est-4:#3F7A6B;
+  --est-5:#8A4F7D; --est-6:#5E6B3A; --est-7:#9A7B1F; --est-8:#4F5D75;
   /* Íconos de estado sobre fondo oscuro (toasts): versión clara de cada estado */
   --ok-on-dark:#7FC08F; --warn-on-dark:#E9B45C; --danger-on-dark:#EE8F82;
 
@@ -962,6 +965,98 @@ nav.tabs button{position:relative;}
 .sched-item .si-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-dim); margin-top:2px;}
 .sched-item .si-notes{font-size:12.5px; color:var(--text-muted); margin-top:3px; font-style:italic;}
 
+/* ===== HORARIOS ===== */
+.hor-subtabs{margin:0;}
+#horSemana, #horConfig{min-width:0; max-width:100%;}
+.hor-bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-3); margin:var(--space-3) 0;}
+.hor-nav{display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2);}
+.hor-nav .btn{min-width:44px; padding:0;}
+.hor-rango{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums; padding:0 4px;}
+.hor-checks{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap:var(--space-3); margin-bottom:var(--space-3);}
+.hor-check{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--danger); border-radius:var(--radius-md); padding:10px 12px; min-width:0;}
+.hor-check.warn{border-left-color:var(--warn);} .hor-check.ok{border-left-color:var(--ok);}
+.hor-check h3{margin:0 0 6px; font-size:14px; display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+.hor-check ul{margin:0; padding:0; list-style:none;}
+.hor-issue{display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer; font:inherit; font-size:13.5px; line-height:1.4; padding:4px 6px; border-radius:var(--radius-sm); color:var(--text);}
+.hor-issue:hover{background:var(--surface-2);}
+.hor-issue:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.hor-grid-wrap{overflow-x:auto; min-width:0; max-width:100%; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface);}
+.hor-grid{border-collapse:separate; border-spacing:0; width:100%; min-width:900px; font-size:13.5px;}
+.hor-grid th, .hor-grid td{border-bottom:1px solid var(--border); padding:0; text-align:center; vertical-align:middle;}
+.hor-grid thead th{background:var(--surface-2); font:600 10.5px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); height:44px;}
+.hor-grid thead th small{display:block; font-size:12px; color:var(--text); letter-spacing:0;}
+.hor-grid thead th.finde{color:var(--accent-strong);}
+.hor-grid .hor-first{position:sticky; left:0; z-index:1; background:var(--surface); text-align:left; padding:0 12px; min-width:150px; max-width:180px; border-right:1px solid var(--border);}
+.hor-grid thead .hor-first{background:var(--surface-2);}
+.hor-grid tr.hor-est td{background:var(--surface-2); text-align:left; padding:6px 12px; font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted);}
+.hor-grid tr.hor-yo td, .hor-grid tr.hor-yo td.hor-first{background:var(--accent-soft);}
+.hor-dot{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:8px; vertical-align:-1px;}
+.hor-pname{display:block; font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.hor-pmeta{font:500 11px 'IBM Plex Mono',monospace; color:var(--text-dim);}
+.hor-grid td.hor-cw{padding:3px; min-width:96px;}
+.hor-cell{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; width:100%; min-height:52px; padding:4px 3px; cursor:pointer; border:2px solid transparent; border-radius:8px; background:transparent; font:inherit; color:var(--text); transition:background .15s ease-out;}
+.hor-cell:hover{background:var(--accent-soft);}
+.hor-cell:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.hor-cell[aria-disabled="true"]{cursor:default;} .hor-cell[aria-disabled="true"]:hover{background:transparent;}
+.hor-cell .c{font:600 13px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.hor-cell .h{font:500 10.5px 'IBM Plex Mono',monospace; color:var(--text-dim);}
+.hor-cell.desc, .hor-cell.desc:hover{background:var(--surface-2);} .hor-cell.desc .c{color:var(--text-muted); font-size:11.5px; letter-spacing:1px;}
+.hor-cell.otro{border-style:dashed; border-color:var(--border-strong);}
+.hor-cell.vacia .c{color:var(--text-dim);}
+.hor-cell.err{border:2px solid var(--danger); background:var(--danger-bg);}
+.hor-cell.warn{border:2px solid var(--warn);}
+.hor-cell.flash, .hor-grid select.flash, .hor-cov.flash{animation:hor-flash 1.2s ease-out;}
+@keyframes hor-flash{0%,40%{box-shadow:0 0 0 4px var(--accent);} 100%{box-shadow:0 0 0 0 transparent;}}
+.hor-marca{display:inline-block; font:600 9.5px 'IBM Plex Mono',monospace; padding:0 4px; border-radius:4px; background:var(--surface-3); color:var(--text-muted); margin-left:2px;}
+.hor-horas{font:600 13.5px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; padding:0 10px; white-space:nowrap; text-align:right !important;}
+.hor-horas small{display:block; font-size:10.5px; font-weight:500;}
+.hor-horas.warn{color:var(--warn);}
+.hor-grid tr.hor-covh td{background:var(--surface-2); text-align:left; padding:8px 12px; font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); border-top:2px solid var(--border-strong);}
+.hor-cov{font:600 13px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; padding:8px 0 !important;}
+.hor-cov.ok{color:var(--ok);} .hor-cov.err{color:var(--danger); background:var(--danger-bg);} .hor-cov.na{color:var(--text-dim);}
+.hor-grid tr.hor-tarea td, .hor-grid tr.hor-tarea td.hor-first{background:var(--accent-soft);}
+.hor-grid tr.hor-tarea select{min-height:40px; width:100%; font-size:12.5px; padding:0 22px 0 6px; background-position:right 4px center;}
+.hor-grid tr.hor-tarea select.err{border:2px solid var(--danger); background-color:var(--danger-bg);}
+.hor-grid tr.hor-tarea select.warn{border:2px solid var(--warn);}
+.hor-leyenda{display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:var(--text-muted); margin:var(--space-3) 0;}
+.hor-leyenda span{display:inline-flex; align-items:center; gap:6px;}
+.hor-sw{width:16px; height:16px; border-radius:4px; border:2px solid transparent; display:inline-block;}
+.hor-publicar{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;}
+.hor-publicar p{margin:0; font-size:14px; color:var(--text-muted); max-width:62ch;}
+.hor-confirmar{display:inline-flex; gap:8px; align-items:center; font-size:13.5px; color:var(--danger); font-weight:600;}
+.hor-confirmar input{width:20px; height:20px; accent-color:var(--danger);}
+.hor-envio{background:var(--surface-2); border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; gap:10px;}
+.hor-img{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:8px; display:flex; justify-content:center; align-items:center; min-height:120px;}
+.hor-img img{display:block; width:100%; max-width:640px; height:auto; border-radius:6px;}
+.hor-envio pre{margin:0; white-space:pre-wrap; font:400 13px/1.5 'IBM Plex Mono',monospace; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; max-height:340px; overflow-y:auto;}
+.hor-acciones{display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center;}
+.hor-vacio{border:1.5px dashed var(--border-strong); border-radius:var(--radius-md); padding:32px 16px; text-align:center; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; gap:10px;}
+.hor-vacio b{color:var(--text); font-size:16px;}
+.hor-opts{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:var(--space-3);}
+.hor-opt{display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; cursor:pointer; border:1px solid var(--border-strong); border-radius:var(--radius-md); padding:10px 12px; min-height:56px; background:var(--surface); font:inherit; color:var(--text);}
+.hor-opt:hover{background:var(--accent-soft);} .hor-opt.on{border:2px solid var(--accent); background:var(--accent-soft);}
+.hor-opt:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.hor-opt .c{font:600 15px 'IBM Plex Mono',monospace;} .hor-opt small{font-size:12px; color:var(--text-muted);}
+.hor-opt.desc{background:var(--surface-2);}
+.hor-otro{border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:12px; margin-bottom:var(--space-3);}
+.hor-otro .field-row{grid-template-columns:repeat(3, minmax(0, 1fr));}
+.hor-cfg{display:flex; flex-direction:column; gap:var(--space-4); margin-top:var(--space-3);}
+.hor-cfg section{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+.hor-cfg h3{margin:0; padding:10px 14px; font:600 11px 'IBM Plex Mono',monospace; letter-spacing:1.2px; text-transform:uppercase; background:var(--surface-2); color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; gap:10px;}
+.hor-cfg-row{display:flex; flex-wrap:wrap; gap:10px 12px; align-items:flex-end; padding:12px 14px; border-bottom:1px solid var(--border);}
+.hor-cfg-row:last-child{border-bottom:none;}
+.hor-cfg-row.inactivo{opacity:.6;}
+.hor-cfg-row label{display:flex; flex-direction:column; gap:4px; min-width:0;}
+.hor-cfg-row label.cb{flex-direction:row; align-items:center; gap:6px; font-size:13.5px; min-height:44px;}
+.hor-cfg-row label.cb input{width:18px; height:18px; accent-color:var(--accent);}
+.hor-cfg-row .field-label{margin:0;}
+.hor-cfg-row input[type=text]{width:180px; max-width:100%;}
+.hor-cfg-row input[type=number]{width:84px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+.hor-cfg-row .mins{display:flex; gap:4px;}
+.hor-cfg-row .mins label{align-items:center;}
+.hor-cfg-row .mins input{width:46px; padding:0 4px; text-align:center;}
+.hor-cfg-nota{font-size:13px; color:var(--text-muted); padding:10px 14px; margin:0;}
+
 /* ===== MODAL (DESIGN.md §4): centrado en escritorio, hoja inferior en celular ===== */
 .modal-overlay{
   position:fixed; inset:0; background:var(--overlay); display:none; align-items:center; justify-content:center;
@@ -1146,6 +1241,7 @@ nav.tabs button{position:relative;}
       <button id="tab-bajas" title="Bajas" aria-label="Bajas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span class="tab-label">Bajas</span></button>
       <button id="tab-inventario" title="Inventario" aria-label="Inventario"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="tab-label">Inventario</span></button>
       <button id="tab-costeo" title="Costeo" aria-label="Costeo"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg><span class="tab-label">Costeo</span></button>
+      <button id="tab-horarios" title="Horarios" aria-label="Horarios"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg><span class="tab-label">Horarios</span></button>
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
@@ -1388,6 +1484,18 @@ nav.tabs button{position:relative;}
       <div class="cal-legend"><span><i style="background:var(--ok);"></i>Conteo cerrado</span><span><i style="background:var(--warn);"></i>Abierto para corregir</span></div>
 
       <div id="invDayPanel" style="margin-top:18px;"></div>
+    </div>
+
+    <div id="view-horarios" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header">
+        <h2>Horarios</h2>
+        <div class="admin-subtabs hor-subtabs" id="horSubtabs" hidden>
+          <button type="button" data-hor-sub="semana" class="active">Semana</button>
+          <button type="button" data-hor-sub="config">Configuración</button>
+        </div>
+      </div>
+      <div id="horSemana"></div>
+      <div id="horConfig" hidden></div>
     </div>
 
     <div id="view-chat" class="view">
@@ -1682,6 +1790,7 @@ nav.tabs button{position:relative;}
               <label class="choice"><input type="checkbox" class="area-module-cb" value="bajas" checked> Bajas</label>
               <label class="choice"><input type="checkbox" class="area-module-cb" value="inventario" checked> Inventario</label>
               <label class="choice"><input type="checkbox" class="area-module-cb" value="costeo"> Costeo</label>
+              <label class="choice"><input type="checkbox" class="area-module-cb" value="horarios"> Horarios</label>
             </div>
           </div>
           <button class="btn btn-accent btn-block" id="areaSubmit">Crear área</button>
@@ -1847,6 +1956,10 @@ nav.tabs button{position:relative;}
     <div id="chatPersonasLista" class="chat-personas"></div>
     <div class="modal-actions"><button class="btn btn-ghost" id="chatPersonasCerrar">Cancelar</button></div>
   </div>
+</div>
+
+<div class="modal-overlay" id="horCeldaModal">
+  <div class="modal-box" id="horCeldaBox" role="dialog" aria-modal="true"></div>
 </div>
 
 <div class="modal-overlay" id="evProxModal">
@@ -2375,7 +2488,7 @@ async function pickAreaForLocation(loc){
   });
 }
 
-const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo'];
+const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','horarios'];
 
 function applyAreaModuleVisibility(modules){
   MODULE_TABS.forEach(m=>{
@@ -3038,8 +3151,9 @@ document.getElementById('tab-costeo').addEventListener('click', ()=>switchTab('c
 document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('admin'));
 document.getElementById('tab-calculadora').addEventListener('click', ()=>switchTab('calculadora'));
 document.getElementById('tab-chat').addEventListener('click', ()=>switchTab('chat'));
+document.getElementById('tab-horarios').addEventListener('click', ()=>switchTab('horarios'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -3051,6 +3165,7 @@ function switchTab(name){
   if(name==='bajas') loadMyBajas();
   if(name==='inventario') loadInventarioMonth();
   if(name==='chat') chatAlEntrar();
+  if(name==='horarios') horAlEntrar();
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
     // Qué pestañas ve cada punto:
     //  - Restaurante: Platos, Eventos (los suyos), Carta (la suya), Cargos (para Platos), Food cost (admin).
@@ -3069,7 +3184,7 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','calculadora','chat','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','horarios','calculadora','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
   cocina: ['recetario','produccion','pedidos','chat'],
@@ -3166,6 +3281,724 @@ document.getElementById('ctxSwitch').addEventListener('click', async ()=>{
     document.getElementById('app').style.display = 'none';
     enterLocation(loc);
   }));
+});
+
+/* ---------- HORARIOS (ver HORARIOS_SPEC.md) ----------
+   Grilla semanal por área: persona × día (turno, descanso u "otro horario"), tareas diarias (Bunker) y validaciones.
+   Editan admin y líderes de horarios (RPC horario_puede_editar); el resto ve solo semanas publicadas.
+   Rojo = error (pide confirmar para publicar); amarillo = aviso. La jornada máxima siempre es aviso, nunca bloquea. */
+const HOR_DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const HOR_DC = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const HOR_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const HOR_EXTRA_MAX = 12; // tope legal de horas extra a la semana (solo aviso)
+const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], turnos:[], tareas:[], lunes:null, semana:null,
+  asig:{}, tareaAsig:{}, domPasadoTemprano:new Set(), haySemanaAnterior:false, sub:'semana', confirmar:false, verTexto:false,
+  imgBlob:null, carga:0, error:null };
+
+function horIso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function horLunesDe(d){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
+function horFecha(dia){ const d = new Date(HOR.lunes); d.setDate(d.getDate() + dia - 1); return d; }
+function horRango(largo){
+  const a = HOR.lunes, b = horFecha(7);
+  if(largo) return a.getMonth() === b.getMonth()
+    ? `del ${a.getDate()} al ${b.getDate()} de ${HOR_MESES[b.getMonth()]}`
+    : `del ${a.getDate()} de ${HOR_MESES[a.getMonth()]} al ${b.getDate()} de ${HOR_MESES[b.getMonth()]}`;
+  const m = d => HOR_MESES[d.getMonth()].slice(0,3);
+  return a.getMonth() === b.getMonth() ? `${a.getDate()} – ${b.getDate()} ${m(b)} ${b.getFullYear()}` : `${a.getDate()} ${m(a)} – ${b.getDate()} ${m(b)} ${b.getFullYear()}`;
+}
+function horNum(n){ return String(Math.round(Number(n) * 100) / 100).replace('.', ','); }
+function horCorto(p){ return (p.nombre || '').split(' ')[0]; }
+function horColor(n){ return `var(--est-${n || 1})`; }
+function horDiasSinDescanso(){ return (HOR.cfg && HOR.cfg.dias_sin_descanso) || [5,6,7]; }
+function horJornada(){ return Number(HOR.cfg && HOR.cfg.jornada_max) || 42; }
+
+async function horAlEntrar(){
+  if(!currentArea) return;
+  if(HOR.areaId !== currentArea.id){
+    HOR.areaId = currentArea.id; HOR.sub = 'semana'; HOR.lunes = horLunesDe(new Date());
+    document.getElementById('horSemana').innerHTML = '<div class="empty-note">Cargando...</div>';
+    await horCargarConfig();
+  }
+  horPintarSub();
+  if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
+}
+
+async function horCargarConfig(){
+  const a = HOR.areaId;
+  const [ed, cfg, est, per, tur, tar] = await Promise.all([
+    supa.rpc('horario_puede_editar', { p_area: a }),
+    supa.from('horario_config').select('*').eq('area_id', a).maybeSingle(),
+    supa.from('horario_estaciones').select('*').eq('area_id', a).order('orden').order('nombre'),
+    supa.from('horario_personal').select('*').eq('area_id', a).order('orden').order('nombre'),
+    supa.from('horario_turnos').select('*').eq('area_id', a).order('orden').order('codigo'),
+    supa.from('horario_tareas').select('*').eq('area_id', a).order('orden').order('nombre'),
+  ]);
+  HOR.error = est.error ? est.error.message : null;
+  HOR.editor = !!ed.data;
+  HOR.cfg = cfg.data || { area_id: a, jornada_max: 42, dias_sin_descanso: [5,6,7] };
+  HOR.estaciones = est.data || []; HOR.personal = per.data || []; HOR.turnos = tur.data || []; HOR.tareas = tar.data || [];
+}
+
+function horPintarSub(){
+  const tabs = document.getElementById('horSubtabs');
+  tabs.hidden = !HOR.editor;
+  tabs.querySelectorAll('[data-hor-sub]').forEach(b => b.classList.toggle('active', b.dataset.horSub === HOR.sub));
+  document.getElementById('horSemana').hidden = HOR.sub !== 'semana';
+  document.getElementById('horConfig').hidden = HOR.sub !== 'config';
+}
+document.getElementById('horSubtabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-hor-sub]'); if(!b) return;
+  HOR.sub = b.dataset.horSub; horPintarSub();
+  if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
+});
+
+async function horCargarSemana(){
+  const box = document.getElementById('horSemana');
+  if(HOR.error){ box.innerHTML = `<div class="empty-note">El módulo Horarios todavía no está listo en la base de datos (falta correr sql/horarios_1_tablas.sql).</div>`; return; }
+  const carga = ++HOR.carga;
+  const lunes = horIso(HOR.lunes);
+  const prev = new Date(HOR.lunes); prev.setDate(prev.getDate() - 7);
+  const [sem, ant] = await Promise.all([
+    supa.from('horario_semanas').select('*').eq('area_id', HOR.areaId).eq('lunes', lunes).maybeSingle(),
+    supa.from('horario_semanas').select('id').eq('area_id', HOR.areaId).eq('lunes', horIso(prev)).maybeSingle(),
+  ]);
+  if(carga !== HOR.carga) return;
+  if(sem.error){ box.innerHTML = `<div class="empty-note">No se pudo cargar el horario: ${escapeHtml(sem.error.message)}</div>`; return; }
+  const asig = {}, tareaAsig = {}, domPasado = new Set();
+  const consultas = [];
+  if(sem.data){
+    consultas.push(supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { asig[x.personal_id + '|' + x.dia] = x; })));
+    consultas.push(supa.from('horario_tarea_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { tareaAsig[x.tarea_id + '|' + x.dia] = x.personal_id; })));
+  }
+  if(ant.data){
+    consultas.push(supa.from('horario_asignaciones').select('personal_id, tipo, cubre_manana, cubre_cierre').eq('semana_id', ant.data.id).eq('dia', 7)
+      .then(r => (r.data || []).forEach(x => { if(x.tipo !== 'descanso' && x.cubre_manana && !x.cubre_cierre) domPasado.add(x.personal_id); })));
+  }
+  await Promise.all(consultas);
+  if(carga !== HOR.carga) return;
+  Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false });
+  horPintarSemana();
+}
+
+function horEditable(){ return HOR.editor && HOR.semana && HOR.semana.estado === 'borrador'; }
+function horTrabaja(pid, dia){ const a = HOR.asig[pid + '|' + dia]; return !!a && a.tipo !== 'descanso'; }
+function horHoras(pid){ let h = 0; for(let d = 1; d <= 7; d++){ const a = HOR.asig[pid + '|' + d]; if(a && a.tipo !== 'descanso') h += Number(a.horas) || 0; } return h; }
+// En la grilla: activos + los inactivos que tengan algo esta semana.
+function horPersonasSemana(){
+  return HOR.personal.filter(p => p.activo || [1,2,3,4,5,6,7].some(d => HOR.asig[p.id + '|' + d]));
+}
+function horGrupos(){
+  const personas = horPersonasSemana();
+  const grupos = HOR.estaciones.map(e => ({ e, gente: personas.filter(p => p.estacion_id === e.id) })).filter(g => g.e.activa || g.gente.length);
+  const sin = personas.filter(p => !HOR.estaciones.some(e => e.id === p.estacion_id));
+  if(sin.length) grupos.push({ e: { id: null, nombre: 'Sin estación', color: 8, minimo_por_dia: [0,0,0,0,0,0,0] }, gente: sin });
+  return grupos;
+}
+
+function horValidar(){
+  const cel = {}, cov = {}, horas = {}, tar = {}, err = [], warn = [];
+  const marcar = (k, lvl) => { if(cel[k] !== 'err') cel[k] = lvl; };
+  const dia = d => HOR_DIAS[d - 1].toLowerCase();
+  const sinDescanso = horDiasSinDescanso(), jornada = horJornada();
+  const personas = horPersonasSemana().filter(p => p.activo);
+  const vacias = [];
+  for(const p of personas){
+    for(let d = 1; d <= 7; d++){
+      const a = HOR.asig[p.id + '|' + d];
+      if(!a){ vacias.push(p.id + '|' + d); marcar(p.id + '|' + d, 'warn'); continue; }
+      if(a.tipo === 'descanso' && p.descanso_dia && d !== p.descanso_dia){
+        marcar(p.id + '|' + d, 'err');
+        err.push({ k: p.id + '|' + d, t: `${p.nombre} descansa el ${dia(d)}, pero su descanso fijo es el ${dia(p.descanso_dia)}` + (sinDescanso.includes(d) && !p.es_produccion ? '. Ese día solo descansa producción.' : '.') });
+      } else if(a.tipo === 'descanso' && !p.descanso_dia && sinDescanso.includes(d) && !p.es_produccion){
+        marcar(p.id + '|' + d, 'err');
+        err.push({ k: p.id + '|' + d, t: `${p.nombre} descansa el ${dia(d)}: ese día solo descansa producción.` });
+      }
+    }
+    if(p.descanso_dia){
+      const a = HOR.asig[p.id + '|' + p.descanso_dia];
+      if(a && a.tipo !== 'descanso'){
+        marcar(p.id + '|' + p.descanso_dia, 'err');
+        err.push({ k: p.id + '|' + p.descanso_dia, t: `${p.nombre} no tiene su descanso fijo (${dia(p.descanso_dia)}).` });
+      }
+    }
+    const h = horHoras(p.id);
+    horas[p.id] = h > jornada ? 'warn' : 'ok';
+    if(h > jornada + HOR_EXTRA_MAX) warn.push({ k: p.id + '|h', t: `${p.nombre} suma ${horNum(h)} h: pasa también el tope de ${HOR_EXTRA_MAX} h extra a la semana.` });
+  }
+  if(vacias.length) warn.push({ k: vacias[0], t: vacias.length === 1 ? 'Hay 1 casilla sin turno.' : `Hay ${vacias.length} casillas sin turno.` });
+  const extras = personas.filter(p => horas[p.id] === 'warn');
+  if(extras.length) warn.push({ k: extras[0].id + '|h', t: `${extras.length} de ${personas.length} personas pasan la jornada máxima de ${horNum(jornada)} h: ${extras.map(p => horCorto(p) + ' ' + horNum(horHoras(p.id)) + ' h').join(', ')}. Se avisa, no impide publicar.` });
+
+  for(const { e, gente } of horGrupos()){
+    if(!e.id) continue;
+    const activos = gente.filter(p => p.activo);
+    const min = e.minimo_por_dia || [];
+    for(let d = 1; d <= 7; d++){
+      const n = activos.filter(p => horTrabaja(p.id, d)).length, m = Number(min[d - 1]) || 0, k = e.id + '|' + d;
+      if(!m) cov[k] = { n, lvl: 'na' };
+      else if(n < m){ cov[k] = { n, lvl: 'err' }; err.push({ k: 'cov|' + k, t: `${e.nombre} el ${dia(d)}: hay ${n} y el mínimo es ${m}.` }); }
+      else cov[k] = { n, lvl: 'ok' };
+      const descansan = activos.filter(p => (HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso');
+      if(descansan.length > 1 && m > 0){
+        descansan.forEach(p => marcar(p.id + '|' + d, 'err'));
+        err.push({ k: descansan[0].id + '|' + d, t: `${descansan.map(horCorto).join(' y ')} (${e.nombre}) descansan el mismo día (${dia(d)}).` });
+      }
+    }
+    // Domingo: por estación uno sale temprano (solo mañana) y otro recibe y cierra (solo cierre); se rota cada semana.
+    if(Number(min[6]) > 0){
+      const dom = activos.map(p => ({ p, a: HOR.asig[p.id + '|7'] })).filter(x => x.a && x.a.tipo !== 'descanso');
+      if(dom.length){
+        const temprano = dom.filter(x => x.a.cubre_manana && !x.a.cubre_cierre), cierre = dom.filter(x => x.a.cubre_cierre && !x.a.cubre_manana);
+        if(!temprano.length) warn.push({ k: dom[0].p.id + '|7', t: `Domingo en ${e.nombre}: nadie sale temprano.` });
+        if(!cierre.length) warn.push({ k: dom[0].p.id + '|7', t: `Domingo en ${e.nombre}: nadie recibe y cierra.` });
+        temprano.filter(x => HOR.domPasadoTemprano.has(x.p.id)).forEach(x => {
+          marcar(x.p.id + '|7', 'warn');
+          warn.push({ k: x.p.id + '|7', t: `${x.p.nombre} sale temprano dos domingos seguidos. Toca rotar con quien cerró la semana pasada.` });
+        });
+      }
+    }
+  }
+  for(const t of HOR.tareas.filter(t => t.activa)){
+    const sinNadie = [], veces = {};
+    for(let d = 1; d <= 7; d++){
+      const pid = HOR.tareaAsig[t.id + '|' + d], k = t.id + '|' + d;
+      if(!pid){ sinNadie.push(d); tar[k] = 'warn'; continue; }
+      veces[pid] = (veces[pid] || 0) + 1;
+      if(!horTrabaja(pid, d)){
+        const p = HOR.personal.find(x => x.id === pid);
+        tar[k] = 'err'; err.push({ k: 'tar|' + k, t: `${t.nombre} del ${dia(d)}: ${p ? p.nombre : 'esa persona'} no trabaja ese día.` });
+      }
+    }
+    if(sinNadie.length) warn.push({ k: 'tar|' + t.id + '|' + sinNadie[0], t: `${t.nombre} sin asignar: ${sinNadie.map(dia).join(', ')}.` });
+    Object.entries(veces).filter(([, v]) => v > 2).forEach(([pid, v]) => {
+      const p = HOR.personal.find(x => x.id === pid);
+      warn.push({ k: 'tar|' + t.id + '|' + ([1,2,3,4,5,6,7].find(d => HOR.tareaAsig[t.id + '|' + d] === pid)), t: `${p ? p.nombre : '?'} hace ${t.nombre} ${v} veces en la semana.` });
+    });
+  }
+  return { cel, cov, horas, tar, err, warn };
+}
+
+const HOR_ICO = {
+  izq: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>',
+  der: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>',
+  imagen: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',
+  enviar: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>',
+  copiar: '<svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+};
+
+function horPintarSemana(){
+  const box = document.getElementById('horSemana');
+  const s = HOR.semana;
+  let html = `<div class="hor-bar">
+    <div class="hor-nav">
+      <button type="button" class="btn btn-secondary" data-hor-act="ant" aria-label="Semana anterior">${HOR_ICO.izq}</button>
+      <span class="hor-rango">${horRango()}</span>
+      <button type="button" class="btn btn-secondary" data-hor-act="sig" aria-label="Semana siguiente">${HOR_ICO.der}</button>
+      ${s ? (s.estado === 'publicada' ? '<span class="badge ok">Publicada</span>' : '<span class="badge warn">Borrador</span>') : ''}
+    </div>
+    ${HOR.editor && s && s.estado === 'publicada' ? `<button type="button" class="btn btn-secondary btn-small" data-hor-act="borrador">Volver a borrador</button>` : ''}
+  </div>`;
+  if(!s){
+    html += HOR.editor
+      ? `<div class="hor-vacio"><b>Esta semana todavía no tiene horario</b>
+          <span>${HOR.personal.some(p => p.activo) ? 'Empieza con los descansos fijos de cada persona o copia la semana anterior.' : 'Primero carga el personal, las estaciones y los turnos en Configuración.'}</span>
+          <div class="hor-acciones" style="justify-content:center">
+            ${HOR.haySemanaAnterior ? `<button type="button" class="btn btn-secondary" data-hor-act="copiar">${HOR_ICO.copiar}Copiar semana anterior</button>` : ''}
+            <button type="button" class="btn btn-accent" data-hor-act="crear"${HOR.personal.some(p => p.activo) ? '' : ' disabled'}>Empezar con los descansos fijos</button>
+          </div></div>`
+      : `<div class="hor-vacio"><b>El horario de esta semana todavía no está publicado</b><span>Cuando el líder lo publique, lo verás aquí.</span></div>`;
+    box.innerHTML = html; return;
+  }
+  const v = horValidar();
+  if(horEditable()) html += horChecksHtml(v);
+  html += horGrillaHtml(v);
+  html += `<div class="hor-leyenda">
+    <span><i class="hor-sw" style="background:var(--surface-2)"></i>Descanso</span>
+    <span><i class="hor-sw" style="border-color:var(--border-strong);border-style:dashed"></i>Otro horario</span>
+    ${horEditable() ? `<span><i class="hor-sw" style="border-color:var(--danger);background:var(--danger-bg)"></i>Error</span><span><i class="hor-sw" style="border-color:var(--warn)"></i>Aviso</span>` : ''}
+    <span><span class="hor-marca">M</span> cubre mañana · <span class="hor-marca">C</span> cubre cierre</span>
+  </div>`;
+  if(s.estado === 'borrador' && HOR.editor){
+    const n = v.err.length;
+    html += `<div class="hor-publicar">
+      <p>${n ? `Hay <b style="color:var(--danger)">${n} error${n > 1 ? 'es' : ''}</b> en la grilla. Puedes publicar igual, pero tienes que confirmarlo.` : 'Al publicar, la semana queda bloqueada y la ve todo el equipo. Los avisos amarillos, como las horas sobre la jornada máxima, no impiden publicar.'}</p>
+      <div class="hor-acciones">
+        ${n ? `<label class="hor-confirmar"><input type="checkbox" id="horConfirmar"${HOR.confirmar ? ' checked' : ''}>Publicar con errores</label>` : ''}
+        <button type="button" class="btn btn-ok" data-hor-act="publicar"${n && !HOR.confirmar ? ' disabled' : ''}>Publicar semana</button>
+      </div></div>`;
+  }
+  if(s.estado === 'publicada'){
+    const fecha = s.publicada_at ? new Date(s.publicada_at).toLocaleString('es-CO', { weekday:'short', day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : '';
+    html += `<div class="hor-envio">
+      <span class="field-label">Publicada${s.publicada_por ? ' por ' + escapeHtml(s.publicada_por) : ''}${fecha ? ' · ' + escapeHtml(fecha) : ''}</span>
+      <div class="hor-img"><img id="horImg" alt="Horario de la semana como imagen" hidden><span id="horImgCargando" class="field-help">Armando la imagen…</span></div>
+      <div class="hor-acciones">
+        <button type="button" class="btn btn-accent" data-hor-act="img">${HOR_ICO.imagen}Enviar como imagen</button>
+        <button type="button" class="btn btn-secondary" data-hor-act="wa">${HOR_ICO.enviar}Enviar como texto</button>
+        <button type="button" class="btn btn-ghost btn-small" data-hor-act="texto">${HOR.verTexto ? 'Ocultar texto' : 'Ver texto'}</button>
+      </div>
+      ${HOR.verTexto ? `<pre id="horTexto">${escapeHtml(horMensaje())}</pre><div><button type="button" class="btn btn-secondary btn-small" data-hor-act="copiartexto">${HOR_ICO.copiar}Copiar texto</button></div>` : ''}
+      <span class="field-help">En el celular, "Enviar como imagen" abre el menú de compartir para elegir WhatsApp; en el computador descarga la imagen. La imagen y el texto no muestran horas.</span>
+    </div>`;
+  }
+  box.innerHTML = html;
+  if(s.estado === 'publicada') horDibujarImagen();
+}
+
+function horChecksHtml(v){
+  const lista = arr => arr.map(i => `<li><button type="button" class="hor-issue" data-hor-ir="${escapeHtml(i.k)}">${escapeHtml(i.t)}</button></li>`).join('');
+  return `<div class="hor-checks">
+    <div class="hor-check${v.err.length ? '' : ' ok'}">
+      <h3>${v.err.length ? `<span class="badge danger">${v.err.length} error${v.err.length > 1 ? 'es' : ''}</span> Hay que corregir` : '<span class="badge ok">Sin errores</span> Reglas cumplidas'}</h3>
+      ${v.err.length ? `<ul>${lista(v.err)}</ul>` : '<span class="field-help">Descansos fijos y cobertura por estación en orden.</span>'}
+    </div>
+    <div class="hor-check warn">
+      <h3><span class="badge warn">${v.warn.length} aviso${v.warn.length === 1 ? '' : 's'}</span> Revisar</h3>
+      ${v.warn.length ? `<ul>${lista(v.warn)}</ul>` : '<span class="field-help">Nada para revisar.</span>'}
+    </div>
+  </div>`;
+}
+
+function horGrillaHtml(v){
+  const ed = horEditable(), jornada = horJornada();
+  let h = `<div class="hor-grid-wrap"><table class="hor-grid"><thead><tr><th class="hor-first">Persona</th>`;
+  for(let d = 1; d <= 7; d++) h += `<th class="${horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small></th>`;
+  h += `<th>Horas</th></tr></thead><tbody>`;
+  const grupos = horGrupos();
+  for(const { e, gente } of grupos){
+    if(!gente.length) continue;
+    h += `<tr class="hor-est"><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td><td colspan="8"></td></tr>`;
+    for(const p of gente){
+      const yo = p.user_id && session && p.user_id === session.user.id;
+      h += `<tr${yo ? ' class="hor-yo"' : ''}><td class="hor-first"><span class="hor-pname">${escapeHtml(p.nombre)}${p.activo ? '' : ' <span class="badge neutral">Inactivo</span>'}</span><span class="hor-pmeta">${p.descanso_dia ? 'desc. ' + HOR_DC[p.descanso_dia - 1].toLowerCase() : 'sin descanso fijo'}</span></td>`;
+      for(let d = 1; d <= 7; d++){
+        const k = p.id + '|' + d, a = HOR.asig[k], lvl = ed ? (v.cel[k] || '') : '';
+        let cls = 'hor-cell', c, sub = '', txt;
+        if(!a){ cls += ' vacia'; c = '—'; txt = 'sin turno'; }
+        else if(a.tipo === 'descanso'){ cls += ' desc'; c = 'DESC'; txt = 'descanso'; }
+        else {
+          if(a.tipo === 'otro') cls += ' otro';
+          c = escapeHtml(a.codigo || '?'); txt = (a.tipo === 'otro' ? 'otro horario ' : 'turno ') + (a.codigo || '');
+          sub = `<span class="h">${horNum(a.horas)} h${a.cubre_manana ? '<span class="hor-marca">M</span>' : ''}${a.cubre_cierre ? '<span class="hor-marca">C</span>' : ''}${a.tipo === 'otro' ? '<span class="hor-marca">OTRO</span>' : ''}</span>`;
+        }
+        if(lvl) cls += ' ' + lvl;
+        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
+      }
+      const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
+      h += `<td class="hor-horas ${lv === 'warn' ? 'warn' : ''}" id="horc-${p.id}-h">${horNum(hh)}<small>${lv === 'warn' ? '+' + horNum(hh - jornada) + ' sobre ' + horNum(jornada) : '&nbsp;'}</small></td></tr>`;
+    }
+  }
+  const conMinimos = grupos.filter(g => g.e.id && g.gente.length);
+  if(conMinimos.length){
+    h += `<tr class="hor-covh"><td class="hor-first">Cobertura</td><td colspan="8">personas trabajando / mínimo del día</td></tr>`;
+    for(const { e } of conMinimos){
+      h += `<tr><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td>`;
+      for(let d = 1; d <= 7; d++){
+        const c = v.cov[e.id + '|' + d] || { n: 0, lvl: 'na' }, m = Number((e.minimo_por_dia || [])[d - 1]) || 0;
+        h += `<td class="hor-cov ${c.lvl}" id="horc-cov-${e.id}-${d}">${c.lvl === 'na' ? (c.n || '—') : c.n + '/' + m}</td>`;
+      }
+      h += '<td></td></tr>';
+    }
+  }
+  for(const t of HOR.tareas.filter(t => t.activa || [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]))){
+    h += `<tr class="hor-tarea"><td class="hor-first"><span class="hor-pname">${escapeHtml(t.nombre)}</span><span class="hor-pmeta">${escapeHtml(t.detalle || 'tarea del día')}</span></td>`;
+    for(let d = 1; d <= 7; d++){
+      const pid = HOR.tareaAsig[t.id + '|' + d], lvl = v.tar[t.id + '|' + d] || '';
+      if(ed){
+        const ops = horPersonasSemana().filter(p => horTrabaja(p.id, d) || p.id === pid)
+          .map(p => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>${escapeHtml(horCorto(p))}${horTrabaja(p.id, d) ? '' : ' (no trabaja)'}</option>`).join('');
+        h += `<td class="hor-cw"><select id="horc-tar-${t.id}-${d}" class="${lvl}" data-hor-tarea="${t.id}|${d}" aria-label="${escapeHtml(t.nombre + ' del ' + HOR_DIAS[d - 1].toLowerCase())}"><option value="">Sin asignar</option>${ops}</select></td>`;
+      } else {
+        const p = HOR.personal.find(x => x.id === pid);
+        h += `<td class="hor-cw"><b>${p ? escapeHtml(horCorto(p)) : '—'}</b></td>`;
+      }
+    }
+    h += '<td></td></tr>';
+  }
+  return h + '</tbody></table></div>';
+}
+
+/* --- Acciones de la semana --- */
+document.getElementById('horSemana').addEventListener('click', async e => {
+  const cell = e.target.closest('[data-hor-cell]');
+  if(cell){ if(horEditable()) horAbrirCelda(cell.dataset.horCell); return; }
+  const ir = e.target.closest('[data-hor-ir]');
+  if(ir){
+    const k = ir.dataset.horIr;
+    const id = k.startsWith('cov|') ? 'horc-cov-' + k.slice(4).replace('|', '-') : k.startsWith('tar|') ? 'horc-tar-' + k.slice(4).replace('|', '-') : 'horc-' + k.replace('|', '-');
+    const el = document.getElementById(id);
+    if(el){ el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+    return;
+  }
+  const btn = e.target.closest('[data-hor-act]'); if(!btn || btn.disabled) return;
+  const act = btn.dataset.horAct;
+  if(act === 'ant' || act === 'sig'){ HOR.lunes.setDate(HOR.lunes.getDate() + (act === 'ant' ? -7 : 7)); HOR.verTexto = false; horPintarSemana(); horCargarSemana(); }
+  else if(act === 'crear' || act === 'copiar'){ btn.disabled = true; await horCrearSemana(act === 'copiar'); }
+  else if(act === 'publicar'){
+    btn.disabled = true;
+    const { error } = await supa.rpc('horario_publicar', { p_semana: HOR.semana.id });
+    if(error){ showToast('No se pudo publicar: ' + error.message, 'danger'); btn.disabled = false; return; }
+    showToast('Semana publicada', 'ok'); horCargarSemana();
+  }
+  else if(act === 'borrador'){
+    btn.disabled = true;
+    const { error } = await supa.rpc('horario_volver_borrador', { p_semana: HOR.semana.id });
+    if(error){ showToast('Error: ' + error.message, 'danger'); btn.disabled = false; return; }
+    showToast('La semana volvió a borrador', 'ok'); horCargarSemana();
+  }
+  else if(act === 'img') horCompartirImagen();
+  else if(act === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(horMensaje()), '_blank');
+  else if(act === 'texto'){ HOR.verTexto = !HOR.verTexto; horPintarSemana(); }
+  else if(act === 'copiartexto'){
+    try{ await navigator.clipboard.writeText(horMensaje()); showToast('Texto copiado', 'ok'); }
+    catch(_){ const pre = document.getElementById('horTexto'); const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); showToast('Selecciona y copia el texto', 'warn'); }
+  }
+});
+document.getElementById('horSemana').addEventListener('change', async e => {
+  if(e.target.id === 'horConfirmar'){ HOR.confirmar = e.target.checked; horPintarSemana(); return; }
+  const t = e.target.dataset.horTarea; if(!t) return;
+  const [tareaId, d] = t.split('|'), dia = Number(d), pid = e.target.value;
+  const res = pid
+    ? await supa.from('horario_tarea_asignaciones').upsert({ semana_id: HOR.semana.id, tarea_id: tareaId, dia, personal_id: pid }, { onConflict: 'semana_id,tarea_id,dia' })
+    : await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', HOR.semana.id).eq('tarea_id', tareaId).eq('dia', dia);
+  if(res.error){ showToast('No se pudo guardar: ' + res.error.message, 'danger'); horPintarSemana(); return; }
+  if(pid) HOR.tareaAsig[t] = pid; else delete HOR.tareaAsig[t];
+  HOR.confirmar = false; horPintarSemana();
+  document.getElementById('horc-tar-' + tareaId + '-' + dia)?.focus();
+});
+
+async function horCrearSemana(copiar){
+  const { data: sem, error } = await supa.from('horario_semanas').insert({ area_id: HOR.areaId, lunes: horIso(HOR.lunes) }).select().single();
+  if(error){ showToast('No se pudo crear la semana: ' + error.message, 'danger'); horCargarSemana(); return; }
+  const activos = new Set(HOR.personal.filter(p => p.activo).map(p => p.id));
+  let filas = [], tareas = [];
+  if(copiar){
+    const prev = new Date(HOR.lunes); prev.setDate(prev.getDate() - 7);
+    const { data: ant } = await supa.from('horario_semanas').select('id').eq('area_id', HOR.areaId).eq('lunes', horIso(prev)).maybeSingle();
+    if(ant){
+      const [a, t] = await Promise.all([
+        supa.from('horario_asignaciones').select('*').eq('semana_id', ant.id),
+        supa.from('horario_tarea_asignaciones').select('*').eq('semana_id', ant.id),
+      ]);
+      filas = (a.data || []).filter(x => activos.has(x.personal_id)).map(x => ({ semana_id: sem.id, personal_id: x.personal_id, dia: x.dia, tipo: x.tipo,
+        turno_id: x.turno_id, codigo: x.codigo, horas: x.horas, cubre_manana: x.cubre_manana, cubre_cierre: x.cubre_cierre }));
+      tareas = (t.data || []).filter(x => activos.has(x.personal_id)).map(x => ({ semana_id: sem.id, tarea_id: x.tarea_id, dia: x.dia, personal_id: x.personal_id }));
+    }
+  }
+  // Los descansos fijos siempre quedan puestos (en la copia, si alguien cambió su día fijo, se corrige).
+  HOR.personal.filter(p => p.activo && p.descanso_dia).forEach(p => {
+    if(!filas.some(f => f.personal_id === p.id && f.dia === p.descanso_dia && f.tipo === 'descanso')){
+      filas = filas.filter(f => !(f.personal_id === p.id && f.dia === p.descanso_dia));
+      filas.push({ semana_id: sem.id, personal_id: p.id, dia: p.descanso_dia, tipo: 'descanso', horas: 0 });
+    }
+  });
+  if(filas.length){
+    const { error: e1 } = await supa.from('horario_asignaciones').insert(filas);
+    if(e1) showToast('La semana se creó, pero no se pudieron copiar los turnos: ' + e1.message, 'danger');
+  }
+  if(tareas.length) await supa.from('horario_tarea_asignaciones').insert(tareas);
+  showToast(copiar ? 'Semana copiada como borrador' : 'Semana creada con los descansos fijos', 'ok');
+  horCargarSemana();
+}
+
+/* --- Elegir turno de una casilla --- */
+function horAbrirCelda(k){
+  const [pid, d] = k.split('|'), dia = Number(d);
+  const p = HOR.personal.find(x => x.id === pid); if(!p) return;
+  const a = HOR.asig[k];
+  const est = HOR.estaciones.find(e => e.id === p.estacion_id);
+  const box = document.getElementById('horCeldaBox');
+  box.setAttribute('aria-labelledby', 'horCeldaTit');
+  box.innerHTML = `<h3 id="horCeldaTit">${escapeHtml(p.nombre)} · ${HOR_DIAS[dia - 1]} ${horFecha(dia).getDate()}</h3>
+    <div class="modal-sub">${est ? escapeHtml(est.nombre) + ' · ' : ''}${p.descanso_dia ? 'descanso fijo: ' + HOR_DIAS[p.descanso_dia - 1].toLowerCase() + (p.descanso_dia === dia ? ' (hoy)' : '') : 'sin descanso fijo'}</div>
+    <div class="hor-opts">
+      ${HOR.turnos.filter(t => t.activo).map(t => `<button type="button" class="hor-opt${a && a.tipo === 'turno' && a.turno_id === t.id ? ' on' : ''}" data-hor-set="${t.id}"><span class="c">${escapeHtml(t.codigo)}</span><small>${horNum(t.horas)} h${t.cubre_manana || t.cubre_cierre ? ' · ' + [t.cubre_manana ? 'mañana' : '', t.cubre_cierre ? 'cierre' : ''].filter(Boolean).join(' y ') : ''}</small></button>`).join('')}
+      <button type="button" class="hor-opt desc${a && a.tipo === 'descanso' ? ' on' : ''}" data-hor-set="descanso"><span class="c">DESC</span><small>Descanso</small></button>
+    </div>
+    <div class="hor-otro">
+      <span class="field-label">Otro horario (solo este día)</span>
+      <div class="field-row">
+        <div class="field"><label class="field-label" for="horOtroDesde">Entra</label><input type="text" id="horOtroDesde" placeholder="2" maxlength="8" value="${a && a.tipo === 'otro' ? escapeHtml((a.codigo || '').split('-')[0]) : ''}"></div>
+        <div class="field"><label class="field-label" for="horOtroHasta">Sale</label><input type="text" id="horOtroHasta" placeholder="10" maxlength="8" value="${a && a.tipo === 'otro' ? escapeHtml((a.codigo || '').split('-').slice(1).join('-')) : ''}"></div>
+        <div class="field"><label class="field-label" for="horOtroHoras">Horas</label><input type="number" id="horOtroHoras" min="0.5" max="16" step="0.5" placeholder="8" value="${a && a.tipo === 'otro' ? a.horas : ''}"></div>
+      </div>
+      <button type="button" class="btn btn-secondary btn-small" data-hor-set="otro">Usar este horario</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-hor-set="vaciar">Dejar vacío</button>
+      <button type="button" class="btn btn-secondary" data-hor-cerrar>Cancelar</button>
+    </div>`;
+  box.dataset.celda = k;
+  document.getElementById('horCeldaModal').classList.add('open');
+  (box.querySelector('.hor-opt.on') || box.querySelector('.hor-opt'))?.focus();
+}
+function horCerrarCelda(){
+  const k = document.getElementById('horCeldaBox').dataset.celda;
+  document.getElementById('horCeldaModal').classList.remove('open');
+  if(k) document.getElementById('horc-' + k.replace('|', '-'))?.focus();
+}
+document.getElementById('horCeldaModal').addEventListener('click', async e => {
+  if(e.target.id === 'horCeldaModal' || e.target.closest('[data-hor-cerrar]')) return horCerrarCelda();
+  const b = e.target.closest('[data-hor-set]'); if(!b) return;
+  const k = document.getElementById('horCeldaBox').dataset.celda, [pid, d] = k.split('|'), set = b.dataset.horSet;
+  let fila = null;
+  if(set === 'descanso') fila = { tipo: 'descanso', turno_id: null, codigo: null, horas: 0, cubre_manana: false, cubre_cierre: false };
+  else if(set === 'otro'){
+    const desde = document.getElementById('horOtroDesde').value.trim(), hasta = document.getElementById('horOtroHasta').value.trim();
+    const horas = Number(String(document.getElementById('horOtroHoras').value).replace(',', '.'));
+    if(!desde || !hasta || !(horas > 0 && horas <= 16)){ showToast('Escribe a qué hora entra, a qué hora sale y cuántas horas cuenta (hasta 16)', 'warn'); return; }
+    fila = { tipo: 'otro', turno_id: null, codigo: desde + '-' + hasta, horas, cubre_manana: false, cubre_cierre: false };
+  }
+  else if(set !== 'vaciar'){
+    const t = HOR.turnos.find(x => x.id === set); if(!t) return;
+    fila = { tipo: 'turno', turno_id: t.id, codigo: t.codigo, horas: t.horas, cubre_manana: t.cubre_manana, cubre_cierre: t.cubre_cierre };
+  }
+  b.disabled = true;
+  if(fila){
+    const { data, error } = await supa.from('horario_asignaciones')
+      .upsert({ semana_id: HOR.semana.id, personal_id: pid, dia: Number(d), ...fila, updated_at: new Date().toISOString() }, { onConflict: 'semana_id,personal_id,dia' })
+      .select().single();
+    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
+    HOR.asig[k] = data;
+  } else if(HOR.asig[k]){
+    const { error } = await supa.from('horario_asignaciones').delete().eq('id', HOR.asig[k].id);
+    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
+    delete HOR.asig[k];
+  }
+  HOR.confirmar = false;
+  document.getElementById('horCeldaModal').classList.remove('open');
+  horPintarSemana();
+  document.getElementById('horc-' + k.replace('|', '-'))?.focus();
+});
+document.getElementById('horCeldaModal').addEventListener('keydown', e => { if(e.key === 'Escape') horCerrarCelda(); });
+
+/* --- Mensaje e imagen para el grupo (sin horas) --- */
+function horMensaje(){
+  let m = `*Horario ${currentArea.name} · ${currentLocation.name}*\n_Semana ${horRango(true)}_\n`;
+  const personas = horPersonasSemana();
+  for(let d = 1; d <= 7; d++){
+    m += `\n*${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}*\n`;
+    const porCodigo = new Map();
+    personas.forEach(p => { const a = HOR.asig[p.id + '|' + d]; if(a && a.tipo !== 'descanso'){ const c = a.codigo || '?'; if(!porCodigo.has(c)) porCodigo.set(c, []); porCodigo.get(c).push(horCorto(p)); } });
+    const orden = HOR.turnos.map(t => t.codigo);
+    [...porCodigo.keys()].sort((x, y) => (orden.indexOf(x) + 1 || 99) - (orden.indexOf(y) + 1 || 99)).forEach(c => { m += `${c}: ${porCodigo.get(c).join(', ')}\n`; });
+    const desc = personas.filter(p => (HOR.asig[p.id + '|' + d] || {}).tipo === 'descanso').map(horCorto);
+    if(desc.length) m += `Descansan: ${desc.join(', ')}\n`;
+    HOR.tareas.forEach(t => { const p = HOR.personal.find(x => x.id === HOR.tareaAsig[t.id + '|' + d]); if(p) m += `🧹 ${t.nombre}: ${horCorto(p)}\n`; });
+  }
+  return m.trim();
+}
+
+async function horDibujarImagen(){
+  try{ await document.fonts.ready; }catch(_){}
+  const img = document.getElementById('horImg'); if(!img || !HOR.semana) return;
+  const css = getComputedStyle(document.documentElement), c = n => css.getPropertyValue(n).trim();
+  const grupos = horGrupos().filter(g => g.gente.length);
+  const tareas = HOR.tareas.filter(t => [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]));
+  const W = 1080, M = 36, NAME = 200, COL = (W - 2 * M - NAME) / 7, RH = 54, EH = 36, HEAD = 176;
+  let H = HEAD + 46;
+  grupos.forEach(g => { H += EH + g.gente.length * RH; });
+  H += tareas.length ? 10 + tareas.length * (RH + 6) : 0;
+  H += 74;
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+  const x = cv.getContext('2d'); x.scale(2, 2);
+  const rr = (X, Y, w, h, r, fill, stroke) => {
+    x.beginPath(); if(x.roundRect) x.roundRect(X, Y, w, h, r); else x.rect(X, Y, w, h);
+    if(fill){ x.fillStyle = fill; x.fill(); } if(stroke){ x.strokeStyle = stroke; x.lineWidth = 1; x.stroke(); }
+  };
+  const txt = (t, X, Y, font, color, align, maxW) => {
+    x.font = font; x.fillStyle = color; x.textAlign = align || 'left'; x.textBaseline = 'middle';
+    if(maxW){ let size = parseFloat(font.match(/([0-9]+)px/)[1]); while(x.measureText(t).width > maxW && size > 10){ size--; x.font = font.replace(/[0-9]+px/, size + 'px'); } }
+    x.fillText(t, X, Y);
+  };
+  const MONO = "'IBM Plex Mono', monospace", SANS = "Inter, system-ui, sans-serif";
+  x.fillStyle = c('--bg'); x.fillRect(0, 0, W, H);
+  x.fillStyle = c('--accent'); x.fillRect(0, 0, W, 8);
+  txt('Horario · ' + currentArea.name, M, 62, "700 40px 'Playfair Display', Georgia, serif", c('--text'), 'left', W - 2 * M);
+  txt(currentLocation.name, M, 104, '500 20px ' + SANS, c('--text-muted'));
+  txt(('Semana ' + horRango(true) + ' ' + HOR.lunes.getFullYear()).toUpperCase(), M, 140, '600 15px ' + MONO, c('--accent-strong'));
+  let y = HEAD;
+  rr(M, y, W - 2 * M, 46, 8, c('--surface-2'));
+  for(let d = 1; d <= 7; d++){
+    const cx = M + NAME + COL * (d - 1) + COL / 2;
+    txt(HOR_DC[d - 1].toUpperCase(), cx, y + 16, '600 13px ' + MONO, horDiasSinDescanso().includes(d) ? c('--accent-strong') : c('--text-muted'), 'center');
+    txt(String(horFecha(d).getDate()), cx, y + 33, '600 15px ' + MONO, c('--text'), 'center');
+  }
+  y += 46;
+  for(const { e, gente } of grupos){
+    x.fillStyle = c('--border'); x.fillRect(M, y, W - 2 * M, 1);
+    rr(M, y + 11, 14, 14, 3, c('--est-' + (e.color || 1)));
+    txt(e.nombre.toUpperCase(), M + 24, y + EH / 2 + 1, '600 13px ' + MONO, c('--text-muted'));
+    y += EH;
+    for(const p of gente){
+      txt(p.nombre, M + 4, y + RH / 2, '600 18px ' + SANS, c('--text'), 'left', NAME - 12);
+      for(let d = 1; d <= 7; d++){
+        const a = HOR.asig[p.id + '|' + d];
+        const X = M + NAME + COL * (d - 1) + 3, Y = y + 4, w = COL - 6, h = RH - 8, cx = X + w / 2;
+        if(!a) continue;
+        if(a.tipo === 'descanso'){ rr(X, Y, w, h, 8, c('--surface-3')); txt('DESCANSO', cx, Y + h / 2, '600 12px ' + MONO, c('--text-muted'), 'center', w - 8); }
+        else { rr(X, Y, w, h, 8, c('--surface'), a.tipo === 'otro' ? c('--border-strong') : c('--border')); txt(a.codigo || '?', cx, Y + h / 2, '600 17px ' + MONO, c('--text'), 'center', w - 10); }
+      }
+      y += RH;
+    }
+  }
+  if(tareas.length) y += 10;
+  for(const t of tareas){
+    rr(M, y, W - 2 * M, RH, 8, c('--accent-soft'));
+    txt(t.nombre, M + 12, y + RH / 2 - (t.detalle ? 8 : 0), '700 18px ' + SANS, c('--text'), 'left', NAME - 20);
+    if(t.detalle) txt(t.detalle.toLowerCase(), M + 12, y + RH / 2 + 12, '500 12px ' + MONO, c('--text-muted'), 'left', NAME - 20);
+    for(let d = 1; d <= 7; d++){
+      const p = HOR.personal.find(z => z.id === HOR.tareaAsig[t.id + '|' + d]);
+      if(p) txt(horCorto(p), M + NAME + COL * (d - 1) + COL / 2, y + RH / 2, '600 16px ' + SANS, c('--text'), 'center', COL - 10);
+    }
+    y += RH + 6;
+  }
+  y += 28;
+  const s = HOR.semana;
+  const fecha = s.publicada_at ? new Date(s.publicada_at).toLocaleString('es-CO', { weekday:'short', day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }) : '';
+  txt(('Publicado' + (s.publicada_por ? ' por ' + s.publicada_por : '') + (fecha ? ' · ' + fecha : '')), M, y, '500 14px ' + SANS, c('--text-dim'), 'left', W - 2 * M - 180);
+  txt('Biblia de Cocina', W - M, y, '600 14px ' + MONO, c('--text-dim'), 'right');
+  if(document.getElementById('horImg') !== img) return;
+  img.src = cv.toDataURL('image/png'); img.hidden = false;
+  document.getElementById('horImgCargando')?.remove();
+  HOR.imgBlob = await new Promise(r => cv.toBlob(r, 'image/png'));
+}
+
+async function horCompartirImagen(){
+  if(!HOR.imgBlob){ showToast('La imagen todavía se está armando', 'warn'); return; }
+  const nombre = `horario-${(currentArea.name || 'area').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}-${horIso(HOR.lunes)}.png`;
+  const file = new File([HOR.imgBlob], nombre, { type: 'image/png' });
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    try{ await navigator.share({ files: [file], title: 'Horario ' + currentArea.name }); return; }
+    catch(e){ if(e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(HOR.imgBlob), a = document.createElement('a');
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast('Imagen descargada. Adjúntala en WhatsApp.', 'ok');
+}
+
+/* --- Configuración (admin y líderes): reglas, estaciones, turnos, personal, tareas. Se desactiva, no se borra. --- */
+function horPintarConfig(){
+  const box = document.getElementById('horConfig');
+  if(HOR.error){ box.innerHTML = `<div class="empty-note">El módulo Horarios todavía no está listo en la base de datos (falta correr sql/horarios_1_tablas.sql).</div>`; return; }
+  const cb = (tabla, id, campo, val, texto) => `<label class="cb"><input type="checkbox" data-hc="${tabla}|${id}|${campo}"${val ? ' checked' : ''}>${texto}</label>`;
+  const inp = (tabla, id, campo, val, label, tipo, extra) => `<label><span class="field-label">${label}</span><input type="${tipo || 'text'}" data-hc="${tabla}|${id}|${campo}" value="${escapeHtml(val == null ? '' : String(val))}"${extra || ''}></label>`;
+  const sinDesc = horDiasSinDescanso();
+  let h = `<div class="hor-cfg">
+    <section><h3>Reglas</h3>
+      <div class="hor-cfg-row">
+        ${inp('horario_config', HOR.areaId, 'jornada_max', HOR.cfg.jornada_max, 'Jornada máxima (h)', 'number', ' min="1" max="80" step="0.5"')}
+        <div><span class="field-label">Días en que solo descansa producción</span><div class="mins">${HOR_DC.map((d, i) => `<label class="cb"><input type="checkbox" data-hc-sindesc="${i + 1}"${sinDesc.includes(i + 1) ? ' checked' : ''}>${d}</label>`).join('')}</div></div>
+      </div>
+      <p class="hor-cfg-nota">La jornada máxima se avisa en amarillo; nunca impide publicar.</p>
+    </section>
+    <section><h3>Estaciones y mínimos por día <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_estaciones">+ Estación</button></h3>
+      ${HOR.estaciones.map(e => `<div class="hor-cfg-row${e.activa ? '' : ' inactivo'}">
+        <i class="hor-dot" style="background:${horColor(e.color)}; width:16px; height:16px; align-self:center"></i>
+        ${inp('horario_estaciones', e.id, 'nombre', e.nombre, 'Nombre')}
+        <label><span class="field-label">Color</span><select data-hc="horario_estaciones|${e.id}|color">${[1,2,3,4,5,6,7,8].map(n => `<option value="${n}"${n === e.color ? ' selected' : ''}>Color ${n}</option>`).join('')}</select></label>
+        <div><span class="field-label">Mínimo por día</span><div class="mins">${HOR_DC.map((d, i) => `<label><span class="hor-pmeta">${d}</span><input type="number" min="0" max="20" data-hc-min="${e.id}|${i}" value="${Number((e.minimo_por_dia || [])[i]) || 0}" aria-label="Mínimo ${d}"></label>`).join('')}</div></div>
+        ${cb('horario_estaciones', e.id, 'activa', e.activa, 'Activa')}
+      </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay estaciones.</p>'}
+    </section>
+    <section><h3>Turnos <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_turnos">+ Turno</button></h3>
+      ${HOR.turnos.map(t => `<div class="hor-cfg-row${t.activo ? '' : ' inactivo'}">
+        ${inp('horario_turnos', t.id, 'codigo', t.codigo, 'Código', 'text', ' maxlength="20" style="font-family:\'IBM Plex Mono\',monospace"')}
+        ${inp('horario_turnos', t.id, 'horas', t.horas, 'Horas', 'number', ' min="0.5" max="16" step="0.5"')}
+        ${cb('horario_turnos', t.id, 'cubre_manana', t.cubre_manana, 'Cubre mañana')}
+        ${cb('horario_turnos', t.id, 'cubre_cierre', t.cubre_cierre, 'Cubre cierre')}
+        ${cb('horario_turnos', t.id, 'activo', t.activo, 'Activo')}
+      </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay turnos.</p>'}
+      <p class="hor-cfg-nota">Si cambias las horas de un turno, las semanas ya armadas no cambian. Para un horario de un solo día, usa "Otro horario" en la casilla.</p>
+    </section>
+    <section><h3>Personal <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_personal">+ Persona</button></h3>
+      ${HOR.personal.map(p => `<div class="hor-cfg-row${p.activo ? '' : ' inactivo'}">
+        ${inp('horario_personal', p.id, 'nombre', p.nombre, 'Nombre')}
+        <label><span class="field-label">Estación</span><select data-hc="horario_personal|${p.id}|estacion_id"><option value="">Sin estación</option>${HOR.estaciones.map(e => `<option value="${e.id}"${e.id === p.estacion_id ? ' selected' : ''}>${escapeHtml(e.nombre)}</option>`).join('')}</select></label>
+        ${inp('horario_personal', p.id, 'cargo', p.cargo, 'Cargo')}
+        <label><span class="field-label">Descanso fijo</span><select data-hc="horario_personal|${p.id}|descanso_dia"><option value="">Ninguno</option>${HOR_DIAS.map((d, i) => `<option value="${i + 1}"${i + 1 === p.descanso_dia ? ' selected' : ''}>${d}</option>`).join('')}</select></label>
+        ${cb('horario_personal', p.id, 'es_produccion', p.es_produccion, 'Producción')}
+        ${cb('horario_personal', p.id, 'activo', p.activo, 'Activo')}
+      </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay personal.</p>'}
+      <p class="hor-cfg-nota">"Producción" puede descansar los días marcados arriba. Quien sale del equipo se desactiva: deja de aparecer en las semanas nuevas y su historial queda.</p>
+    </section>
+    <section><h3>Tareas diarias <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_tareas">+ Tarea</button></h3>
+      ${HOR.tareas.map(t => `<div class="hor-cfg-row${t.activa ? '' : ' inactivo'}">
+        ${inp('horario_tareas', t.id, 'nombre', t.nombre, 'Nombre')}
+        ${inp('horario_tareas', t.id, 'detalle', t.detalle, 'Detalle')}
+        ${cb('horario_tareas', t.id, 'activa', t.activa, 'Activa')}
+      </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay tareas.</p>'}
+      <p class="hor-cfg-nota">Cada día se asigna a una persona que trabaje ese día. No suma horas.</p>
+    </section>
+  </div>`;
+  box.innerHTML = h;
+}
+
+const HOR_TABLAS = { horario_estaciones: 'estaciones', horario_turnos: 'turnos', horario_personal: 'personal', horario_tareas: 'tareas' };
+async function horGuardarConfig(tabla, id, cambios){
+  const q = tabla === 'horario_config'
+    ? supa.from('horario_config').upsert({ area_id: HOR.areaId, ...cambios, updated_at: new Date().toISOString() }, { onConflict: 'area_id' }).select().single()
+    : supa.from(tabla).update(cambios).eq('id', id).select().single();
+  const { data, error } = await q;
+  if(error){
+    showToast(error.code === '23505' ? 'Ya existe uno con ese nombre o código' : 'No se pudo guardar: ' + error.message, 'danger');
+    horPintarConfig(); return false;
+  }
+  if(tabla === 'horario_config') HOR.cfg = data;
+  else { const arr = HOR[HOR_TABLAS[tabla]], i = arr.findIndex(r => r.id === id); if(i >= 0) arr[i] = data; }
+  showToast('Guardado', 'ok');
+  return true;
+}
+document.getElementById('horConfig').addEventListener('change', async e => {
+  const el = e.target;
+  if(el.dataset.hcSindesc){
+    const dias = [...document.querySelectorAll('[data-hc-sindesc]')].filter(x => x.checked).map(x => Number(x.dataset.hcSindesc));
+    await horGuardarConfig('horario_config', HOR.areaId, { dias_sin_descanso: dias }); return;
+  }
+  if(el.dataset.hcMin){
+    const [id, i] = el.dataset.hcMin.split('|'), est = HOR.estaciones.find(x => x.id === id); if(!est) return;
+    const mins = [0,1,2,3,4,5,6].map(j => Number((est.minimo_por_dia || [])[j]) || 0);
+    mins[Number(i)] = Math.max(0, Math.min(20, parseInt(el.value, 10) || 0));
+    await horGuardarConfig('horario_estaciones', id, { minimo_por_dia: mins }); return;
+  }
+  if(!el.dataset.hc) return;
+  const [tabla, id, campo] = el.dataset.hc.split('|');
+  let val;
+  if(el.type === 'checkbox') val = el.checked;
+  else if(el.type === 'number'){
+    val = Number(String(el.value).replace(',', '.'));
+    if(!(val > 0)){ showToast('Escribe un número mayor que cero', 'warn'); horPintarConfig(); return; }
+  }
+  else if(campo === 'estacion_id') val = el.value || null;
+  else if(campo === 'descanso_dia' || campo === 'color') val = el.value ? Number(el.value) : null;
+  else {
+    val = el.value.trim();
+    if(!val && (campo === 'nombre' || campo === 'codigo')){ showToast('No puede quedar vacío', 'warn'); horPintarConfig(); return; }
+    if(!val) val = null;
+  }
+  const ok = await horGuardarConfig(tabla, id, { [campo]: val });
+  if(ok && (el.type === 'checkbox' || el.tagName === 'SELECT')) horPintarConfig();
+});
+document.getElementById('horConfig').addEventListener('click', async e => {
+  const b = e.target.closest('[data-hc-nuevo]'); if(!b) return;
+  const tabla = b.dataset.hcNuevo, arr = HOR[HOR_TABLAS[tabla]];
+  const orden = arr.reduce((m, r) => Math.max(m, r.orden || 0), 0) + 1;
+  const base = { area_id: HOR.areaId, orden };
+  const nuevo = {
+    horario_estaciones: { nombre: 'Estación ' + orden, color: ((orden - 1) % 8) + 1 },
+    horario_turnos: { codigo: 'Turno ' + orden, horas: 8 },
+    horario_personal: { nombre: 'Persona ' + orden },
+    horario_tareas: { nombre: 'Tarea ' + orden },
+  }[tabla];
+  b.disabled = true;
+  const { data, error } = await supa.from(tabla).insert({ ...base, ...nuevo }).select().single();
+  b.disabled = false;
+  if(error){ showToast('No se pudo agregar: ' + error.message, 'danger'); return; }
+  arr.push(data); horPintarConfig();
+  const campo = tabla === 'horario_turnos' ? 'codigo' : 'nombre';
+  const input = document.querySelector(`[data-hc="${tabla}|${data.id}|${campo}"]`);
+  if(input){ input.focus(); input.select(); }
 });
 
 /* ---------- INIT ---------- */
@@ -8952,7 +9785,7 @@ async function loadAreasAdmin(){
 }
 
 function renderAreasAdminList(){
-  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario', costeo:'Costeo'};
+  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario', costeo:'Costeo', horarios:'Horarios'};
   const box = document.getElementById('areasAdminList');
   if(AREAS_THIS_LOCATION.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay áreas creadas en este punto.</div>'; return; }
   box.innerHTML = AREAS_THIS_LOCATION.map(a => `
@@ -9006,6 +9839,9 @@ async function loadAreaAccessMatrix(){
   if(uErr || aErr){ box.innerHTML = '<div class="empty-note">No se pudo cargar la lista de accesos.</div>'; return; }
 
   const accessSet = new Set((accessRows||[]).map(r => r.user_id + '::' + r.area_id));
+  const liderSet = new Set((accessRows||[]).filter(r => r.lider_horarios).map(r => r.user_id + '::' + r.area_id));
+  // "Líder de horarios": solo en áreas con el módulo Horarios; edita el horario de esa área (ver HORARIOS_SPEC.md).
+  const areasHorarios = AREAS_THIS_LOCATION.filter(a => (a.modules || []).includes('horarios'));
 
   box.innerHTML = (users||[]).map(u => `
     <div class="user-row stack">
@@ -9021,11 +9857,18 @@ async function loadAreaAccessMatrix(){
             ${escapeHtml(a.name)}
           </label>`;
         }).join('')}
+        ${areasHorarios.map(a => {
+          const acceso = accessSet.has(u.id + '::' + a.id), lider = liderSet.has(u.id + '::' + a.id);
+          return `<label class="chip-check" title="Edita y publica el horario de ${escapeHtml(a.name)}">
+            <input type="checkbox" data-lider-user="${u.id}" data-lider-area="${a.id}" ${lider?'checked':''} ${acceso?'':'disabled'}>
+            Líder de horarios · ${escapeHtml(a.name)}
+          </label>`;
+        }).join('')}
       </div>
     </div>
   `).join('');
 
-  box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+  box.querySelectorAll('input[data-area-user]').forEach(cb=>{
     cb.addEventListener('change', async ()=>{
       const userId = cb.dataset.areaUser, areaId = cb.dataset.areaId;
       if(cb.checked){
@@ -9035,7 +9878,16 @@ async function loadAreaAccessMatrix(){
         const { error } = await supa.from('user_areas').delete().eq('user_id', userId).eq('area_id', areaId);
         if(error){ showToast('Error: ' + error.message); cb.checked = true; return; }
       }
+      const lider = box.querySelector(`input[data-lider-user="${userId}"][data-lider-area="${areaId}"]`);
+      if(lider){ lider.disabled = !cb.checked; if(!cb.checked) lider.checked = false; }
       showToast('Acceso actualizado');
+    });
+  });
+  box.querySelectorAll('input[data-lider-user]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const { error } = await supa.rpc('set_lider_horarios', { p_user: cb.dataset.liderUser, p_area: cb.dataset.liderArea, p_valor: cb.checked });
+      if(error){ showToast('Error: ' + error.message); cb.checked = !cb.checked; return; }
+      showToast(cb.checked ? 'Ahora es líder de horarios' : 'Ya no es líder de horarios');
     });
   });
 }
