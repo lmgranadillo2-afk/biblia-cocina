@@ -1011,6 +1011,50 @@ nav.tabs button{position:relative;}
 .hor-desglose small{font-size:12px; color:var(--text-muted);}
 .hor-marca.noct{background:var(--info-bg); color:var(--info);}
 .hor-otro-prev{font-size:13px; color:var(--text-muted); margin:0 0 8px;}
+.pren-controles{align-items:flex-end;}
+.pren-switch{display:inline-flex; align-items:center; gap:8px; cursor:pointer; font:600 14px 'Inter',sans-serif; background:none; border:none; color:var(--text); padding:0 4px; min-height:44px;}
+.pren-switch i{width:40px; height:24px; border-radius:var(--radius-pill); background:var(--surface-3); position:relative; transition:background .15s ease-out;}
+.pren-switch i::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-1); transition:transform .15s ease-out;}
+.pren-switch[aria-checked="true"] i{background:var(--accent);} .pren-switch[aria-checked="true"] i::after{transform:translateX(16px);}
+.pren-switch:focus-visible{outline:none; box-shadow:var(--focus-ring); border-radius:var(--radius-md);}
+.pren-aviso{border-radius:var(--radius-md); padding:10px 14px; font-size:14px; margin-bottom:var(--space-2); line-height:1.45;}
+.pren-aviso.warn{background:var(--warn-bg); color:var(--text);} .pren-aviso.warn b{color:var(--warn);}
+.pren-aviso.info{background:var(--info-bg); color:var(--text);} .pren-aviso.info b{color:var(--info);}
+.pren-totales{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap:10px; margin:var(--space-3) 0;}
+.pren-tot{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; display:flex; flex-direction:column; gap:2px;}
+.pren-tot.pesos{border-color:var(--accent);}
+.pren-tot b{font:600 22px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.pren-tot small{font-size:12.5px; color:var(--text-muted);}
+.pren-tabla{border-collapse:collapse; width:100%; min-width:1040px; font-size:13.5px;}
+.pren-tabla th{background:var(--surface-2); font:600 10.5px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); padding:8px 10px; text-align:right; vertical-align:bottom; line-height:1.3;}
+.pren-tabla th:first-child, .pren-tabla td:first-child{text-align:left; position:sticky; left:0; background:var(--surface); z-index:1; border-right:1px solid var(--border);}
+.pren-tabla th:first-child{background:var(--surface-2);}
+.pren-tabla td{padding:0 10px; height:48px; border-bottom:1px solid var(--border); text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.pren-tabla td:first-child{font-family:'Inter',sans-serif; font-weight:600; white-space:nowrap;}
+.pren-cero{color:var(--surface-3);}
+.pren-fila{cursor:pointer;} .pren-fila:hover td, .pren-fila.abierta td{background:var(--accent-soft);}
+.pren-fila:focus-visible{outline:none; box-shadow:inset var(--focus-ring);}
+.pren-chev{display:inline-block; color:var(--text-dim); margin-right:6px; transition:transform .15s ease-out;}
+.pren-fila.abierta .pren-chev{transform:rotate(90deg);}
+.pren-total td, .pren-tabla tr.pren-total td:first-child{background:var(--surface-2); font-weight:700;}
+.pren-chips{display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;}
+.pren-detalle td{background:var(--bg) !important; padding:10px 12px 14px; height:auto; text-align:left; font-family:'Inter',sans-serif;}
+.pren-dias{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:6px; position:sticky; left:12px; max-width:min(1000px, calc(100vw - 90px));}
+.pren-nota{position:sticky; left:12px; max-width:calc(100vw - 90px);}
+.pren-dia{border:1px solid var(--border); border-radius:8px; padding:6px 8px; background:var(--surface); font-size:12.5px; line-height:1.4;}
+.pren-dia b{font:600 12px 'IBM Plex Mono',monospace; display:block;}
+.pren-dia .pren-cod{font-family:'IBM Plex Mono',monospace; color:var(--text-muted);}
+.pren-dia.fest{border-color:var(--accent);} .pren-dia.prog{border-style:dashed;}
+.pren-dia.nov{background:var(--warn-bg); border-color:transparent;} .pren-dia.desc{background:var(--surface-2); border-color:transparent; color:var(--text-muted);}
+.pren-sec{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-top:var(--space-3);}
+.pren-sec summary{cursor:pointer; padding:12px 14px; font:600 11px 'IBM Plex Mono',monospace; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted); display:flex; gap:10px; align-items:center; flex-wrap:wrap; min-height:44px;}
+.pren-sec summary:focus-visible{outline:none; box-shadow:var(--focus-ring); border-radius:var(--radius-md);}
+.pren-cuerpo{padding:0 14px 14px;}
+.pren-salarios{display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap:8px 16px; margin-top:8px;}
+.pren-sal, .pren-param{display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid var(--border); padding:6px 0; font-size:14px;}
+.pren-sal input, .pren-param input{width:140px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+.pren-param input{width:90px;}
+.pren-params{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap:4px 20px;}
 .hor-prop{background:var(--info-bg); border:1px solid var(--info); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:var(--space-3);}
 .hor-prop h3{margin:0 0 6px; font-size:15px; color:var(--info); display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
 .hor-prop ul{margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.5;}
@@ -1538,6 +1582,7 @@ nav.tabs button{position:relative;}
           <button type="button" data-hor-sub="novedades">Novedades</button>
           <button type="button" data-hor-sub="registro">Registro del día</button>
           <button type="button" data-hor-sub="config">Configuración</button>
+          <button type="button" data-hor-sub="prenomina" id="horSubPren" hidden>Pre-nómina</button>
         </div>
       </div>
       <div id="horSemana"></div>
@@ -3414,6 +3459,7 @@ async function horAlEntrar(){
 function horPintar(){
   if(HOR.sub === 'novedades' && HOR.editor) horPintarNovedades();
   else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
+  else if(HOR.sub === 'prenomina' && horEsAdmin()) horPintarPrenomina();
   else horPintarSemana();
 }
 
@@ -3436,6 +3482,8 @@ async function horCargarConfig(){
 function horPintarSub(){
   const tabs = document.getElementById('horSubtabs');
   tabs.hidden = !HOR.editor;
+  document.getElementById('horSubPren').hidden = !horEsAdmin();
+  if(HOR.sub === 'prenomina' && !horEsAdmin()) HOR.sub = 'semana';
   tabs.querySelectorAll('[data-hor-sub]').forEach(b => b.classList.toggle('active', b.dataset.horSub === HOR.sub));
   document.getElementById('horSemana').hidden = HOR.sub === 'config';
   document.getElementById('horConfig').hidden = HOR.sub !== 'config';
@@ -4210,7 +4258,7 @@ function horPintarNovedades(){
   let h = horBarraSemana();
   h += `<div class="hor-novs">${HOR.nov.length ? HOR.nov.map(n => `
     <div class="hor-nov ${n.tipo}">
-      <div><b>${escapeHtml(nombre(n.personal_id))}</b> <span class="badge ${badge(n.tipo)}">${HOR_TIPOS[n.tipo]}</span>
+      <div><b>${escapeHtml(nombre(n.personal_id))}</b> <span class="badge ${badge(n.tipo)}">${HOR_TIPOS[n.tipo]}</span>${n.tipo === 'permiso' && n.remunerado === false ? ' <span class="badge neutral">No remunerado</span>' : n.tipo === 'permiso' && n.remunerado ? ' <span class="badge ok">Remunerado</span>' : ''}
         <div class="m">${horRangoNov(n)}${n.creado_por ? ' · por ' + escapeHtml(n.creado_por) : ''}</div>
         ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}</div>
       <button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>
@@ -4220,6 +4268,7 @@ function horPintarNovedades(){
     <div class="field"><label class="field-label" for="horNovT">Tipo</label><select id="horNovT">${Object.entries(HOR_TIPOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
     <div class="field"><label class="field-label" for="horNovD">Desde</label><input type="date" id="horNovD" value="${def}" required></div>
     <div class="field"><label class="field-label" for="horNovH">Hasta</label><input type="date" id="horNovH" value="${def}" required></div>
+    <div class="field" id="horNovRemBox" hidden><label class="field-label" for="horNovRem">¿Remunerado?</label><select id="horNovRem"><option value="si">Sí, se paga</option><option value="no">No se paga</option></select></div>
     <span class="field-help full" id="horNovAyuda">${HOR_AYUDA_NOV.incapacidad}</span>
     <div class="field full"><label class="field-label" for="horNovN">Nota</label><input type="text" id="horNovN" maxlength="300" placeholder="Ej.: incapacidad de 3 días, trae soporte"></div>
     <div class="full"><button type="submit" class="btn btn-accent">Agregar novedad</button></div>
@@ -4238,6 +4287,7 @@ document.getElementById('horSemana').addEventListener('submit', async e => {
   const { error } = await supa.from('horario_novedades').insert({
     area_id: HOR.areaId, personal_id: document.getElementById('horNovP').value, tipo: document.getElementById('horNovT').value,
     desde, hasta, nota: document.getElementById('horNovN').value.trim() || null, creado_por: profile.name || session.user.email,
+    ...(document.getElementById('horNovT').value === 'permiso' ? { remunerado: document.getElementById('horNovRem').value === 'si' } : {}),
   });
   if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); btn.disabled = false; return; }
   await horCargarSemana();
@@ -4389,7 +4439,7 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   }
 });
 document.getElementById('horSemana').addEventListener('change', async e => {
-  if(e.target.id === 'horNovT'){ document.getElementById('horNovAyuda').textContent = HOR_AYUDA_NOV[e.target.value]; return; }
+  if(e.target.id === 'horNovT'){ document.getElementById('horNovAyuda').textContent = HOR_AYUDA_NOV[e.target.value]; document.getElementById('horNovRemBox').hidden = e.target.value !== 'permiso'; return; }
   if(e.target.id === 'horRegExtra' && e.target.value){
     const fecha = horIso(horFecha(HOR.diaReg));
     HOR.agregar = false;
@@ -4404,6 +4454,326 @@ document.getElementById('horSemana').addEventListener('change', async e => {
   else if(campo === 'minutos_tarde') val = parseInt(val, 10) || null;
   else val = val.trim() || null;
   if(await horGuardarReg(pid, fecha, { [campo]: val })) showToast('Guardado', 'ok');
+});
+
+/* --- Pre-nómina (solo admin): horas por persona y quincena para el contador, con valores opcionales en pesos.
+   Extras por SEMANA (lo que pasa de la jornada máxima de lunes a domingo, en orden cronológico); cada minuto se clasifica
+   por la hora (nocturno según Configuración) y el día (festivo; domingo solo si su recargo es mayor que 0).
+   Días sin cerrar en el registro se cuentan con el horario programado y se avisan. Parámetros en horario_config. --- */
+const PREN = { periodo: null, pesos: false, abierta: null, datos: null, carga: 0 };
+const PREN_CATS = [
+  ['h', 'Horas<br>trabajadas', 'Horas trabajadas'], ['rn', 'Ordinarias<br>nocturnas', 'Ordinarias nocturnas'],
+  ['hed', 'Extra<br>diurna', 'Extra diurna'], ['hen', 'Extra<br>nocturna', 'Extra nocturna'],
+  ['dfd', 'Dom/fest<br>diurna', 'Dominical o festiva diurna'], ['dfn', 'Dom/fest<br>nocturna', 'Dominical o festiva nocturna'],
+  ['hedf', 'Extra dom/fest<br>diurna', 'Extra dominical o festiva diurna'], ['henf', 'Extra dom/fest<br>nocturna', 'Extra dominical o festiva nocturna'],
+];
+function prenPeriodos(){
+  const out = [], hoy = new Date();
+  let y = hoy.getFullYear(), m = hoy.getMonth(), q = hoy.getDate() <= 15 ? 1 : 2;
+  for(let i = 0; i < 8; i++){
+    const desde = new Date(y, m, q === 1 ? 1 : 16), hasta = new Date(y, m, q === 1 ? 15 : new Date(y, m + 1, 0).getDate());
+    out.push({ id: horIso(desde), desde, hasta, actual: i === 0 });
+    if(q === 2) q = 1; else { q = 2; m--; if(m < 0){ m = 11; y--; } }
+  }
+  return out;
+}
+function prenTextoPeriodo(p){
+  const m = d => HOR_MESES[d.getMonth()].slice(0, 3);
+  return `${p.desde.getDate()} – ${p.hasta.getDate()} ${m(p.hasta)} ${p.hasta.getFullYear()}`;
+}
+function prenSumarDias(iso, n){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return horIso(d); }
+function prenPct(campo, def){ const v = HOR.cfg && HOR.cfg[campo]; return v === null || v === undefined || v === '' ? def : Number(v); }
+
+async function horPintarPrenomina(){
+  const box = document.getElementById('horSemana');
+  if(!horEsAdmin()){ box.innerHTML = '<div class="empty-note">La pre-nómina solo la ven los admin.</div>'; return; }
+  const periodos = prenPeriodos();
+  if(!PREN.periodo) PREN.periodo = periodos[1].id; // la última quincena terminada
+  const per = periodos.find(p => p.id === PREN.periodo) || periodos[1];
+  box.innerHTML = prenControlesHtml(periodos, per) + '<div class="empty-note">Calculando...</div>';
+  const carga = ++PREN.carga;
+  const datos = await prenCargar(per);
+  if(carga !== PREN.carga) return;
+  if(datos.error){ box.innerHTML = prenControlesHtml(periodos, per) + `<div class="empty-note">${escapeHtml(datos.error)}</div>`; return; }
+  PREN.datos = { ...datos, per, res: prenCalcular(datos, per) };
+  prenRender();
+}
+function prenControlesHtml(periodos, per){
+  return `<div class="hor-bar pren-controles">
+    <div class="field" style="margin:0"><label class="field-label" for="prenPeriodo">Quincena</label>
+      <select id="prenPeriodo">${periodos.map(p => `<option value="${p.id}"${p.id === per.id ? ' selected' : ''}>${prenTextoPeriodo(p)}${p.actual ? ' (en curso)' : ''}</option>`).join('')}</select></div>
+    <div class="hor-acciones">
+      <button type="button" class="pren-switch" id="prenPesos" role="switch" aria-checked="${PREN.pesos}"><i></i>Valores en pesos</button>
+      <button type="button" class="btn btn-secondary btn-small" data-pren="detalle">Detalle por día (Excel)</button>
+      <button type="button" class="btn btn-accent btn-small" data-pren="resumen">Descargar para el contador</button>
+    </div>
+  </div>`;
+}
+
+async function prenCargar(per){
+  const a = HOR.areaId, desde = horIso(per.desde), hasta = horIso(per.hasta);
+  const lunes1 = horIso(horLunesDe(per.desde)), lunesN = horIso(horLunesDe(per.hasta)), domingoN = prenSumarDias(lunesN, 6);
+  const [sem, nov, reg, cer, fes, sal] = await Promise.all([
+    supa.from('horario_semanas').select('*').eq('area_id', a).gte('lunes', lunes1).lte('lunes', lunesN),
+    supa.from('horario_novedades').select('*').eq('area_id', a).lte('desde', domingoN).gte('hasta', lunes1),
+    supa.from('horario_registro_dia').select('*').eq('area_id', a).gte('fecha', lunes1).lte('fecha', domingoN),
+    supa.from('horario_dias_cerrados').select('*').eq('area_id', a).gte('fecha', lunes1).lte('fecha', domingoN),
+    supa.from('horario_festivos').select('*').gte('fecha', lunes1).lte('fecha', prenSumarDias(domingoN, 1)),
+    supa.from('horario_salarios').select('*').eq('area_id', a),
+  ]);
+  const err = [sem, nov, reg, cer, fes, sal].find(r => r.error);
+  if(err) return { error: /horario_(festivos|salarios)|recargo|remunerado/.test(err.error.message) ? 'La pre-nómina todavía no está lista en la base de datos (falta correr sql/horarios_5_prenomina.sql).' : 'No se pudo cargar: ' + err.error.message };
+  const semanas = sem.data || [];
+  let asig = [];
+  if(semanas.length){
+    const r = await supa.from('horario_asignaciones').select('*').in('semana_id', semanas.map(s => s.id));
+    if(r.error) return { error: 'No se pudo cargar: ' + r.error.message };
+    asig = r.data || [];
+  }
+  const semPorLunes = {}; semanas.forEach(s => { semPorLunes[s.lunes] = s; });
+  const asigPor = {}; asig.forEach(x => { asigPor[x.semana_id + '|' + x.personal_id + '|' + x.dia] = x; });
+  const regPor = {}; (reg.data || []).forEach(x => { regPor[x.personal_id + '|' + x.fecha] = x; });
+  const cerrados = {}; (cer.data || []).forEach(x => { cerrados[x.fecha] = x; });
+  const festivos = {}; (fes.data || []).forEach(x => { festivos[x.fecha] = x.nombre; });
+  const salarios = {}; (sal.data || []).forEach(x => { salarios[x.personal_id] = Number(x.salario); });
+  return { lunes1, lunesN, semPorLunes, asigPor, regPor, cerrados, festivos, salarios, nov: nov.data || [], desde, hasta };
+}
+
+// Un día de una persona: tramos en minutos desde las 00:00 de ese día (ajustados con el registro) o la razón de no trabajar.
+function prenDia(d, p, iso, lunes, dia){
+  const n = d.nov.find(x => x.personal_id === p.id && x.tipo !== 'retardo' && x.desde <= iso && x.hasta >= iso);
+  if(n) return { tipo: 'nov', nov: n };
+  const reg = d.regPor[p.id + '|' + iso], sem = d.semPorLunes[lunes], a = sem ? d.asigPor[sem.id + '|' + p.id + '|' + dia] : null;
+  const prog = !d.cerrados[iso];
+  if(reg && reg.estado === 'falto') return { tipo: 'falta', reg };
+  let tramos = a && a.tipo !== 'descanso' ? horTramosMin(horTramosDe(a)) : [];
+  let sinHorario = false;
+  if(!tramos.length && reg && Number(reg.horas_reales) > 0){ tramos = [[8 * 60, 8 * 60 + Math.round(Number(reg.horas_reales) * 60)]]; sinHorario = true; }
+  if(!tramos.length) return { tipo: a && a.tipo === 'descanso' ? 'desc' : 'vacio' };
+  tramos = tramos.map(t => [...t]).sort((x, y) => x[0] - y[0]);
+  if(reg && !sinHorario){
+    if(reg.estado === 'tarde' && reg.minutos_tarde) tramos[0][0] = Math.min(tramos[0][1], tramos[0][0] + Number(reg.minutos_tarde));
+    if(reg.horas_reales !== null && reg.horas_reales !== undefined){
+      let delta = Math.round(Number(reg.horas_reales) * 60) - tramos.reduce((s, t) => s + t[1] - t[0], 0);
+      if(delta > 0) tramos[tramos.length - 1][1] += delta;
+      for(let i = tramos.length - 1; delta < 0 && i >= 0; i--){ const quita = Math.min(-delta, tramos[i][1] - tramos[i][0]); tramos[i][1] -= quita; delta += quita; }
+    }
+  }
+  return { tipo: 'turno', tramos, a, reg, prog, sinHorario };
+}
+
+function prenCalcular(d, per){
+  const jornada = horJornada() * 60;
+  const nd = horMin((HOR.cfg && HOR.cfg.nocturno_desde) || '19:00'), nh = horMin((HOR.cfg && HOR.cfg.nocturno_hasta) || '06:00');
+  const pRn = prenPct('recargo_nocturno', 35) / 100, pHed = prenPct('extra_diurna', 25) / 100, pHen = prenPct('extra_nocturna', 75) / 100;
+  const pDom = prenPct('recargo_dominical', 0) / 100, pFes = prenPct('recargo_festivo', 90) / 100, horasMes = prenPct('horas_mes', 180) || 180;
+  const factor = { ord: 0, rn: pRn, hed: 1 + pHed, hen: 1 + pHen };
+  const semanas = [];
+  for(let l = d.lunes1; l <= d.lunesN; l = prenSumarDias(l, 7)) semanas.push(l);
+  const personas = HOR.personal.filter(p => p.activo || Object.keys(d.regPor).some(k => k.startsWith(p.id + '|')) || Object.keys(d.asigPor).some(k => k.split('|')[1] === p.id));
+  return personas.map(p => {
+    const r = { p, dias: 0, min: { h: 0, ord: 0, rn: 0, hed: 0, hen: 0, dfd: 0, dfn: 0, hedf: 0, henf: 0 }, valor: 0, det: [],
+      incap: 0, vac: 0, permR: 0, permN: 0, vacante: 0, falta: 0, tarde: 0, tardeMin: 0, prog: 0, sal: d.salarios[p.id] };
+    const vhMin = r.sal ? r.sal / horasMes / 60 : 0;
+    for(const lunes of semanas){
+      let acum = 0;
+      for(let dia = 1; dia <= 7; dia++){
+        const iso = prenSumarDias(lunes, dia - 1), enPeriodo = iso >= d.desde && iso <= d.hasta;
+        const x = prenDia(d, p, iso, lunes, dia);
+        const det = { iso, dia, tipo: x.tipo, fest: d.festivos[iso] || null, min: 0, extra: 0, noct: 0, x };
+        if(x.tipo === 'turno'){
+          for(const [a, b] of x.tramos){
+            for(let m = a; m < b; m++){
+              const extra = acum >= jornada; acum++;
+              const isoM = m >= 1440 ? prenSumarDias(iso, Math.floor(m / 1440)) : iso;
+              if(isoM < d.desde || isoM > d.hasta) continue;
+              const hd = m % 1440, noct = nd > nh ? (hd >= nd || hd < nh) : (hd >= nd && hd < nh);
+              const dom = new Date(isoM + 'T12:00:00').getDay() === 0, fes = !!d.festivos[isoM];
+              const pct = Math.max(fes ? pFes : 0, dom ? pDom : 0), especial = pct > 0;
+              const k = extra ? (especial ? (noct ? 'henf' : 'hedf') : (noct ? 'hen' : 'hed')) : (especial ? (noct ? 'dfn' : 'dfd') : (noct ? 'rn' : 'ord'));
+              r.min[k]++; r.min.h++; det.min++;
+              if(extra) det.extra++; if(noct) det.noct++;
+              r.valor += vhMin * (k === 'dfd' ? pct : k === 'dfn' ? pct + pRn : k === 'hedf' ? 1 + pHed + pct : k === 'henf' ? 1 + pHen + pct : factor[k]);
+            }
+          }
+          if(enPeriodo && det.min){ r.dias++; if(x.prog && iso <= horHoy()) r.prog++; }
+          if(enPeriodo && x.reg && x.reg.estado === 'tarde'){ r.tarde++; r.tardeMin += Number(x.reg.minutos_tarde) || 0; }
+        }
+        if(!enPeriodo) continue;
+        if(x.tipo === 'nov'){
+          const t = x.nov.tipo;
+          if(t === 'incapacidad') r.incap++; else if(t === 'vacaciones') r.vac++; else if(t === 'vacante') r.vacante++;
+          else if(t === 'permiso'){ if(x.nov.remunerado === false) r.permN++; else r.permR++; }
+        }
+        if(x.tipo === 'falta') r.falta++;
+        r.det.push(det);
+      }
+    }
+    return r;
+  }).filter(r => r.min.h || r.incap || r.vac || r.permR || r.permN || r.falta || r.p.activo);
+}
+
+function prenRender(){
+  const box = document.getElementById('horSemana');
+  const { per, res, festivos, semPorLunes, cerrados, lunes1, lunesN } = PREN.datos;
+  const h2 = m => horNum(Math.round(m / 60 * 100) / 100);
+  const tot = k => res.reduce((s, r) => s + r.min[k], 0);
+  const periodos = prenPeriodos();
+  let html = prenControlesHtml(periodos, per);
+  // Avisos
+  const avisos = [];
+  const sinPublicar = [];
+  for(let l = lunes1; l <= lunesN; l = prenSumarDias(l, 7)){ const s = semPorLunes[l]; if(!s || s.estado !== 'publicada') sinPublicar.push(l); }
+  if(sinPublicar.length) avisos.push(['warn', `<b>${sinPublicar.length === 1 ? 'Una semana' : sinPublicar.length + ' semanas'} sin publicar</b> (${sinPublicar.map(l => 'desde el ' + new Date(l + 'T12:00:00').getDate() + ' ' + HOR_MESES[new Date(l + 'T12:00:00').getMonth()].slice(0, 3)).join(', ')}). Se cuenta lo que haya en el borrador.`]);
+  const abiertos = [];
+  for(let f = horIso(per.desde); f <= horIso(per.hasta) && f <= horHoy(); f = prenSumarDias(f, 1)) if(!cerrados[f] && res.some(r => r.det.some(x => x.iso === f && x.tipo === 'turno'))) abiertos.push(f);
+  if(abiertos.length) avisos.push(['warn', `<b>${abiertos.length} día${abiertos.length > 1 ? 's' : ''} sin cerrar en el registro</b> (${abiertos.map(f => HOR_DC[(new Date(f + 'T12:00:00').getDay() + 6) % 7].toLowerCase() + ' ' + Number(f.slice(8))).join(', ')}). Se cuentan con el horario programado; ciérralos en Registro del día antes de mandar el archivo.`]);
+  if(per.hasta >= new Date(new Date().toDateString())) avisos.push(['info', 'Esta quincena todavía no termina: los días que faltan se cuentan con el horario programado.']);
+  const fes = Object.entries(festivos).filter(([f]) => f >= horIso(per.desde) && f <= horIso(per.hasta));
+  if(fes.length) avisos.push(['info', `Festivo${fes.length > 1 ? 's' : ''} en la quincena: ${fes.map(([f, n]) => `<b>${HOR_DIAS[(new Date(f + 'T12:00:00').getDay() + 6) % 7].toLowerCase()} ${Number(f.slice(8))}</b> (${escapeHtml(n)})`).join(', ')}.`]);
+  if(PREN.pesos){ const sin = res.filter(r => !r.sal && r.min.h); if(sin.length) avisos.push(['warn', `Sin salario cargado: ${sin.map(r => escapeHtml(r.p.nombre)).join(', ')}. Cárgalo abajo en Salarios.`]); }
+  html += avisos.map(([t, a]) => `<div class="pren-aviso ${t}">${a}</div>`).join('');
+  // Totales
+  const extras = tot('hed') + tot('hen') + tot('hedf') + tot('henf'), noct = tot('rn') + tot('dfn') + tot('hen') + tot('henf'), domf = tot('dfd') + tot('dfn') + tot('hedf') + tot('henf');
+  html += `<div class="pren-totales">
+    <div class="pren-tot"><span class="field-label">Horas trabajadas</span><b>${h2(tot('h'))}</b><small>${res.filter(r => r.min.h).length} personas</small></div>
+    <div class="pren-tot"><span class="field-label">Horas extra</span><b>${h2(extras)}</b><small>más de ${horNum(horJornada())} h en la semana</small></div>
+    <div class="pren-tot"><span class="field-label">Horas nocturnas</span><b>${h2(noct)}</b><small>${horHoraCorta((HOR.cfg && HOR.cfg.nocturno_desde) || '19:00')} a ${horHoraCorta((HOR.cfg && HOR.cfg.nocturno_hasta) || '06:00')}</small></div>
+    <div class="pren-tot"><span class="field-label">Dominicales y festivas</span><b>${h2(domf)}</b><small>${prenPct('recargo_dominical', 0) > 0 ? 'domingos y festivos' : 'solo festivos (domingo ordinario)'}</small></div>
+    ${PREN.pesos ? `<div class="pren-tot pesos"><span class="field-label">Recargos y extras</span><b>${prenPesos(res.reduce((s, r) => s + r.valor, 0))}</b><small>aparte del salario básico</small></div>` : ''}
+  </div>`;
+  // Tabla
+  const cols = PREN_CATS;
+  html += `<div class="hor-grid-wrap"><table class="pren-tabla"><thead><tr><th>Persona</th><th>Días</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Novedades</th>${PREN.pesos ? '<th>Valor<br>recargos</th>' : ''}</tr></thead><tbody>`;
+  res.forEach(r => {
+    const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`,
+      r.permR && `<span class="badge warn">${r.permR} d permiso</span>`, r.permN && `<span class="badge warn">${r.permN} d permiso no rem.</span>`,
+      r.vacante && `<span class="badge info">${r.vacante} d vacante</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`,
+      r.tarde && `<span class="badge neutral">${r.tarde} tarde · ${r.tardeMin} min</span>`].filter(Boolean).join('');
+    const abierta = PREN.abierta === r.p.id;
+    html += `<tr class="pren-fila${abierta ? ' abierta' : ''}" tabindex="0" data-pren-p="${r.p.id}" aria-expanded="${abierta}"><td><span class="pren-chev" aria-hidden="true">›</span>${escapeHtml(r.p.nombre)}</td><td>${r.dias}</td>${cols.map(c => `<td>${r.min[c[0]] ? h2(r.min[c[0]]) : '<span class="pren-cero">·</span>'}</td>`).join('')}<td><div class="pren-chips">${chips || '<span class="pren-cero">·</span>'}</div></td>${PREN.pesos ? `<td>${r.sal ? prenPesos(r.valor) : '—'}</td>` : ''}</tr>`;
+    if(abierta) html += `<tr class="pren-detalle"><td colspan="${cols.length + 3 + (PREN.pesos ? 1 : 0)}"><div class="pren-dias">${r.det.map(x => prenDiaHtml(x)).join('')}</div>${PREN.pesos && r.sal ? `<p class="field-help pren-nota">Salario ${prenPesos(r.sal)} · valor hora ${prenPesos(r.sal / (prenPct('horas_mes', 180) || 180))} (salario ÷ ${horNum(prenPct('horas_mes', 180))} h).</p>` : ''}</td></tr>`;
+  });
+  html += `<tr class="pren-total"><td>Total</td><td></td>${cols.map(c => `<td>${h2(tot(c[0]))}</td>`).join('')}<td></td>${PREN.pesos ? `<td>${prenPesos(res.reduce((s, r) => s + r.valor, 0))}</td>` : ''}</tr></tbody></table></div>`;
+  html += prenSalariosHtml(res) + prenParametrosHtml();
+  box.innerHTML = html;
+}
+function prenPesos(n){ return '$' + Math.round(n).toLocaleString('es-CO'); }
+function prenDiaHtml(x){
+  const f = new Date(x.iso + 'T12:00:00');
+  const tit = `${HOR_DC[(f.getDay() + 6) % 7]} ${f.getDate()}${x.fest ? ' · festivo' : ''}`;
+  if(x.tipo === 'desc') return `<div class="pren-dia desc"><b>${tit}</b>Descanso</div>`;
+  if(x.tipo === 'vacio') return `<div class="pren-dia desc"><b>${tit}</b>Sin turno</div>`;
+  if(x.tipo === 'nov') return `<div class="pren-dia nov"><b>${tit}</b>${HOR_TIPOS[x.x.nov.tipo]}${x.x.nov.tipo === 'permiso' && x.x.nov.remunerado === false ? ' no remunerado' : ''}</div>`;
+  if(x.tipo === 'falta') return `<div class="pren-dia nov"><b>${tit}</b>Faltó${x.x.reg.nota ? ': ' + escapeHtml(x.x.reg.nota) : ''}</div>`;
+  const a = x.x.a, cod = x.x.sinHorario ? 'sin horario' : (a && a.codigo) || '';
+  const nota = [x.x.reg && x.x.reg.estado === 'tarde' ? `llegó ${x.x.reg.minutos_tarde || '?'} min tarde` : '', x.x.sinHorario ? 'vino sin turno: se cuenta de día' : '', x.x.prog && x.iso <= horHoy() ? 'sin cerrar: programado' : x.x.prog ? 'programado' : ''].filter(Boolean).join(' · ');
+  return `<div class="pren-dia${x.fest ? ' fest' : ''}${x.x.prog ? ' prog' : ''}"><b>${tit}</b><span class="pren-cod">${escapeHtml(cod)}</span> · ${horNum(Math.round(x.min / 60 * 100) / 100)} h${x.noct ? ` · ${horNum(Math.round(x.noct / 60 * 100) / 100)} noct.` : ''}${x.extra ? ` · <span style="color:var(--warn)">${horNum(Math.round(x.extra / 60 * 100) / 100)} extra</span>` : ''}${nota ? `<br><i>${nota}</i>` : ''}</div>`;
+}
+function prenSalariosHtml(res){
+  return `<details class="pren-sec"${PREN.pesos ? ' open' : ''}><summary>Salarios <span class="badge neutral">Solo admin</span></summary><div class="pren-cuerpo">
+    <p class="field-help">Salario mensual básico de cada persona. Solo lo ven los admin; los líderes de horarios no. Se usa para el valor de los recargos y las horas extra.</p>
+    <div class="pren-salarios">${HOR.personal.filter(p => p.activo || PREN.datos.salarios[p.id]).map(p => `<label class="pren-sal"><span>${escapeHtml(p.nombre)}</span><input type="number" min="0" step="1000" inputmode="numeric" data-pren-sal="${p.id}" value="${PREN.datos.salarios[p.id] || ''}" placeholder="Sin cargar" aria-label="Salario de ${escapeHtml(p.nombre)}"></label>`).join('')}</div>
+  </div></details>`;
+}
+function prenParametrosHtml(){
+  const inp = (campo, label, val, extra) => `<label class="pren-param"><span>${label}</span><input type="number" data-pren-param="${campo}" value="${val}"${extra || ''}></label>`;
+  const pDom = prenPct('recargo_dominical', 0), pFes = prenPct('recargo_festivo', 90), pRn = prenPct('recargo_nocturno', 35), pHed = prenPct('extra_diurna', 25), pHen = prenPct('extra_nocturna', 75);
+  return `<details class="pren-sec"><summary>Parámetros <span class="badge warn">Confírmalos con tu contador</span></summary><div class="pren-cuerpo">
+    <div class="pren-params">
+      ${inp('jornada_max', 'Jornada semanal (h): lo que pase es extra', horJornada(), ' min="1" max="60" step="0.5"')}
+      ${inp('recargo_nocturno', 'Recargo nocturno %', pRn, ' min="0" max="200"')}
+      ${inp('extra_diurna', 'Hora extra diurna: recargo %', pHed, ' min="0" max="200"')}
+      ${inp('extra_nocturna', 'Hora extra nocturna: recargo %', pHen, ' min="0" max="200"')}
+      ${inp('recargo_dominical', 'Recargo dominical %', pDom, ' min="0" max="200"')}
+      ${inp('recargo_festivo', 'Recargo festivo %', pFes, ' min="0" max="200"')}
+      ${inp('horas_mes', 'Horas al mes (valor hora = salario ÷ horas)', prenPct('horas_mes', 180), ' min="100" max="240"')}
+    </div>
+    <label class="field" style="margin:10px 0 0"><span class="field-label">Nota sobre los domingos</span><input type="text" data-pren-param="nota_dominical" maxlength="300" value="${escapeHtml((HOR.cfg && HOR.cfg.nota_dominical) || '')}"></label>
+    <table class="hor-tabla" style="margin-top:12px"><thead><tr><th>Tipo de hora</th><th class="num">Se paga</th></tr></thead><tbody>
+      <tr><td>Ordinaria nocturna</td><td class="num">+${horNum(pRn)} % de recargo</td></tr>
+      <tr><td>Extra diurna</td><td class="num">${horNum(100 + pHed)} %</td></tr>
+      <tr><td>Extra nocturna</td><td class="num">${horNum(100 + pHen)} %</td></tr>
+      <tr><td>Domingo diurna / nocturna</td><td class="num">${pDom ? `+${horNum(pDom)} % / +${horNum(pDom + pRn)} %` : 'como día ordinario'}</td></tr>
+      <tr><td>Festivo diurna / nocturna</td><td class="num">+${horNum(pFes)} % / +${horNum(pFes + pRn)} %</td></tr>
+      <tr><td>Extra en festivo diurna / nocturna</td><td class="num">${horNum(100 + pHed + pFes)} % / ${horNum(100 + pHen + pFes)} %</td></tr>
+    </tbody></table>
+    <p class="field-help">Horas extra por semana: las que pasen de ${horNum(horJornada())} h entre lunes y domingo, contadas en el orden en que se trabajaron. El horario nocturno se cambia en Configuración → Reglas.</p>
+  </div></details>`;
+}
+
+function prenCsv(detalle){
+  const { res, per } = PREN.datos;
+  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const n = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
+  const est = id => { const e = HOR.estaciones.find(x => x.id === id); return e ? e.nombre : ''; };
+  let filas;
+  if(!detalle){
+    filas = [['Persona', 'Estación', 'Cargo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar']
+      .concat(PREN.pesos ? ['Salario', 'Valor hora', 'Valor recargos y extras'] : [])];
+    res.forEach(r => filas.push([r.p.nombre, est(r.p.estacion_id), r.p.cargo || '', r.dias, ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.falta, r.tarde, r.tardeMin, r.prog]
+      .concat(PREN.pesos ? [r.sal || '', r.sal ? Math.round(r.sal / (prenPct('horas_mes', 180) || 180)) : '', r.sal ? Math.round(r.valor) : ''] : [])));
+  } else {
+    filas = [['Persona', 'Fecha', 'Día', 'Festivo', 'Tipo', 'Turno', 'Entra - sale', 'Horas', 'Nocturnas', 'Extra', 'Estado', 'Nota']];
+    res.forEach(r => r.det.forEach(x => {
+      const f = new Date(x.iso + 'T12:00:00'), a = x.x.a;
+      const tipo = { turno: 'Trabajó', desc: 'Descanso', vacio: 'Sin turno', falta: 'Faltó', nov: x.x.nov ? HOR_TIPOS[x.x.nov.tipo] : '' }[x.tipo];
+      filas.push([r.p.nombre, x.iso, HOR_DIAS[(f.getDay() + 6) % 7], x.fest || '', tipo, x.tipo === 'turno' ? (x.x.sinHorario ? 'sin horario' : (a && a.codigo) || '') : '',
+        x.tipo === 'turno' && a ? horTramosTexto(horTramosDe(a)) : '', x.tipo === 'turno' ? n(x.min) : '', x.tipo === 'turno' ? n(x.noct) : '', x.tipo === 'turno' ? n(x.extra) : '',
+        x.tipo === 'turno' ? (x.x.prog ? 'Programado' : 'Cerrado') : '', [x.x.reg && x.x.reg.estado === 'tarde' ? 'Llegó ' + (x.x.reg.minutos_tarde || '?') + ' min tarde' : '', x.x.reg && x.x.reg.nota || '', x.x.nov && x.x.nov.nota || ''].filter(Boolean).join(' · ')]);
+    }));
+  }
+  const csv = '﻿' + filas.map(f => f.map(celda).join(';')).join('\r\n');
+  const nombre = ['prenomina', detalle ? 'detalle' : '', currentLocation.name, currentArea.name, horIso(per.desde) + '_al_' + horIso(per.hasta)].filter(Boolean).join('_').replace(/[^\w\-áéíóúñÁÉÍÓÚÑ]+/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = nombre + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('Archivo descargado', 'ok');
+}
+
+document.getElementById('horSemana').addEventListener('click', e => {
+  if(HOR.sub !== 'prenomina' || !PREN.datos) return;
+  if(e.target.closest('#prenPesos')){ PREN.pesos = !PREN.pesos; prenRender(); return; }
+  const b = e.target.closest('[data-pren]');
+  if(b){ prenCsv(b.dataset.pren === 'detalle'); return; }
+  const f = e.target.closest('.pren-fila');
+  if(f){ PREN.abierta = PREN.abierta === f.dataset.prenP ? null : f.dataset.prenP; prenRender(); }
+});
+document.getElementById('horSemana').addEventListener('keydown', e => {
+  const f = e.target.closest('.pren-fila'); if(!f || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault(); PREN.abierta = PREN.abierta === f.dataset.prenP ? null : f.dataset.prenP; prenRender();
+  document.querySelector(`.pren-fila[data-pren-p="${f.dataset.prenP}"]`)?.focus();
+});
+document.getElementById('horSemana').addEventListener('change', async e => {
+  if(HOR.sub !== 'prenomina') return;
+  if(e.target.id === 'prenPeriodo'){ PREN.periodo = e.target.value; PREN.abierta = null; horPintarPrenomina(); return; }
+  const sal = e.target.dataset.prenSal;
+  if(sal){
+    const v = e.target.value === '' ? null : Math.round(Number(e.target.value));
+    if(v !== null && !(v >= 0)){ showToast('Escribe el salario en pesos, sin puntos', 'warn'); return; }
+    const res = v === null
+      ? await supa.from('horario_salarios').delete().eq('personal_id', sal)
+      : await supa.from('horario_salarios').upsert({ personal_id: sal, area_id: HOR.areaId, salario: v, actualizado_por: profile.name || session.user.email, updated_at: new Date().toISOString() }, { onConflict: 'personal_id' });
+    if(res.error){ showToast('No se pudo guardar: ' + res.error.message, 'danger'); return; }
+    if(v === null) delete PREN.datos.salarios[sal]; else PREN.datos.salarios[sal] = v;
+    PREN.datos.res = prenCalcular(PREN.datos, PREN.datos.per);
+    showToast('Salario guardado', 'ok');
+    if(PREN.pesos){ const y = window.scrollY; prenRender(); window.scrollTo(0, y); }
+    return;
+  }
+  const campo = e.target.dataset.prenParam;
+  if(campo){
+    let v = e.target.value;
+    if(campo !== 'nota_dominical'){ v = Number(String(v).replace(',', '.')); if(!(v >= 0)){ showToast('Escribe un número', 'warn'); return; } }
+    if(await horGuardarConfig('horario_config', HOR.areaId, { [campo]: v })){
+      PREN.datos.res = prenCalcular(PREN.datos, PREN.datos.per);
+      const abierto = [...document.querySelectorAll('.pren-sec')].map(d => d.open);
+      prenRender();
+      document.querySelectorAll('.pren-sec').forEach((d, i) => { d.open = abierto[i]; });
+    }
+  }
 });
 
 /* --- Configuración (admin y líderes): reglas, estaciones, turnos, personal, tareas. Se desactiva, no se borra. --- */
