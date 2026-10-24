@@ -531,6 +531,9 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+.loc-empresa{flex-basis:100%; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,2fr) auto; gap:8px; align-items:end; margin-top:10px;}
+.loc-empresa label{display:flex; flex-direction:column; gap:4px; min-width:0;}
+@media (max-width:760px){ .loc-empresa{grid-template-columns:1fr;} }
 .admin-grupos{display:flex; gap:4px; padding:4px; margin-bottom:var(--space-3); background:var(--surface-2); border-radius:var(--radius-md); overflow-x:auto; max-width:100%;}
 .admin-grupos button{display:inline-flex; align-items:center; gap:8px; border:none; background:transparent; color:var(--text-muted); font:600 14.5px 'Inter',sans-serif; border-radius:8px; min-height:44px; padding:0 16px; cursor:pointer; white-space:nowrap;}
 .admin-grupos button:hover{color:var(--text);}
@@ -9771,10 +9774,24 @@ async function loadLocationsAdmin(){
           <button class="btn btn-secondary btn-small" data-toggle-loc="${loc.id}" data-toggle-loc-active="${isActive}">${isActive ? 'Desactivar' : 'Activar'}</button>
           ${profile.is_super_admin ? `<button class="btn btn-danger btn-small" data-del-loc="${loc.id}" data-del-loc-name="${escapeHtml(loc.name)}">Eliminar</button>` : ''}
         </div>
+        <div class="loc-empresa" data-empresa-loc="${loc.id}">
+          <label><span class="field-label">NIT</span><input type="text" data-emp="nit" maxlength="20" value="${escapeHtml(loc.nit || '')}" placeholder="900.000.000-0"></label>
+          <label><span class="field-label">Razón social</span><input type="text" data-emp="razon_social" maxlength="120" value="${escapeHtml(loc.razon_social || '')}" placeholder="Como sale en el RUT"></label>
+          <label><span class="field-label">Dirección</span><input type="text" data-emp="direccion_fiscal" maxlength="120" value="${escapeHtml(loc.direccion_fiscal || '')}"></label>
+          <button type="button" class="btn btn-secondary btn-small" data-guardar-empresa="${loc.id}">Guardar datos</button>
+        </div>
       </div>`;
     }).join('');
     listBox.querySelectorAll('[data-del-loc]').forEach(btn=>{
       btn.addEventListener('click', ()=>openDeleteLocationModal(btn.dataset.delLoc, btn.dataset.delLocName));
+    });
+    listBox.querySelectorAll('[data-guardar-empresa]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const box = btn.closest('[data-empresa-loc]'), datos = {};
+        box.querySelectorAll('[data-emp]').forEach(i => { datos[i.dataset.emp] = i.value.trim() || null; });
+        const { error } = await supa.from('locations').update(datos).eq('id', btn.dataset.guardarEmpresa);
+        showToast(error ? 'Error: ' + error.message : 'Datos de la empresa guardados', error ? undefined : 'ok');
+      });
     });
     listBox.querySelectorAll('[data-enter-loc]').forEach(btn=>{
       btn.addEventListener('click', ()=>superAdminEnterLocation(btn.dataset.enterLoc));
