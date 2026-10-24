@@ -531,6 +531,8 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+.pren-sincerrar{margin:12px 0; padding:0 0 0 18px; max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; font-size:14px;}
+.pren-sincerrar span{color:var(--text-muted); font-size:13px;}
 .vivo-quien{position:fixed; top:12px; right:16px; z-index:60; display:flex; align-items:center; gap:4px; padding:4px 12px 4px 4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); box-shadow:var(--shadow-1); max-width:calc(100vw - 32px);}
 .vivo-quien[hidden], .vivo-barra[hidden]{display:none;}
 .vivo-ini{width:28px; height:28px; border-radius:50%; display:inline-grid; place-items:center; background:var(--accent); color:var(--accent-text, #1F1810); font:600 11px 'IBM Plex Mono',monospace; border:2px solid var(--surface); margin-left:-6px;}
@@ -2791,7 +2793,15 @@ function applyAreaModuleVisibility(modules){
     const tabBtn = document.getElementById('tab-'+m);
     if(tabBtn) tabBtn.style.display = modules.includes(m) ? '' : 'none';
   });
-  const firstAvailable = MODULE_TABS.find(m => modules.includes(m));
+  // Horarios: solo admin, líderes de horarios del área y Recursos humanos (los demás no ven la pestaña).
+  const horTab = document.getElementById('tab-horarios');
+  const conHorarios = modules.includes('horarios') && !esRrhh() && !(profile && (profile.role === 'admin' || profile.is_super_admin));
+  if(conHorarios && horTab){
+    horTab.style.display = 'none';
+    const area = currentArea && currentArea.id;
+    if(area) supa.rpc('horario_puede_editar', { p_area: area }).then(({ data }) => { if(data && currentArea && currentArea.id === area){ horTab.style.display = ''; layoutNav(); } });
+  }
+  const firstAvailable = MODULE_TABS.find(m => modules.includes(m) && !(m === 'horarios' && conHorarios));
   if(firstAvailable) switchTab(firstAvailable);
   layoutNav();
 }
@@ -3803,6 +3813,7 @@ async function horAlEntrar(){
     document.getElementById('horSemana').innerHTML = '<div class="empty-note">Cargando...</div>';
     await horCargarConfig();
   }
+  if(!HOR.editor && !esRrhh() && !HOR.error){ document.getElementById('horSubtabs').hidden = true; document.getElementById('horSemana').innerHTML = '<div class="empty-note">Horarios es solo para los admin y los líderes de horarios del área. Si necesitas entrar, pídele a un admin que te marque como líder de horarios.</div>'; return; }
   if(HOR.subPedida){ HOR.sub = HOR.subPedida; HOR.subPedida = null; }
   if(HOR.lunesPedido){ HOR.lunes = HOR.lunesPedido; HOR.diaReg = HOR.diaRegPedido; HOR.lunesPedido = null; }
   horPintarSub();
@@ -5231,11 +5242,35 @@ function prenParametrosHtml(){
 }
 
 // Un solo archivo con todos los puntos y áreas que tienen Horarios (Recursos humanos y super admin).
+// Aviso antes de descargar. grupos: [{ titulo, cerrada, personas: [{ nombre, dias }] }]. Resuelve true si se descarga igual.
+function prenConfirmarSinCerrar(grupos){
+  const conPend = grupos.filter(g => !g.cerrada || g.personas.length);
+  if(!conPend.length) return Promise.resolve(true);
+  return new Promise(res => {
+    let m = document.getElementById('prenSinCerrarModal');
+    if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'prenSinCerrarModal'; document.body.appendChild(m); }
+    const dias = conPend.reduce((a, g) => a + g.personas.reduce((b, p) => b + p.dias, 0), 0);
+    const sinQuin = conPend.filter(g => !g.cerrada).length;
+    m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="prenSinCerrarTit">
+      <h3 id="prenSinCerrarTit">Hay turnos sin cerrar</h3>
+      <div class="modal-sub">${dias ? dias + ' turno' + (dias === 1 ? '' : 's') + ' sin cerrar en el registro del día' : ''}${dias && sinQuin ? ' y ' : ''}${sinQuin ? (sinQuin === 1 ? 'la quincena no está cerrada' : sinQuin + ' áreas sin cerrar la quincena') : ''}. Esos días se cuentan con el horario programado, no con lo que de verdad se trabajó: el reporte puede cambiar cuando el líder los cierre.</div>
+      <ul class="pren-sincerrar">${conPend.map(g => `<li><b>${escapeHtml(g.titulo)}</b>${g.cerrada ? '' : ' · <span class="badge warn">Quincena sin cerrar</span>'}${g.personas.length ? '<br><span>' + g.personas.map(p => escapeHtml(p.nombre) + ' (' + p.dias + ')').join(', ') + '</span>' : ''}</li>`).join('')}</ul>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" data-psc="no">Cancelar</button><button type="button" class="btn btn-accent" data-psc="si">Descargar igual</button></div>
+    </div>`;
+    m.classList.add('open');
+    const cerrar = v => { m.classList.remove('open'); m.onclick = null; document.removeEventListener('keydown', esc); res(v); };
+    const esc = e => { if(e.key === 'Escape') cerrar(false); };
+    document.addEventListener('keydown', esc);
+    m.onclick = e => { const b = e.target.closest('[data-psc]'); if(b) cerrar(b.dataset.psc === 'si'); else if(e.target === m) cerrar(false); };
+    m.querySelector('[data-psc="si"]').focus();
+  });
+}
+const prenPendientes = res => res.filter(r => r.prog > 0).map(r => ({ nombre: r.p.nombre, dias: r.prog }));
 async function prenCsvTodos(btn){
   const per = PREN.datos.per;
   btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Armando…';
   const guardado = { areaId: HOR.areaId, cfg: HOR.cfg, estaciones: HOR.estaciones, personal: HOR.personal, turnos: HOR.turnos };
-  const filas = [];
+  const filas = [], grupos = [];
   try {
     const { data: locs } = await supa.from('locations').select('id, name, slug, activo').order('name');
     for(const loc of (locs || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug))){
@@ -5252,6 +5287,7 @@ async function prenCsvTodos(btn){
         const datos = await prenCargar(per);
         if(datos.error) continue;
         const res = prenCalcular(datos, per);
+        grupos.push({ titulo: loc.name + ' · ' + a.name, cerrada: !!datos.cerrada, personas: prenPendientes(res) });
         const n = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
         const hm = prenPct('horas_mes', 210) || 210;
         res.forEach(r => filas.push([loc.name, a.name, r.p.nombre, (HOR.estaciones.find(e => e.id === r.p.estacion_id) || {}).nombre || '', r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias,
@@ -5264,6 +5300,7 @@ async function prenCsvTodos(btn){
     btn.disabled = false; btn.textContent = txt;
   }
   if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
+  if(!(await prenConfirmarSinCerrar(grupos))) return;
   const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
   const celda = v => { const t = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
   const csv = '\uFEFF' + [cab].concat(filas).map(f => f.map(celda).join(';')).join('\r\n');
@@ -5310,7 +5347,12 @@ document.getElementById('horSemana').addEventListener('click', e => {
   if(e.target.closest('#prenPesos')){ PREN.pesos = !PREN.pesos; prenRender(); return; }
   const b = e.target.closest('[data-pren]');
   if(b && b.dataset.pren === 'todos'){ prenCsvTodos(b); return; }
-  if(b){ prenCsv(b.dataset.pren === 'detalle'); return; }
+  if(b){
+    const d = PREN.datos;
+    prenConfirmarSinCerrar([{ titulo: (currentLocation ? currentLocation.name + ' · ' : '') + (currentArea ? currentArea.name : ''), cerrada: !!d.cerrada, personas: prenPendientes(d.res) }])
+      .then(ok => { if(ok) prenCsv(b.dataset.pren === 'detalle'); });
+    return;
+  }
   const f = e.target.closest('.pren-fila');
   if(f){ PREN.abierta = PREN.abierta === f.dataset.prenP ? null : f.dataset.prenP; prenRender(); }
 });
