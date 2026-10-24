@@ -1030,6 +1030,15 @@ nav.tabs button{position:relative;}
 .hor-marca.noct{background:var(--info-bg); color:var(--info);}
 .hor-otro-prev{font-size:13px; color:var(--text-muted); margin:0 0 8px;}
 .pren-controles{align-items:flex-end;}
+.user-pass{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
+.user-pass[hidden]{display:none;}
+.user-pass input{flex:1; min-width:180px;}
+.user-crear{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:var(--space-4);}
+.user-crear h3{margin:0 0 10px; font-family:'Playfair Display',serif; font-size:20px;}
+.user-crear .seg-acceso{display:inline-flex; gap:4px; padding:4px; background:var(--surface-2); border-radius:var(--radius-md); margin-bottom:var(--space-3);}
+.user-crear .seg-acceso button{border:none; background:transparent; border-radius:8px; min-height:38px; padding:0 14px; font:600 13.5px 'Inter',sans-serif; color:var(--text-muted); cursor:pointer;}
+.user-crear .seg-acceso button.on{background:var(--surface); color:var(--text); box-shadow:var(--shadow-1);}
+.user-crear .areas{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 12px;}
 .kio{position:fixed; inset:0; z-index:300; background:var(--text); color:var(--bg); display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);}
 .kio[hidden]{display:none;}
 .kio-cam{position:relative; overflow:hidden; background:#000;}
@@ -1381,8 +1390,8 @@ nav.tabs button{position:relative;}
     <div class="login-sub">Biblia de Cocina · Acceso con cuenta</div>
     <div class="login-error" id="loginError"></div>
     <div class="field">
-      <label class="field-label">Correo</label>
-      <input type="email" id="loginEmail" placeholder="tucorreo@ejemplo.com">
+      <label class="field-label" for="loginEmail">Correo o cédula</label>
+      <input type="text" id="loginEmail" placeholder="Tu correo o tu número de cédula" autocomplete="username" autocapitalize="off" spellcheck="false">
     </div>
     <div class="field">
       <label class="field-label">Contraseña</label>
@@ -1757,6 +1766,7 @@ nav.tabs button{position:relative;}
           <h2>Usuarios y permisos</h2>
         </div>
         <div class="empty-note" style="margin-bottom:14px;">Cambia el rol de cada persona entre <b>Cocina</b> (solo ver recetas, dejar observaciones, registrar producción) y <b>Admin</b> (además, ve todo el historial, puede anular registros y exportar).</div>
+        <div id="userCrear"></div>
         <div id="usersList"></div>
       </div>
 
@@ -2542,23 +2552,28 @@ function showToast(msg, tipo){
 }
 
 /* ---------- AUTH ---------- */
-// Solo inicio de sesión: las cuentas las crea el super admin en Supabase (registro público apagado).
+// Solo inicio de sesión: las cuentas las crea el super admin (Admin → Usuarios, función usuarios-admin; registro público apagado).
+// Quien entra con cédula tiene un correo interno "<cédula>@biblia-cocina.vercel.app" que nunca ve.
+const DOMINIO_CEDULA = 'biblia-cocina.vercel.app';
+function correoDeAcceso(txt){ const t = String(txt || '').trim(); return /^[0-9.\s-]{5,16}$/.test(t) && /[0-9]/.test(t) ? t.replace(/\D/g, '') + '@' + DOMINIO_CEDULA : t.toLowerCase(); }
+function accesoTexto(email){ const e = String(email || ''); return e.endsWith('@' + DOMINIO_CEDULA) ? 'Cédula ' + e.split('@')[0] : e; }
 
+['loginEmail', 'loginPassword'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if(e.key === 'Enter') document.getElementById('loginSubmit').click(); }));
 document.getElementById('loginSubmit').addEventListener('click', async ()=>{
-  const email = document.getElementById('loginEmail').value.trim();
+  const email = correoDeAcceso(document.getElementById('loginEmail').value);
   const password = document.getElementById('loginPassword').value;
   const errBox = document.getElementById('loginError');
   errBox.classList.remove('show');
 
   if(!email || !password){
-    errBox.textContent = 'Escribe tu correo y contraseña.';
+    errBox.textContent = 'Escribe tu correo o tu cédula, y tu contraseña.';
     errBox.classList.add('show');
     return;
   }
 
   const { data, error } = await supa.auth.signInWithPassword({ email, password });
   if(error){
-    errBox.textContent = error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos.' : error.message;
+    errBox.textContent = error.message === 'Invalid login credentials' ? 'Correo, cédula o contraseña incorrectos.' : error.message;
     errBox.classList.add('show');
     return;
   }
@@ -9680,17 +9695,77 @@ async function loadAccessMatrix(){
 }
 
 /* ---------- GESTIÓN DE USUARIOS ---------- */
+/* Crear usuarios y cambiar contraseñas (función usuarios-admin, solo super admin). */
+let USUARIO_ACCESO = 'cedula';
+async function usuariosAdmin(body){
+  const { data, error } = await supa.functions.invoke('usuarios-admin', { body });
+  if(error){
+    let msg = error.message;
+    try { const j = await error.context.json(); if(j && j.error) msg = j.error; } catch(_){}
+    if(/Failed to send|404|not found/i.test(msg)) msg = 'Falta publicar la función usuarios-admin en Supabase';
+    return { error: msg };
+  }
+  return data && data.error ? { error: data.error } : (data || {});
+}
+async function usuarioPintarCrear(){
+  const box = document.getElementById('userCrear');
+  if(!profile || !profile.is_super_admin){ box.innerHTML = ''; return; }
+  const { data: areas } = await supa.from('areas').select('id, name').eq('location_id', currentLocation.id).order('created_at', { ascending: true });
+  box.innerHTML = `<form class="user-crear" id="userCrearForm">
+    <h3>Crear usuario</h3>
+    <div class="seg-acceso" role="group" aria-label="Cómo entra"><button type="button" data-acceso="cedula" class="${USUARIO_ACCESO === 'cedula' ? 'on' : ''}">Entra con cédula</button><button type="button" data-acceso="correo" class="${USUARIO_ACCESO === 'correo' ? 'on' : ''}">Entra con correo</button></div>
+    <div class="field-row">
+      <div class="field">${USUARIO_ACCESO === 'cedula'
+        ? '<label class="field-label" for="ucCedula">Cédula</label><input type="text" id="ucCedula" inputmode="numeric" maxlength="12" placeholder="Solo números" autocomplete="off">'
+        : '<label class="field-label" for="ucCorreo">Correo</label><input type="email" id="ucCorreo" placeholder="persona@correo.com" autocomplete="off">'}</div>
+      <div class="field"><label class="field-label" for="ucNombre">Nombre</label><input type="text" id="ucNombre" maxlength="80" placeholder="Nombre y apellido" autocomplete="off"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label" for="ucPass">Contraseña (mínimo 8)</label><input type="text" id="ucPass" autocomplete="new-password" placeholder="Se la das a la persona"></div>
+      <div class="field"><label class="field-label" for="ucRol">Rol</label><select id="ucRol"><option value="cocina">Cocina</option><option value="admin">Admin</option></select></div>
+    </div>
+    <span class="field-label">Áreas de ${escapeHtml(currentLocation.name)}</span>
+    <div class="areas">${(areas || []).map(a => `<label class="chip-check"><input type="checkbox" data-uc-area="${a.id}">${escapeHtml(a.name)}</label>`).join('') || '<span class="field-help">Este punto no tiene áreas.</span>'}</div>
+    <button type="submit" class="btn btn-accent">Crear usuario</button>
+    <p class="field-help" style="margin-top:8px">Queda con acceso a ${escapeHtml(currentLocation.name)} y a las áreas que marques. Si entra con cédula, en la pantalla de entrada escribe su cédula y la contraseña. Si la olvida, aquí abajo le pones una nueva con "Cambiar contraseña".</p>
+  </form>`;
+}
+document.getElementById('userCrear').addEventListener('click', e => {
+  const b = e.target.closest('[data-acceso]'); if(!b) return;
+  USUARIO_ACCESO = b.dataset.acceso; usuarioPintarCrear();
+});
+document.getElementById('userCrear').addEventListener('submit', async e => {
+  if(e.target.id !== 'userCrearForm') return;
+  e.preventDefault();
+  const v = id => (document.getElementById(id) || {}).value?.trim() || '';
+  const cedula = USUARIO_ACCESO === 'cedula' ? v('ucCedula').replace(/\D/g, '') : '', correo = USUARIO_ACCESO === 'correo' ? v('ucCorreo') : '';
+  const nombre = v('ucNombre'), password = (document.getElementById('ucPass').value || '');
+  if(USUARIO_ACCESO === 'cedula' && !/^[0-9]{5,12}$/.test(cedula)){ showToast('La cédula debe tener de 5 a 12 números', 'warn'); return; }
+  if(USUARIO_ACCESO === 'correo' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)){ showToast('Escribe un correo válido', 'warn'); return; }
+  if(!nombre){ showToast('Escribe el nombre', 'warn'); return; }
+  if(password.length < 8){ showToast('La contraseña debe tener al menos 8 caracteres', 'warn'); return; }
+  const area_ids = [...document.querySelectorAll('[data-uc-area]:checked')].map(x => x.dataset.ucArea);
+  const btn = e.target.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Creando…';
+  const r = await usuariosAdmin({ accion: 'crear', cedula, correo, nombre, password, rol: v('ucRol') || 'cocina', location_id: currentLocation.id, area_ids });
+  btn.disabled = false; btn.textContent = 'Crear usuario';
+  if(r.error){ showToast(r.error, 'danger'); return; }
+  showToast(`Usuario creado. ${nombre.split(' ')[0]} entra con ${cedula ? 'su cédula ' + cedula : correo} y la contraseña que pusiste.`, 'ok');
+  loadUsers();
+});
+
 async function loadUsers(){
   const wrap = document.getElementById('usersList');
   wrap.innerHTML = '<div class="empty-note">Cargando usuarios...</div>';
   const { data, error } = await supa.from('profiles').select('*').order('created_at', {ascending:true});
   if(error){ wrap.innerHTML = '<div class="empty-note">No se pudo cargar la lista de usuarios.</div>'; return; }
   if(!data || data.length===0){ wrap.innerHTML = '<div class="empty-note">Aún no hay usuarios registrados.</div>'; return; }
+  usuarioPintarCrear();
   wrap.innerHTML = data.map(u=>`
     <div class="user-row" data-id="${u.id}">
       <div class="u-main">
         <div class="u-name">${escapeHtml(u.name || '(sin nombre)')}</div>
-        <div class="u-email">${escapeHtml(u.email || '')}</div>
+        <div class="u-email">${escapeHtml(accesoTexto(u.email || ''))}</div>
+        <div class="user-pass" data-pass-box="${u.id}" hidden><input type="password" data-pass-input="${u.id}" placeholder="Contraseña nueva (mín. 8)" autocomplete="new-password" aria-label="Contraseña nueva de ${escapeHtml(u.name || '')}"><button type="button" class="btn btn-accent btn-small" data-pass-guardar="${u.id}">Guardar</button></div>
       </div>
       <div class="u-actions">
         <select data-role-for="${u.id}">
@@ -9702,9 +9777,24 @@ async function loadUsers(){
           Super admin
         </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
+        <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
     </div>
   `).join('');
+  wrap.querySelectorAll('[data-pass-abrir]').forEach(b => b.addEventListener('click', () => {
+    const box = wrap.querySelector(`[data-pass-box="${b.dataset.passAbrir}"]`); box.hidden = !box.hidden;
+    if(!box.hidden) box.querySelector('input').focus();
+  }));
+  wrap.querySelectorAll('[data-pass-guardar]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.passGuardar, inp = wrap.querySelector(`[data-pass-input="${id}"]`);
+    if((inp.value || '').length < 8){ showToast('La contraseña debe tener al menos 8 caracteres', 'warn'); inp.focus(); return; }
+    b.disabled = true;
+    const r = await usuariosAdmin({ accion: 'password', user_id: id, password: inp.value });
+    b.disabled = false;
+    if(r.error){ showToast(r.error, 'danger'); return; }
+    inp.value = ''; wrap.querySelector(`[data-pass-box="${id}"]`).hidden = true;
+    showToast('Contraseña cambiada. Avísale a la persona su contraseña nueva.', 'ok');
+  }));
   wrap.querySelectorAll('[data-save-role]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.dataset.saveRole;
