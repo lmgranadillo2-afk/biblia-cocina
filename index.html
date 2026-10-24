@@ -531,6 +531,28 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+.admin-grupos{display:flex; gap:4px; padding:4px; margin-bottom:var(--space-3); background:var(--surface-2); border-radius:var(--radius-md); overflow-x:auto; max-width:100%;}
+.admin-grupos button{display:inline-flex; align-items:center; gap:8px; border:none; background:transparent; color:var(--text-muted); font:600 14.5px 'Inter',sans-serif; border-radius:8px; min-height:44px; padding:0 16px; cursor:pointer; white-space:nowrap;}
+.admin-grupos button:hover{color:var(--text);}
+.admin-grupos button.active{background:var(--surface); color:var(--text); box-shadow:var(--shadow-1);}
+.admin-grupos button:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.admin-cnt{min-width:20px; height:20px; padding:0 6px; border-radius:var(--radius-pill); background:var(--danger); color:var(--on-state); font:600 11px 'IBM Plex Mono',monospace; display:inline-grid; place-items:center;}
+.admin-cnt[hidden]{display:none;}
+.admin-subtabs[hidden], .admin-subtabs button[hidden]{display:none !important;}
+.ainicio{display:flex; flex-direction:column; gap:16px;}
+.ainicio h2{font-family:'Playfair Display',serif; font-size:24px; margin:0;}
+.ainicio .sub{color:var(--text-muted); font-size:14px; margin:-10px 0 0;}
+.ainicio-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap:12px;}
+.ainicio-card{all:unset; box-sizing:border-box; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--border-strong); border-radius:var(--radius-md); padding:14px 16px; display:flex; flex-direction:column; gap:4px; box-shadow:var(--shadow-1);}
+.ainicio-card:hover{background:var(--accent-soft);} .ainicio-card:focus-visible{box-shadow:var(--focus-ring);}
+.ainicio-card b{font:600 30px 'IBM Plex Mono',monospace; line-height:1.1;}
+.ainicio-card span{font-size:14px; font-weight:600;} .ainicio-card small{font-size:12.5px; color:var(--text-muted);}
+.ainicio-card.danger{border-left-color:var(--danger);} .ainicio-card.warn{border-left-color:var(--warn);} .ainicio-card.info{border-left-color:var(--info);} .ainicio-card.ok{border-left-color:var(--ok);}
+.ainicio-acc{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap:10px;}
+.ainicio-acc button{all:unset; box-sizing:border-box; cursor:pointer; border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; display:flex; gap:10px; align-items:center; background:var(--surface);}
+.ainicio-acc button:hover{background:var(--surface-2);} .ainicio-acc button:focus-visible{box-shadow:var(--focus-ring);}
+.ainicio-acc .ico{color:var(--accent-strong);}
+.ainicio-acc b{display:block; font-size:14.5px;} .ainicio-acc small{font-size:12.5px; color:var(--text-muted);}
 .adminpanel.active{display:block;}
 .user-row{
   display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -1731,21 +1753,29 @@ nav.tabs button{position:relative;}
       </div>
     </div>
     <div id="view-admin" class="view">
-      <div class="admin-subtabs">
-        <button id="adminsub-produccion" class="active">Producción</button>
+      <nav class="admin-grupos" id="adminGrupos" aria-label="Secciones de Admin">
+        <button type="button" data-agrupo="inicio" class="active"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Inicio</button>
+        <button type="button" data-agrupo="pedidos"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>Pedidos<span class="admin-cnt" id="adminCntPedidos" hidden></span></button>
+        <button type="button" data-agrupo="operacion"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.46.32-.84.73-1.04a4 4 0 0 0-2.14-7.59 5 5 0 0 0-9.18 0 4 4 0 0 0-2.14 7.59c.41.2.73.58.73 1.04V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg>Operación<span class="admin-cnt" id="adminCntOperacion" hidden></span></button>
+        <button type="button" data-agrupo="catalogos"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>Catálogos</button>
+        <button type="button" data-agrupo="equipo"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Equipo</button>
+      </nav>
+      <div class="admin-subtabs" id="adminSubtabs" hidden>
+        <button id="adminsub-produccion">Producción</button>
         <button id="adminsub-usuarios">Usuarios</button>
         <button id="adminsub-puntos" style="display:none">Puntos</button>
-        <button id="adminsub-pedidos">Pedidos</button>
+        <button id="adminsub-pedidos">Por revisar</button>
         <button id="adminsub-auditoria">Auditoría</button>
         <button id="adminsub-bajas">Bajas</button>
         <button id="adminsub-insumos">Insumos</button>
         <button id="adminsub-proveedores">Proveedores</button>
-        <button id="adminsub-invcatalogo">Cat. Inventario</button>
-        <button id="adminsub-areas">Áreas</button>
+        <button id="adminsub-invcatalogo">Inventario</button>
+        <button id="adminsub-areas">Áreas y accesos</button>
         <button id="adminsub-consolidado">Consolidado</button>
       </div>
 
-      <div id="adminpanel-produccion" class="adminpanel active">
+      <div id="adminpanel-inicio" class="adminpanel active"></div>
+      <div id="adminpanel-produccion" class="adminpanel">
         <div class="admin-header">
           <h2>Historial completo</h2>
           <button class="btn btn-secondary btn-small" id="exportCsvBtn">Exportar CSV</button>
@@ -2610,12 +2640,20 @@ async function onLoggedIn(sess){
     showToast('Esta cuenta no tiene acceso a la marcación de esa área', 'danger');
   }
 
-  const { data: locRows, error: locErr } = await supa.from('user_locations').select('location_id, locations(*)').eq('user_id', sess.user.id);
-  if(locErr){
-    showToast('No se pudieron cargar tus puntos asignados.');
-    return;
+  let locations;
+  if(esRrhh()){
+    // Recursos humanos: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
+    const { data: todas, error: tErr } = await supa.from('locations').select('*').order('name');
+    if(tErr){ showToast('No se pudieron cargar los puntos.'); return; }
+    locations = (todas || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug));
+  } else {
+    const { data: locRows, error: locErr } = await supa.from('user_locations').select('location_id, locations(*)').eq('user_id', sess.user.id);
+    if(locErr){
+      showToast('No se pudieron cargar tus puntos asignados.');
+      return;
+    }
+    locations = (locRows || []).map(r => r.locations).filter(loc => loc && loc.activo !== false);
   }
-  const locations = (locRows || []).map(r => r.locations).filter(loc => loc && loc.activo !== false);
   USER_LOCATIONS = locations;
 
   if(locations.length === 0){
@@ -2694,13 +2732,22 @@ async function superAdminEnterLocation(locId){
   });
 }
 
+function esRrhh(){ return !!(profile && profile.es_rrhh && !profile.is_super_admin); }
+async function areasDeRrhh(locId){
+  const { data } = await supa.from('areas').select('*').eq('location_id', locId).order('created_at', { ascending: true });
+  return (data || []).filter(a => (a.modules || []).includes('horarios'));
+}
 async function pickAreaForLocation(loc){
-  const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
-  if(error){
-    showToast('No se pudieron cargar tus áreas.');
-    return;
+  let areas;
+  if(esRrhh()) areas = await areasDeRrhh(loc.id);
+  else {
+    const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
+    if(error){
+      showToast('No se pudieron cargar tus áreas.');
+      return;
+    }
+    areas = (data || []).map(r => r.areas).filter(a => a && a.location_id === loc.id);
   }
-  const areas = (data || []).map(r => r.areas).filter(a => a && a.location_id === loc.id);
 
   if(areas.length === 0){
     document.getElementById('areaScreen').style.display = 'flex';
@@ -2749,12 +2796,19 @@ function enterArea(loc, area){
   document.getElementById('ctxLoc').textContent = loc.name;
   document.getElementById('userInitial').textContent = (profile.name || session.user.email || '?').trim().charAt(0).toUpperCase();
   const roleBadge = document.getElementById('whoRole');
-  roleBadge.textContent = profile.role === 'admin' ? 'Admin' : 'Cocina';
+  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
+  if(esRrhh()){
+    // Recursos humanos: solo Horarios (pre-nómina, quincenas, novedades) en cualquier punto y área.
+    ['tab-chat', 'tab-admin', 'tab-calculadora'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    HOR.subPedida = 'prenomina';
+    applyAreaModuleVisibility(['horarios']);
+    return;
+  }
   applyAreaModuleVisibility(area.modules || MODULE_TABS);
   initApp();
   setupRealtime();
@@ -3399,7 +3453,7 @@ function switchTab(name){
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
   markNavMore();
-  if(name==='admin') loadAdminHistory();
+  if(name==='admin'){ loadAdminHistory(); if(adminGrupo === 'inicio') adminPintarInicio(); adminActualizarConteos(); }
   if(name==='calculadora') abrirCalculadoraPrecios();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
@@ -3492,7 +3546,8 @@ document.getElementById('ctxSwitch').addEventListener('click', async ()=>{
   box.innerHTML = '<div class="empty-note">Cargando...</div>';
   openSheet('ctxSheet');
   let areas = [];
-  if(profile.is_super_admin){
+  if(esRrhh()) areas = await areasDeRrhh(currentLocation.id);
+  else if(profile.is_super_admin){
     const { data } = await supa.from('areas').select('*').eq('location_id', currentLocation.id).order('created_at', {ascending:true});
     areas = data || [];
   } else {
@@ -3588,6 +3643,10 @@ function horCodigoDeTramos(tramos){
 function horTramosDe(a){ if(a && a.tramos && a.tramos.length) return a.tramos; const t = a && a.turno_id && HOR.turnos.find(x => x.id === a.turno_id); return t ? (t.tramos || []) : []; }
 function horNocDe(pid){ let n = 0; for(let d = 1; d <= 7; d++){ if(horTrabaja(pid, d)) n += horDesglose(horTramosDe(HOR.asig[pid + '|' + d])).noct; } return n; }
 function horEsAdmin(){ return profile && (profile.role === 'admin' || profile.is_super_admin); }
+// Ve la pre-nómina: admin o Recursos humanos.
+function horVeNomina(){ return horEsAdmin() || esRrhh(); }
+// Lee novedades, registro y quincenas (sin editar): editor o Recursos humanos.
+function horLee(){ return HOR.editor || esRrhh(); }
 
 function horIso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function horLunesDe(d){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
@@ -3620,10 +3679,10 @@ async function horAlEntrar(){
   if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
 }
 function horPintar(){
-  if(HOR.sub === 'novedades' && HOR.editor) horPintarNovedades();
+  if(HOR.sub === 'novedades' && horLee()) horPintarNovedades();
   else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
-  else if(HOR.sub === 'prenomina' && horEsAdmin()) horPintarPrenomina();
-  else if(HOR.sub === 'quincena' && HOR.editor) horPintarQuincena();
+  else if(HOR.sub === 'prenomina' && horVeNomina()) horPintarPrenomina();
+  else if(HOR.sub === 'quincena' && horLee()) horPintarQuincena();
   else if(HOR.sub === 'enturno' && HOR.editor) horPintarEnTurno();
   else horPintarSemana();
 }
@@ -3647,9 +3706,12 @@ async function horCargarConfig(){
 
 function horPintarSub(){
   const tabs = document.getElementById('horSubtabs');
-  tabs.hidden = !HOR.editor;
-  document.getElementById('horSubPren').hidden = !horEsAdmin();
-  if(HOR.sub === 'prenomina' && !horEsAdmin()) HOR.sub = 'semana';
+  tabs.hidden = !horLee();
+  document.getElementById('horSubPren').hidden = !horVeNomina();
+  // Recursos humanos solo ve Semana, Novedades, Quincena y Pre-nómina.
+  tabs.querySelectorAll('[data-hor-sub]').forEach(b => { if(b.id !== 'horSubPren') b.hidden = esRrhh() && !['semana', 'novedades', 'quincena'].includes(b.dataset.horSub); });
+  if(HOR.sub === 'prenomina' && !horVeNomina()) HOR.sub = 'semana';
+  if(esRrhh() && !['semana', 'novedades', 'quincena', 'prenomina'].includes(HOR.sub)) HOR.sub = 'prenomina';
   tabs.querySelectorAll('[data-hor-sub]').forEach(b => b.classList.toggle('active', b.dataset.horSub === HOR.sub));
   document.getElementById('horSemana').hidden = HOR.sub === 'config';
   document.getElementById('horConfig').hidden = HOR.sub !== 'config';
@@ -3683,7 +3745,7 @@ async function horCargarSemana(){
   let quincenas = [], habilitados = {}, marcas = {};
   consultas.push(supa.from('horario_quincenas_cerradas').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes)
     .then(r => { quincenas = r.error ? [] : (r.data || []); }));
-  if(HOR.editor){
+  if(horLee()){
     consultas.push(supa.from('horario_marcaciones').select('personal_id, tipo, at, fecha_turno, manual').eq('area_id', HOR.areaId).eq('estado', 'valida').gte('fecha_turno', lunes).lte('fecha_turno', domingo).order('at')
       .then(r => { (r.error ? [] : (r.data || [])).forEach(x => { (marcas[x.personal_id + '|' + x.fecha_turno] ||= []).push(x); }); }));
     consultas.push(supa.from('horario_turnos_habilitados').select('*').eq('area_id', HOR.areaId).gte('fecha', lunes).lte('fecha', domingo)
@@ -4442,8 +4504,9 @@ function horPintarNovedades(){
         <div class="m">${horRangoNov(n)}${n.creado_por ? ' · por ' + escapeHtml(n.creado_por) : ''}</div>
         ${n.nota ? `<p>${escapeHtml(n.nota)}</p>` : ''}
         ${horSoportesHtml(n)}</div>
-      ${horRangoBloqueadoPersona(n.personal_id, n.desde, n.hasta) ? '<span class="badge neutral">Quincena cerrada</span>' : `<button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>`}
+      ${!HOR.editor ? '' : horRangoBloqueadoPersona(n.personal_id, n.desde, n.hasta) ? '<span class="badge neutral">Quincena cerrada</span>' : `<button type="button" class="btn btn-ghost btn-small" data-hor-borrar-nov="${n.id}">Quitar</button>`}
     </div>`).join('') : '<div class="empty-note">Sin novedades esta semana.</div>'}</div>`;
+  if(!HOR.editor){ box.innerHTML = h + '<p class="field-help">Solo lectura: las novedades las anotan los líderes y los admin del área.</p>'; return; }
   h += `<form class="hor-form" id="horNovForm">
     <div class="field"><label class="field-label" for="horNovP">Persona</label><select id="horNovP" required>${HOR.personal.filter(p => p.activo).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></div>
     <div class="field"><label class="field-label" for="horNovT">Tipo</label><select id="horNovT">${Object.entries(HOR_TIPOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
@@ -4486,9 +4549,9 @@ const HOR_SOP_MAX = 10 * 1024 * 1024;
 const HOR_ICO_CLIP = '<svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>';
 function horSoportesHtml(n){
   const sops = n.soportes || [];
-  return `<div class="hor-soportes">${sops.map((x, i) => `<span class="hor-sop"><button type="button" data-hor-ver-sop="${n.id}|${i}" title="Ver ${escapeHtml(x.nombre || 'soporte')}">${HOR_ICO_CLIP}<span>${escapeHtml(x.nombre || 'Soporte')}</span></button><button type="button" data-hor-quitar-sop="${n.id}|${i}" aria-label="Quitar ${escapeHtml(x.nombre || 'soporte')}">×</button></span>`).join('')}
+  return `<div class="hor-soportes">${sops.map((x, i) => `<span class="hor-sop"><button type="button" data-hor-ver-sop="${n.id}|${i}" title="Ver ${escapeHtml(x.nombre || 'soporte')}">${HOR_ICO_CLIP}<span>${escapeHtml(x.nombre || 'Soporte')}</span></button>${HOR.editor ? `<button type="button" data-hor-quitar-sop="${n.id}|${i}" aria-label="Quitar ${escapeHtml(x.nombre || 'soporte')}">×</button>` : ''}</span>`).join('')}
     ${!sops.length && n.tipo === 'incapacidad' ? '<span class="badge warn">Sin soporte</span>' : ''}
-    ${sops.length < 10 ? `<label class="btn btn-ghost btn-small hor-sop-add">+ ${sops.length ? 'Otro soporte' : 'Adjuntar soporte'}<input type="file" accept="image/*,application/pdf" multiple data-hor-sop="${n.id}"></label>` : ''}</div>`;
+    ${sops.length < 10 && HOR.editor ? `<label class="btn btn-ghost btn-small hor-sop-add">+ ${sops.length ? 'Otro soporte' : 'Adjuntar soporte'}<input type="file" accept="image/*,application/pdf" multiple data-hor-sop="${n.id}"></label>` : ''}</div>`;
 }
 async function horSubirSoportes(nov, files){
   const nuevos = [];
@@ -4774,7 +4837,7 @@ function prenPct(campo, def){ const v = HOR.cfg && HOR.cfg[campo]; return v === 
 
 async function horPintarPrenomina(){
   const box = document.getElementById('horSemana');
-  if(!horEsAdmin()){ box.innerHTML = '<div class="empty-note">La pre-nómina solo la ven los admin.</div>'; return; }
+  if(!horVeNomina()){ box.innerHTML = '<div class="empty-note">La pre-nómina solo la ven los admin y Recursos humanos.</div>'; return; }
   const periodos = prenPeriodos();
   if(!PREN.periodo) PREN.periodo = periodos[1].id; // la última quincena terminada
   const per = periodos.find(p => p.id === PREN.periodo) || periodos[1];
@@ -4794,6 +4857,7 @@ function prenControlesHtml(periodos, per){
       <button type="button" class="pren-switch" id="prenPesos" role="switch" aria-checked="${PREN.pesos}"><i></i>Valores en pesos</button>
       <button type="button" class="btn btn-secondary btn-small" data-pren="detalle">Detalle por día (Excel)</button>
       <button type="button" class="btn btn-accent btn-small" data-pren="resumen">Descargar para el contador</button>
+      ${esRrhh() || (profile && profile.is_super_admin) ? '<button type="button" class="btn btn-secondary btn-small" data-pren="todos">Todos los puntos (Excel)</button>' : ''}
     </div>
   </div>`;
 }
@@ -4977,7 +5041,7 @@ function prenSalariosHtml(res){
   </div></details>`;
 }
 function prenParametrosHtml(){
-  const inp = (campo, label, val, extra) => `<label class="pren-param"><span>${label}</span><input type="number" data-pren-param="${campo}" value="${val}"${extra || ''}></label>`;
+  const inp = (campo, label, val, extra) => `<label class="pren-param"><span>${label}</span><input type="number" data-pren-param="${campo}" value="${val}"${extra || ''}${HOR.editor ? '' : ' disabled'}></label>`;
   const pDom = prenPct('recargo_dominical', 0), pFes = prenPct('recargo_festivo', 90), pRn = prenPct('recargo_nocturno', 35), pHed = prenPct('extra_diurna', 25), pHen = prenPct('extra_nocturna', 75);
   return `<details class="pren-sec"><summary>Parámetros <span class="badge warn">Confírmalos con tu contador</span></summary><div class="pren-cuerpo">
     <div class="pren-params">
@@ -4989,7 +5053,7 @@ function prenParametrosHtml(){
       ${inp('recargo_festivo', 'Recargo festivo %', pFes, ' min="0" max="200"')}
       ${inp('horas_mes', 'Horas legales al mes (42 h × 5 = 210; valor hora = salario ÷ horas)', prenPct('horas_mes', 210), ' min="100" max="240"')}
     </div>
-    <label class="field" style="margin:10px 0 0"><span class="field-label">Nota sobre los domingos</span><input type="text" data-pren-param="nota_dominical" maxlength="300" value="${escapeHtml((HOR.cfg && HOR.cfg.nota_dominical) || '')}"></label>
+    <label class="field" style="margin:10px 0 0"><span class="field-label">Nota sobre los domingos</span><input type="text" data-pren-param="nota_dominical" maxlength="300" value="${escapeHtml((HOR.cfg && HOR.cfg.nota_dominical) || '')}"${HOR.editor ? '' : ' disabled'}></label>
     <table class="hor-tabla" style="margin-top:12px"><thead><tr><th>Tipo de hora</th><th class="num">Se paga</th></tr></thead><tbody>
       <tr><td>Ordinaria nocturna</td><td class="num">+${horNum(pRn)} % de recargo</td></tr>
       <tr><td>Extra diurna</td><td class="num">${horNum(100 + pHed)} %</td></tr>
@@ -5002,6 +5066,50 @@ function prenParametrosHtml(){
   </div></details>`;
 }
 
+// Un solo archivo con todos los puntos y áreas que tienen Horarios (Recursos humanos y super admin).
+async function prenCsvTodos(btn){
+  const per = PREN.datos.per;
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Armando…';
+  const guardado = { areaId: HOR.areaId, cfg: HOR.cfg, estaciones: HOR.estaciones, personal: HOR.personal, turnos: HOR.turnos };
+  const filas = [];
+  try {
+    const { data: locs } = await supa.from('locations').select('id, name, slug, activo').order('name');
+    for(const loc of (locs || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug))){
+      const { data: areas } = await supa.from('areas').select('id, name, modules').eq('location_id', loc.id);
+      for(const a of (areas || []).filter(x => (x.modules || []).includes('horarios'))){
+        const [cfg, est, per2, tur] = await Promise.all([
+          supa.from('horario_config').select('*').eq('area_id', a.id).maybeSingle(),
+          supa.from('horario_estaciones').select('*').eq('area_id', a.id),
+          supa.from('horario_personal').select('*').eq('area_id', a.id).order('orden'),
+          supa.from('horario_turnos').select('*').eq('area_id', a.id),
+        ]);
+        if(!(per2.data || []).length) continue;
+        Object.assign(HOR, { areaId: a.id, cfg: cfg.data || { area_id: a.id }, estaciones: est.data || [], personal: per2.data || [], turnos: tur.data || [] });
+        const datos = await prenCargar(per);
+        if(datos.error) continue;
+        const res = prenCalcular(datos, per);
+        const n = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
+        const hm = prenPct('horas_mes', 210) || 210;
+        res.forEach(r => filas.push([loc.name, a.name, r.p.nombre, (HOR.estaciones.find(e => e.id === r.p.estacion_id) || {}).nombre || '', r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias,
+          ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.falta, r.tarde, r.tardeMin, r.prog,
+          datos.cerrada ? 'Cerrada' : 'Sin cerrar', r.sal || '', r.sal ? Math.round(r.sal / hm) : '', r.sal && !r.p.salario_fijo ? Math.round(r.valor) : '']));
+      }
+    }
+  } finally {
+    Object.assign(HOR, guardado);
+    btn.disabled = false; btn.textContent = txt;
+  }
+  if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
+  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
+  const celda = v => { const t = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const csv = '\uFEFF' + [cab].concat(filas).map(f => f.map(celda).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showToast('Archivo descargado con ' + filas.length + ' personas', 'ok');
+}
 function prenCsv(detalle){
   const { res, per } = PREN.datos;
   const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -5037,6 +5145,7 @@ document.getElementById('horSemana').addEventListener('click', e => {
   if(HOR.sub !== 'prenomina' || !PREN.datos) return;
   if(e.target.closest('#prenPesos')){ PREN.pesos = !PREN.pesos; prenRender(); return; }
   const b = e.target.closest('[data-pren]');
+  if(b && b.dataset.pren === 'todos'){ prenCsvTodos(b); return; }
   if(b){ prenCsv(b.dataset.pren === 'detalle'); return; }
   const f = e.target.closest('.pren-fila');
   if(f){ PREN.abierta = PREN.abierta === f.dataset.prenP ? null : f.dataset.prenP; prenRender(); }
@@ -5138,7 +5247,7 @@ async function horPintarQuincena(){
       const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
       return `<tr><td>${escapeHtml(r.p.nombre)}</td><td>${r.dias}</td><td>${h2(m.h)}</td><td>${ext ? h2(ext) : '<span class="pren-cero">·</span>'}</td><td>${noc ? h2(noc) : '<span class="pren-cero">·</span>'}</td><td>${df ? h2(df) : '<span class="pren-cero">·</span>'}</td><td><div class="pren-chips">${chips || '<span class="pren-cero">·</span>'}</div></td></tr>`; }).join('')}
   </tbody></table></div>`;
-  if(!q) html += `<div class="hor-publicar" style="margin-top:12px">
+  if(!q && HOR.editor) html += `<div class="hor-publicar" style="margin-top:12px">
       <label class="quin-confirmar"><input type="checkbox" id="quinOk"${listo ? '' : ' disabled'}>Revisé y la información es correcta</label>
       <button type="button" class="btn btn-ok" data-quin="cerrar" disabled>Cerrar quincena</button>
     </div>
@@ -9503,7 +9612,71 @@ document.getElementById('adminsub-proveedores').addEventListener('click', ()=>sw
 document.getElementById('adminsub-invcatalogo').addEventListener('click', ()=>switchAdminSub('invcatalogo'));
 document.getElementById('adminsub-areas').addEventListener('click', ()=>switchAdminSub('areas'));
 document.getElementById('adminsub-consolidado').addEventListener('click', ()=>switchAdminSub('consolidado'));
+/* Admin agrupado: Inicio (pendientes) + 4 grupos; cada grupo muestra solo sus pestañas. Los botones adminsub-* siguen
+   existiendo (la visibilidad por rol usa style.display; el grupo usa el atributo hidden). */
+const ADMIN_GRUPOS = { inicio: ['inicio'], pedidos: ['pedidos', 'consolidado', 'auditoria'], operacion: ['produccion', 'bajas'], catalogos: ['insumos', 'proveedores', 'invcatalogo'], equipo: ['usuarios', 'areas', 'puntos'] };
+let adminGrupo = 'inicio';
+function adminSubVisible(n){ const b = document.getElementById('adminsub-' + n); return !!b && b.style.display !== 'none'; }
+function adminMostrarGrupo(g){
+  adminGrupo = g;
+  document.querySelectorAll('[data-agrupo]').forEach(b => b.classList.toggle('active', b.dataset.agrupo === g));
+  Object.entries(ADMIN_GRUPOS).forEach(([gr, subs]) => subs.forEach(n => { const b = document.getElementById('adminsub-' + n); if(b) b.hidden = gr !== g; }));
+  const visibles = ADMIN_GRUPOS[g].filter(adminSubVisible);
+  document.getElementById('adminSubtabs').hidden = g === 'inicio' || visibles.length < 2;
+}
+document.getElementById('adminGrupos').addEventListener('click', e => {
+  const b = e.target.closest('[data-agrupo]'); if(!b) return;
+  const g = b.dataset.agrupo;
+  switchAdminSub(g === 'inicio' ? 'inicio' : (ADMIN_GRUPOS[g].find(adminSubVisible) || ADMIN_GRUPOS[g][0]));
+});
+async function adminActualizarConteos(){
+  if(!currentArea) return;
+  const hoy = toISODate(new Date());
+  const [porAprobar, sinEnviar, bajas, prod] = await Promise.all([
+    supa.from('orders').select('id, created_at').eq('area_id', currentArea.id).eq('status', 'pendiente').order('created_at', { ascending: true }),
+    supa.from('orders').select('id', { count: 'exact', head: true }).eq('area_id', currentArea.id).eq('status', 'aprobado').eq('enviado', false),
+    supa.from('bajas').select('id', { count: 'exact', head: true }).eq('location_id', currentLocation.id).or(`area_id.eq.${currentArea.id},area_id.is.null`).eq('status', 'pendiente'),
+    supa.from('productions').select('id, status').eq('area_id', currentArea.id).eq('fecha', hoy),
+  ]);
+  const c = { pedidos: (porAprobar.data || []).length, viejo: (porAprobar.data || [])[0], sinEnviar: sinEnviar.count || 0, bajas: bajas.count || 0,
+    prod: (prod.data || []).filter(p => p.status !== 'anulado').length, anuladas: (prod.data || []).filter(p => p.status === 'anulado').length };
+  ADMIN_CONTEOS = c;
+  const pon = (id, n) => { const el = document.getElementById(id); el.hidden = !n; el.textContent = n; };
+  pon('adminCntPedidos', c.pedidos); pon('adminCntOperacion', c.bajas);
+  if(adminGrupo === 'inicio') adminPintarInicio();
+}
+let ADMIN_CONTEOS = null;
+function adminPintarInicio(){
+  const box = document.getElementById('adminpanel-inicio'), c = ADMIN_CONTEOS;
+  const h = new Date().getHours(), saludo = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const hace = iso => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
+  const n = v => c ? v : '…';
+  const ic = { equipo: `<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`, catalogos: `<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`, pedidos: `<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>`, operacion: `<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.46.32-.84.73-1.04a4 4 0 0 0-2.14-7.59 5 5 0 0 0-9.18 0 4 4 0 0 0-2.14 7.59c.41.2.73.58.73 1.04V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg>` };
+  box.innerHTML = `<div class="ainicio">
+    <h2>${saludo}, ${escapeHtml(((profile && profile.name) || '').split(' ')[0] || 'admin')}</h2>
+    <p class="sub">${escapeHtml(currentLocation ? currentLocation.name : '')} · ${escapeHtml(currentArea ? currentArea.name : '')} · lo que necesita tu atención</p>
+    <div class="ainicio-cards">
+      <button type="button" class="ainicio-card ${c && c.pedidos ? 'danger' : ''}" data-air="pedidos"><b>${n(c && c.pedidos)}</b><span>Pedidos por aprobar</span><small>${c && c.viejo ? 'El más viejo lleva ' + hace(c.viejo.created_at) : 'Nada pendiente'}</small></button>
+      <button type="button" class="ainicio-card ${c && c.bajas ? 'warn' : ''}" data-air="bajas"><b>${n(c && c.bajas)}</b><span>Bajas por revisar</span><small>Esta área y las sin área</small></button>
+      <button type="button" class="ainicio-card ${c && c.sinEnviar ? 'info' : ''}" data-air="consolidado"><b>${n(c && c.sinEnviar)}</b><span>Pedidos aprobados sin enviar</span><small>Se pueden consolidar por proveedor</small></button>
+      <button type="button" class="ainicio-card ok" data-air="produccion"><b>${n(c && c.prod)}</b><span>Producciones hoy</span><small>${c && c.anuladas ? c.anuladas + ' anulada' + (c.anuladas > 1 ? 's' : '') : 'Ninguna anulada'}</small></button>
+    </div>
+    <span class="field-label">Accesos rápidos</span>
+    <div class="ainicio-acc">
+      ${profile && profile.is_super_admin ? `<button type="button" data-air="usuarios">${ic.equipo}<span><b>Crear usuario</b><small>Con cédula o correo</small></span></button>` : ''}
+      <button type="button" data-air="insumos">${ic.catalogos}<span><b>Agregar insumo</b><small>Catálogo de pedidos</small></span></button>
+      <button type="button" data-air="auditoria">${ic.pedidos}<span><b>Auditoría de pedidos</b><small>Filtros y Excel</small></span></button>
+      <button type="button" data-air="produccion">${ic.operacion}<span><b>Exportar producción</b><small>Historial en Excel</small></span></button>
+      <button type="button" data-air="areas">${ic.equipo}<span><b>Áreas y accesos</b><small>Quién entra a cada área</small></span></button>
+    </div>
+    <p class="field-help">Horarios, pre-nómina y costeo siguen en sus propios módulos del menú principal.</p>
+  </div>`;
+}
+document.getElementById('adminpanel-inicio').addEventListener('click', e => { const b = e.target.closest('[data-air]'); if(b) switchAdminSub(b.dataset.air); });
 function switchAdminSub(name){
+  adminMostrarGrupo(name === 'inicio' ? 'inicio' : (Object.keys(ADMIN_GRUPOS).find(g => ADMIN_GRUPOS[g].includes(name)) || 'inicio'));
+  document.getElementById('adminpanel-inicio').classList.toggle('active', name === 'inicio');
+  if(name === 'inicio'){ adminPintarInicio(); adminActualizarConteos(); }
   ['produccion','usuarios','puntos','pedidos','auditoria','bajas','insumos','proveedores','invcatalogo','areas','consolidado'].forEach(n=>{
     document.getElementById('adminsub-'+n).classList.toggle('active', n===name);
     document.getElementById('adminpanel-'+n).classList.toggle('active', n===name);
@@ -9778,6 +9951,10 @@ async function loadUsers(){
           <input type="checkbox" data-super-for="${u.id}" ${u.is_super_admin?'checked':''}>
           Super admin
         </label>
+        <label class="chip-check" title="Ve solo nómina (pre-nómina, quincenas, novedades y salarios) de todos los puntos">
+          <input type="checkbox" data-rrhh-for="${u.id}" ${u.es_rrhh?'checked':''}>
+          Recursos humanos
+        </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
         <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
@@ -9804,6 +9981,7 @@ async function loadUsers(){
       const superCb = wrap.querySelector(`[data-super-for="${id}"]`);
       const newRole = select.value;
       const newSuper = superCb.checked;
+      const newRrhh = wrap.querySelector(`[data-rrhh-for="${id}"]`).checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
@@ -9814,7 +9992,7 @@ async function loadUsers(){
         superCb.checked = true;
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper }).eq('id', id);
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
       showToast('Usuario actualizado');
     });
@@ -11818,6 +11996,7 @@ function renderAreasAdminList(){
 
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
+  if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
   currentArea = area;
   document.getElementById('whoArea').textContent = area.name;
