@@ -6198,11 +6198,13 @@ document.getElementById('horConfig').addEventListener('click', async e => {
   const tabla = b.dataset.hcNuevo, arr = HOR[HOR_TABLAS[tabla]];
   const orden = arr.reduce((m, r) => Math.max(m, r.orden || 0), 0) + 1;
   const base = { area_id: HOR.areaId, orden };
+  // El nombre no se puede repetir en el área: "Tarea 3" puede existir aunque su orden sea otro.
+  const libre = pref => { const usados = new Set(arr.map(r => String(r.nombre || r.codigo || '').trim().toLowerCase())); let n = orden; while(usados.has((pref + ' ' + n).toLowerCase())) n++; return pref + ' ' + n; };
   const nuevo = {
-    horario_estaciones: { nombre: 'Estación ' + orden, color: ((orden - 1) % 8) + 1 },
-    horario_turnos: { codigo: 'Turno ' + orden, horas: 8, tramos: [{ desde: '16:00', hasta: '00:00' }] },
-    horario_personal: { nombre: 'Persona ' + orden },
-    horario_tareas: { nombre: 'Tarea ' + orden },
+    horario_estaciones: { nombre: libre('Estación'), color: ((orden - 1) % 8) + 1 },
+    horario_turnos: { codigo: libre('Turno'), horas: 8, tramos: [{ desde: '16:00', hasta: '00:00' }] },
+    horario_personal: { nombre: libre('Persona') },
+    horario_tareas: { nombre: libre('Tarea') },
   }[tabla];
   b.disabled = true;
   const { data, error } = await supa.from(tabla).insert({ ...base, ...nuevo }).select().single();
