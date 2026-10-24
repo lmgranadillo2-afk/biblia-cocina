@@ -531,6 +531,13 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+.vivo-quien{position:fixed; top:12px; right:16px; z-index:60; display:flex; align-items:center; gap:4px; padding:4px 12px 4px 4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); box-shadow:var(--shadow-1); max-width:calc(100vw - 32px);}
+.vivo-quien[hidden], .vivo-barra[hidden]{display:none;}
+.vivo-ini{width:28px; height:28px; border-radius:50%; display:inline-grid; place-items:center; background:var(--accent); color:var(--accent-text, #1F1810); font:600 11px 'IBM Plex Mono',monospace; border:2px solid var(--surface); margin-left:-6px;}
+.vivo-ini:first-child{margin-left:0;}
+.vivo-txt{font-size:12.5px; color:var(--text-muted); margin-left:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.vivo-barra{position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:70; display:flex; align-items:center; gap:12px; padding:10px 12px 10px 16px; background:var(--text); color:var(--surface); border-radius:var(--radius-md); box-shadow:var(--shadow-2, 0 6px 20px rgba(0,0,0,.2)); font-size:14px; max-width:calc(100vw - 32px);}
+@media (max-width:760px){ .vivo-quien{top:auto; bottom:84px; right:12px;} .vivo-txt{display:none;} .vivo-barra{bottom:84px;} }
 .loc-empresa{flex-basis:100%; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,2fr) auto; gap:8px; align-items:end; margin-top:10px;}
 .loc-empresa label{display:flex; flex-direction:column; gap:4px; min-width:0;}
 @media (max-width:760px){ .loc-empresa{grid-template-columns:1fr;} }
@@ -3398,7 +3405,106 @@ async function pushOlvidarDispositivo(){
 /* ---------- TIEMPO REAL: pedidos y bajas ---------- */
 let realtimeChannel = null;
 
+/* ---------- Tiempo real en Horarios y Producción ----------
+   Un canal por área: escucha los cambios de las tablas y lleva la "presencia" (quién está viendo qué pantalla).
+   Si quien mira está escribiendo o tiene una ventana abierta, no se recarga: sale una barra para actualizar. */
+const VIVO = { canal: null, area: null, yo: 0, timers: {}, otros: [], pendiente: null, vista: '' };
+(function(){ // Marca cuándo escribió este equipo, para no avisarle de sus propios cambios.
+  const _from = supa.from.bind(supa);
+  supa.from = t => { const b = _from(t); ['insert', 'update', 'upsert', 'delete'].forEach(m => { const fn = b[m]; if(typeof fn === 'function') b[m] = (...a) => { VIVO.yo = Date.now(); return fn.apply(b, a); }; }); return b; };
+})();
+function vivoVistaActual(){
+  const v = document.querySelector('.view.active'); if(!v) return '';
+  if(v.id === 'view-horarios') return 'horarios:' + (HOR.lunes ? horIso(HOR.lunes) : '') + ':' + (HOR.sub || 'semana');
+  if(v.id === 'view-produccion') return 'produccion';
+  return '';
+}
+function vivoTrack(){
+  if(!VIVO.canal) return;
+  const vista = vivoVistaActual();
+  if(vista === VIVO.vista) return;
+  VIVO.vista = vista;
+  VIVO.canal.track({ nombre: (profile && profile.name) || 'Alguien', vista });
+  vivoPintarQuien();
+}
+function vivoPintarQuien(){
+  let el = document.getElementById('vivoQuien');
+  if(!el){ el = document.createElement('div'); el.id = 'vivoQuien'; el.className = 'vivo-quien'; el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+  const aqui = VIVO.vista ? VIVO.otros.filter(o => o.vista === VIVO.vista) : [];
+  el.hidden = !aqui.length;
+  if(!aqui.length) return;
+  const ini = n => n.split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+  const nombres = aqui.map(o => o.nombre.split(' ')[0]);
+  el.innerHTML = aqui.slice(0, 4).map(o => `<span class="vivo-ini" title="${escapeHtml(o.nombre)}">${escapeHtml(ini(o.nombre))}</span>`).join('')
+    + `<span class="vivo-txt">${escapeHtml(nombres.length > 2 ? nombres.slice(0, 2).join(', ') + ' y ' + (nombres.length - 2) + ' más' : nombres.join(' y '))} ${nombres.length > 1 ? 'están' : 'está'} viendo esto</span>`;
+}
+function vivoOcupado(viewId){
+  if(document.querySelector('.modal-overlay.open')) return true;
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#' + viewId) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'button');
+}
+function vivoBarra(txt, accion){
+  let el = document.getElementById('vivoBarra');
+  if(!el){ el = document.createElement('div'); el.id = 'vivoBarra'; el.className = 'vivo-barra'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  if(!txt){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `<span>${escapeHtml(txt)}</span><button type="button" class="btn btn-accent btn-small">Actualizar</button>`;
+  el.querySelector('button').onclick = () => { el.hidden = true; accion(); };
+}
+function vivoQuienCambio(){
+  const aqui = VIVO.otros.filter(o => o.vista && o.vista.split(':')[0] === VIVO.vista.split(':')[0]);
+  return aqui.length === 1 ? aqui[0].nombre.split(' ')[0] : aqui.length ? 'otra persona' : 'otro equipo';
+}
+// Junta varios cambios seguidos (una propuesta guarda decenas de casillas) en una sola recarga.
+function vivoProgramar(clave, fn){
+  clearTimeout(VIVO.timers[clave]);
+  VIVO.timers[clave] = setTimeout(fn, 900);
+}
+function vivoHorarios(){
+  if(!document.getElementById('view-horarios').classList.contains('active') || HOR.areaId !== (currentArea && currentArea.id)) return;
+  const propio = Date.now() - VIVO.yo < 4000;
+  vivoProgramar('hor', () => {
+    const recargar = async () => { await horCargarSemana(); vivoBarra(null); };
+    if(vivoOcupado('view-horarios')){ vivoBarra((propio ? 'Hay cambios nuevos' : 'Cambios de ' + vivoQuienCambio()) + ' en el horario', recargar); return; }
+    recargar();
+    if(!propio) showToast('Horario actualizado: cambios de ' + vivoQuienCambio(), 'info');
+  });
+}
+function vivoProduccion(){
+  const propio = Date.now() - VIVO.yo < 4000;
+  vivoProgramar('prod', () => {
+    if(document.getElementById('view-produccion').classList.contains('active')){
+      loadMyProductions();
+      if(!propio) showToast('Producción actualizada: registro de ' + vivoQuienCambio(), 'info');
+    }
+    const ap = document.getElementById('adminpanel-produccion');
+    if(ap && ap.classList.contains('active') && document.getElementById('view-admin').classList.contains('active')) loadAdminHistory();
+  });
+}
+function vivoIniciar(){
+  if(!currentArea || (VIVO.canal && VIVO.area === currentArea.id)) return;
+  if(VIVO.canal){ supa.removeChannel(VIVO.canal); VIVO.canal = null; }
+  const area = currentArea.id, filtro = 'area_id=eq.' + area;
+  // Casillas y tareas no tienen área: llegan todas las que el usuario puede ver y se filtran por la semana en pantalla.
+  const deLaSemana = p => { const r = p.new && Object.keys(p.new).length ? p.new : p.old || {};
+    return !HOR.semana || !r.semana_id ? !!(p.old && p.old.id && Object.values(HOR.asig || {}).some(a => a.id === p.old.id)) : r.semana_id === HOR.semana.id; };
+  const c = supa.channel('vivo-' + area, { config: { presence: { key: session.user.id } } });
+  ['horario_semanas', 'horario_novedades', 'horario_registro_dia', 'horario_dias_cerrados', 'horario_turnos_habilitados']
+    .forEach(t => c.on('postgres_changes', { event: '*', schema: 'public', table: t, filter: filtro }, vivoHorarios));
+  ['horario_asignaciones', 'horario_tarea_asignaciones']
+    .forEach(t => c.on('postgres_changes', { event: '*', schema: 'public', table: t }, p => { if(deLaSemana(p)) vivoHorarios(); }));
+  c.on('postgres_changes', { event: '*', schema: 'public', table: 'productions', filter: filtro }, vivoProduccion);
+  c.on('presence', { event: 'sync' }, () => {
+    const st = c.presenceState();
+    VIVO.otros = Object.entries(st).filter(([k]) => k !== session.user.id).map(([, v]) => v[v.length - 1] || {}).filter(o => o.nombre);
+    vivoPintarQuien();
+  });
+  VIVO.canal = c; VIVO.area = area;
+  c.subscribe(estado => { if(estado === 'SUBSCRIBED'){ VIVO.vista = null; vivoTrack(); } });
+}
+
 function setupRealtime(){
+  vivoIniciar();
   if(realtimeChannel){ supa.removeChannel(realtimeChannel); realtimeChannel = null; }
   realtimeChannel = supa.channel('loc-' + currentLocation.id + '-area-' + currentArea.id)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'orders', filter:`area_id=eq.${currentArea.id}` }, payload=>{
@@ -3456,6 +3562,7 @@ function switchTab(name){
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
   markNavMore();
+  vivoBarra(null); setTimeout(vivoTrack, 0);
   if(name==='admin'){ loadAdminHistory(); if(adminGrupo === 'inicio') adminPintarInicio(); adminActualizarConteos(); }
   if(name==='calculadora') abrirCalculadoraPrecios();
   if(name==='cronograma') loadCalendarMonth();
@@ -3702,6 +3809,7 @@ async function horAlEntrar(){
   if(HOR.sub === 'config') horPintarConfig(); else horCargarSemana();
 }
 function horPintar(){
+  setTimeout(vivoTrack, 0);
   if(HOR.sub === 'novedades' && horLee()) horPintarNovedades();
   else if(HOR.sub === 'registro' && HOR.editor) horPintarRegistro();
   else if(HOR.sub === 'prenomina' && horVeNomina()) horPintarPrenomina();
@@ -3750,6 +3858,7 @@ async function horCargarSemana(){
   if(HOR.error){ box.innerHTML = `<div class="empty-note">El módulo Horarios todavía no está listo en la base de datos (falta correr sql/horarios_1_tablas.sql).</div>`; return; }
   const carga = ++HOR.carga;
   const lunes = horIso(HOR.lunes);
+  setTimeout(vivoTrack, 0);
   const prev = new Date(HOR.lunes); prev.setDate(prev.getDate() - 7);
   const [sem, ant] = await Promise.all([
     supa.from('horario_semanas').select('*').eq('area_id', HOR.areaId).eq('lunes', lunes).maybeSingle(),
