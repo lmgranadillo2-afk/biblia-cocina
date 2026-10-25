@@ -4142,6 +4142,32 @@ function horCambiosHtml(v){
     ${nov.length ? `<div class="hor-acciones" style="margin-top:8px"><button type="button" class="btn btn-secondary btn-small" data-hor-act="avisarcambios">${HOR_ICO.enviar}Avisar cambios al grupo</button></div>` : ''}
   </div></div>`;
 }
+// Al volver a publicar: a quien le cambió el turno (y tiene usuario) le llega un mensaje directo en el chat, con
+// notificación al celular. "antes" es la foto de la publicación anterior (persona|día → turno); null la primera vez.
+async function horAvisarCambiosTurno(antes){
+  if(!antes || typeof antes !== 'object') return 0;
+  const etiqueta = a => !a ? '' : a.tipo === 'descanso' ? 'Descanso' : (a.codigo || '');
+  const semana = 'semana del ' + HOR.lunes.getDate() + ' ' + HOR.lunes.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+  let avisados = 0;
+  for(const p of HOR.personal.filter(x => x.activo && x.user_id && (!session || x.user_id !== session.user.id))){
+    const cambios = [];
+    for(let d = 1; d <= 7; d++){
+      const k = p.id + '|' + d, ahora = etiqueta(HOR.asig[k]), prev = antes[k] || '';
+      if(ahora !== prev) cambios.push(`• ${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}: ${prev || 'sin turno'} → ${ahora || 'sin turno'}`);
+    }
+    if(!cambios.length) continue;
+    try {
+      const { data: conv, error } = await supa.rpc('chat_abrir_directo', { p_otro: p.user_id });
+      if(error || !conv) continue;
+      const { error: e2 } = await supa.from('chat_mensajes').insert({
+        conversacion_id: conv, autor_nombre: profile.name || session.user.email, autor_area: currentArea ? currentArea.name : null,
+        texto: `Cambió tu horario (${semana}):\n${cambios.join('\n')}`,
+      });
+      if(!e2) avisados++;
+    } catch(_){}
+  }
+  return avisados;
+}
 function horMensajeCambios(){
   let m = `*Cambios en el horario de ${currentArea.name}*\n_Semana ${horRango(true)}_\n\n`;
   horCambiosNov().forEach(n => { const p = HOR.personal.find(x => x.id === n.personal_id); m += `• ${p ? horCorto(p) : '?'} no viene ${horRangoNov(n, true)}\n`; });
@@ -4251,9 +4277,10 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   else if(act === 'crear' || act === 'copiar'){ btn.disabled = true; await horCrearSemana(act === 'copiar'); }
   else if(act === 'publicar'){
     btn.disabled = true;
-    const { error } = await supa.rpc('horario_publicar', { p_semana: HOR.semana.id });
+    const { data: antes, error } = await supa.rpc('horario_publicar', { p_semana: HOR.semana.id });
     if(error){ showToast('No se pudo publicar: ' + error.message, 'danger'); btn.disabled = false; return; }
-    showToast('Semana publicada', 'ok'); horCargarSemana();
+    const avisados = await horAvisarCambiosTurno(antes);
+    showToast('Semana publicada' + (avisados ? ' · se avisó a ' + avisados + ' persona' + (avisados === 1 ? '' : 's') + ' por el chat' : ''), 'ok'); horCargarSemana();
   }
   else if(act === 'borrador'){
     btn.disabled = true;
@@ -6027,6 +6054,15 @@ document.getElementById('horSemana').addEventListener('click', async e => {
 function horPintarConfig(){
   const box = document.getElementById('horConfig');
   if(HOR.error){ box.innerHTML = `<div class="empty-note">El módulo Horarios todavía no está listo en la base de datos (falta correr sql/horarios_1_tablas.sql).</div>`; return; }
+  // Usuarios del punto, para enlazar cada persona con su cuenta (se cargan una vez por punto).
+  if(currentLocation && HOR.usuariosLoc !== currentLocation.id){
+    HOR.usuariosLoc = currentLocation.id;
+    supa.rpc('chat_personas', { p_location_id: currentLocation.id }).then(({ data }) => {
+      const yo = session ? [{ id: session.user.id, nombre: (profile && profile.name) || 'Yo' }] : [];
+      HOR.usuarios = yo.concat((data || []).map(u => ({ id: u.id, nombre: u.nombre + (u.areas ? ' · ' + u.areas : '') })));
+      if(document.getElementById('horConfig').offsetParent) horPintarConfig();
+    });
+  }
   const cb = (tabla, id, campo, val, texto) => `<label class="cb"><input type="checkbox" data-hc="${tabla}|${id}|${campo}"${val ? ' checked' : ''}>${texto}</label>`;
   const inp = (tabla, id, campo, val, label, tipo, extra) => `<label><span class="field-label">${label}</span><input type="${tipo || 'text'}" data-hc="${tabla}|${id}|${campo}" value="${escapeHtml(val == null ? '' : String(val))}"${extra || ''}></label>`;
   const sinDesc = horDiasSinDescanso();
@@ -6079,6 +6115,7 @@ function horPintarConfig(){
         <label><span class="field-label">Estación</span><select data-hc="horario_personal|${p.id}|estacion_id"><option value="">Sin estación</option>${HOR.estaciones.map(e => `<option value="${e.id}"${e.id === p.estacion_id ? ' selected' : ''}>${escapeHtml(e.nombre)}</option>`).join('')}</select></label>
         ${inp('horario_personal', p.id, 'cargo', p.cargo, 'Cargo')}
         <label><span class="field-label">Descanso fijo</span><select data-hc="horario_personal|${p.id}|descanso_dia"><option value="">Ninguno</option>${HOR_DIAS.map((d, i) => `<option value="${i + 1}"${i + 1 === p.descanso_dia ? ' selected' : ''}>${d}</option>`).join('')}</select></label>
+        <label title="Con su usuario le llega un mensaje en el chat cuando le cambian el turno"><span class="field-label">Usuario en la app</span><select data-hc="horario_personal|${p.id}|user_id"><option value="">Sin usuario</option>${(HOR.usuarios || []).concat(p.user_id && !(HOR.usuarios || []).some(u => u.id === p.user_id) ? [{ id: p.user_id, nombre: 'Usuario enlazado' }] : []).map(u => `<option value="${u.id}"${u.id === p.user_id ? ' selected' : ''}>${escapeHtml(u.nombre)}</option>`).join('')}</select></label>
         ${cb('horario_personal', p.id, 'es_produccion', p.es_produccion, 'Producción')}
         ${cb('horario_personal', p.id, 'salario_fijo', p.salario_fijo, 'Salario fijo (sin extras ni recargos)')}
         ${cb('horario_personal', p.id, 'activo', p.activo, 'Activo')}
