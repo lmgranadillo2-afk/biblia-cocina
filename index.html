@@ -2648,6 +2648,16 @@ async function onLoggedIn(sess){
   profile = prof;
 
   // Enlace de marcación (?marcacion=<área>): entra directo a la pantalla de marcación de esa área, sin cargar la app.
+  const marcPunto = new URLSearchParams(location.search).get('marcacion_punto');
+  if(marcPunto && /^[0-9a-f-]{36}$/i.test(marcPunto)){
+    const [{ data: loc }, { data: ars }] = await Promise.all([
+      supa.from('locations').select('*').eq('id', marcPunto).maybeSingle(),
+      supa.from('areas').select('*').eq('location_id', marcPunto).order('created_at', { ascending: true }),
+    ]);
+    const conHor = (ars || []).filter(a => (a.modules || []).includes('horarios'));
+    if(loc && conHor.length){ marcacionEntrarPunto(loc, conHor); return; }
+    showToast('Esta cuenta no tiene acceso a la marcación de ese punto', 'danger');
+  }
   const marcArea = new URLSearchParams(location.search).get('marcacion');
   if(marcArea && /^[0-9a-f-]{36}$/i.test(marcArea)){
     const { data: ar } = await supa.from('areas').select('*, locations(*)').eq('id', marcArea).maybeSingle();
@@ -5602,8 +5612,17 @@ function faceFoto(video, ancho){
 
 /* ---------- Pantalla de marcación (quiosco) ---------- */
 const KIO = { stream: null, timer: null, estado: 'apagado', datos: null, ultimo: null, racha: 0, persona: null, match: null, wake: null, recarga: null, ocupado: false };
+function marcacionEntrarPunto(loc, areas){
+  currentLocation = loc; currentArea = areas[0]; applyLocationTheme(loc);
+  ['loginScreen', 'locationScreen', 'areaScreen'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+  document.getElementById('app').style.display = 'none';
+  document.title = 'Marcación · ' + loc.name;
+  KIO.separado = true; KIO.areas = areas;
+  kioscoAbrir();
+}
 function marcacionEntrar(loc, area){
   const { locations, ...a } = area;
+  KIO.areas = [a];
   currentLocation = loc; currentArea = a; applyLocationTheme(loc);
   ['loginScreen', 'locationScreen', 'areaScreen'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
   document.getElementById('app').style.display = 'none';
@@ -5612,11 +5631,14 @@ function marcacionEntrar(loc, area){
   kioscoAbrir();
 }
 function marcacionEnlace(){ return location.origin + location.pathname + '?marcacion=' + currentArea.id; }
+function marcacionEnlacePunto(){ return location.origin + location.pathname + '?marcacion_punto=' + currentLocation.id; }
+// El botón de la barra lateral abre la ventana de todo el punto.
 function marcacionAbrirVentana(){
-  const w = window.open(marcacionEnlace(), 'marcacion-' + currentArea.id, 'popup=yes,width=1180,height=760');
-  if(!w) location.href = marcacionEnlace();
+  const url = marcacionEnlacePunto();
+  const w = window.open(url, 'marcacion-punto-' + currentLocation.id, 'popup=yes,width=1180,height=760');
+  if(!w) location.href = url;
 }
-document.getElementById('marcacionBtn').addEventListener('click', () => { if(currentArea) marcacionAbrirVentana(); });
+document.getElementById('marcacionBtn').addEventListener('click', () => { if(currentLocation) marcacionAbrirVentana(); });
 async function kioscoAbrir(){
   const k = document.getElementById('horKiosco');
   k.hidden = false; document.body.style.overflow = 'hidden'; document.getElementById('app').inert = true;
@@ -5641,9 +5663,24 @@ function kioscoCerrar(){
   if(KIO.separado){ if(window.opener){ window.close(); } location.href = location.pathname; }
 }
 async function kioscoCargarDatos(){
-  const a = currentArea.id, hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
+  const areas = KIO.areas && KIO.areas.length ? KIO.areas : [currentArea];
+  const partes = await Promise.all(areas.map(ar => kioscoCargarArea(ar.id)));
+  const ok = partes.filter(x => !x.error);
+  if(!ok.length) throw new Error(partes[0].error);
+  const nombreArea = {}; areas.forEach(ar => { nombreArea[ar.id] = ar.name; });
+  KIO.liderDe = {}; ok.forEach(x => { KIO.liderDe[x.area] = x.lider; });
+  KIO.lider = ok.some(x => x.lider);
+  KIO.datos = {
+    personal: ok.flatMap(x => x.personal.map(p => ({ ...p, area_nombre: nombreArea[x.area] }))),
+    rostros: ok.flatMap(x => x.rostros), asig: ok.flatMap(x => x.asig), marc: ok.flatMap(x => x.marc), nov: ok.flatMap(x => x.nov),
+    cfgDe: Object.fromEntries(ok.map(x => [x.area, x.cfg])), cfg: ok[0].cfg, hoy: horHoy(), varias: areas.length > 1,
+  };
+}
+function kioscoCfg(pid){ const p = KIO.datos.personal.find(x => x.id === pid); return (p && KIO.datos.cfgDe[p.area_id]) || KIO.datos.cfg || {}; }
+function kioscoAreaDe(pid){ const p = KIO.datos.personal.find(x => x.id === pid); return p ? p.area_id : currentArea.id; }
+async function kioscoCargarArea(a){
+  const hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
   const ed = await supa.rpc('horario_puede_editar', { p_area: a });
-  KIO.lider = !!ed.data;
   const [per, ros, sem, cfg, mar, nov] = await Promise.all([
     supa.from('horario_personal').select('*').eq('area_id', a).eq('activo', true).order('orden'),
     supa.from('horario_rostros').select('personal_id, descriptores').eq('area_id', a),
@@ -5653,10 +5690,10 @@ async function kioscoCargarDatos(){
     supa.from('horario_novedades').select('personal_id, tipo, desde, hasta').eq('area_id', a).lte('desde', hoy).gte('hasta', hoy),
   ]);
   const err = [per, ros, sem, cfg, mar, nov].find(r => r.error);
-  if(err) throw new Error(/horario_(rostros|marcaciones)/.test(err.error.message) ? 'La marcación todavía no está lista en la base de datos (falta correr sql/horarios_10_marcacion.sql).' : 'No se pudo cargar: ' + err.error.message);
+  if(err) return { error: /horario_(rostros|marcaciones)/.test(err.error.message) ? 'La marcación todavía no está lista en la base de datos (falta correr sql/horarios_10_marcacion.sql).' : 'No se pudo cargar: ' + err.error.message };
   let asig = [];
   if(sem.data){ const r = await supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).eq('dia', dia); asig = r.data || []; }
-  KIO.datos = { personal: per.data || [], rostros: ros.data || [], asig, cfg: cfg.data || {}, marc: mar.data || [], nov: nov.data || [], hoy };
+  return { area: a, lider: !!ed.data, personal: per.data || [], rostros: ros.data || [], asig, cfg: cfg.data || {}, marc: mar.data || [], nov: nov.data || [] };
 }
 function kioscoUltima(pid){ const m = KIO.datos.marc.filter(x => x.personal_id === pid); return m[m.length - 1] || null; }
 function kioscoTurno(pid){ return KIO.datos.asig.find(a => a.personal_id === pid && a.tipo !== 'descanso') || null; }
@@ -5696,7 +5733,7 @@ function kioscoPintar(estado, extra){
   KIO.estado = estado;
   const panel = document.getElementById('kioPanel'), marco = document.getElementById('kioMarco'), est = document.getElementById('kioEstado');
   const r = kioscoReloj();
-  const cab = `<div class="kio-lugar">${escapeHtml(currentLocation.name)} · ${escapeHtml(currentArea.name)}</div><div class="kio-hora">${escapeHtml(r.hora)}</div><div class="kio-fecha">${escapeHtml(r.fecha)}</div>`;
+  const cab = `<div class="kio-lugar">${escapeHtml(currentLocation.name)}${KIO.datos && KIO.datos.varias ? '' : ' · ' + escapeHtml(currentArea.name)}</div><div class="kio-hora">${escapeHtml(r.hora)}</div><div class="kio-fecha">${escapeHtml(r.fecha)}</div>`;
   marco.className = 'kio-marco';
   clearTimeout(KIO.volver);
   if(estado === 'cargando'){ est.textContent = 'Preparando la cámara…'; panel.innerHTML = cab + '<p>Cargando el reconocimiento facial. La primera vez tarda un poco.</p>'; }
@@ -5708,7 +5745,7 @@ function kioscoPintar(estado, extra){
     panel.innerHTML = cab + '<h2>No te reconozco</h2><p>Acércate, quítate el tapabocas y mira de frente. Si sigue sin reconocerte, llama al líder.</p>' + kioscoPie();
   }
   else if(estado === 'reconocido'){
-    const p = KIO.persona, ult = kioscoUltima(p.id), dentro = ult && ult.tipo === 'entrada', turno = kioscoTurno(p.id), atraso = kioscoAtraso(p.id), tol = Number(KIO.datos.cfg.tolerancia_min ?? 5);
+    const p = KIO.persona, ult = kioscoUltima(p.id), dentro = ult && ult.tipo === 'entrada', turno = kioscoTurno(p.id), atraso = kioscoAtraso(p.id), tol = Number(kioscoCfg(p.id).tolerancia_min ?? 5);
     marco.classList.add(KIO.match.dudosa ? 'warn' : 'ok'); est.textContent = KIO.match.dudosa ? 'Reconocido (con duda)' : 'Reconocido';
     panel.innerHTML = `<div class="kio-lugar">${escapeHtml(r.hora)}</div><h2>Hola, ${escapeHtml(p.nombre.split(' ')[0])}</h2>
       <div class="kio-info">${turno ? `<span>Tu turno de hoy: <b>${escapeHtml(turno.codigo || '')}</b></span>` : '<span>Hoy no tienes turno en el horario.</span>'}
@@ -5732,7 +5769,7 @@ function kioscoPintar(estado, extra){
     const manual = extra === 'manual';
     panel.innerHTML = `<h2>${manual ? 'Marcación por el líder' : 'Salir de la marcación'}</h2>
       <p>${manual ? 'El líder elige a la persona y escribe su contraseña de la app. Queda anotado que la marcó él, con la foto.' : 'Escribe la contraseña de la cuenta que está abierta en este equipo.'}</p>
-      ${manual ? `<label class="kio-campo"><span>Persona</span><select id="kioPersona">${KIO.datos.personal.map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`).join('')}</select></label>
+      ${manual ? `<label class="kio-campo"><span>Persona</span><select id="kioPersona">${KIO.datos.personal.filter(p => !KIO.liderDe || KIO.liderDe[p.area_id] !== false).map(p => `<option value="${p.id}">${escapeHtml(p.nombre)}${KIO.datos.varias ? ' · ' + escapeHtml(p.area_nombre || '') : ''}</option>`).join('')}</select></label>
         <label class="kio-campo"><span>Tipo</span><select id="kioTipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></label>` : ''}
       <label class="kio-campo"><span>Contraseña</span><input type="password" id="kioClave" autocomplete="current-password"></label>
       <button type="button" class="kio-grande entrada" data-kio="${manual ? 'confirmarmanual' : 'confirmarsalir'}">${manual ? 'Marcar' : 'Salir'}</button>
@@ -5757,30 +5794,32 @@ async function kioscoMarcar(pid, tipo, opciones){
     try {
       const blob = await faceFoto(v, 320);
       const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
-      const path = `${currentArea.id}/${hoy}/${id}.jpg`;
+      const path = `${kioscoAreaDe(pid)}/${hoy}/${id}.jpg`;
       const up = await supa.storage.from('horario-marcaciones').upload(path, blob, { contentType: 'image/jpeg' });
       if(!up.error) foto_path = path;
     } catch(_){}
-    const fila = { area_id: currentArea.id, personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual };
+    const fila = { area_id: kioscoAreaDe(pid), personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual };
     const { data, error } = await supa.from('horario_marcaciones').insert(fila).select().single();
     if(error){ showToast('No se pudo marcar: ' + error.message, 'danger'); kioscoReiniciar(); return; }
     KIO.datos.marc.push({ personal_id: pid, tipo, at: data.at, fecha_turno: data.fecha_turno });
     KIO.reciente = { pid, hasta: Date.now() + 60 * 1000 };
-    const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(KIO.datos.cfg.tolerancia_min ?? 5);
+    const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(kioscoCfg(pid).tolerancia_min ?? 5);
     kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path });
   } finally { KIO.ocupado = false; }
 }
 // Borra las fotos de evidencia de más de 60 días (carpetas por fecha).
 async function kioscoLimpiarFotos(){
-  try {
-    const limite = prenSumarDias(horHoy(), -60);
-    const { data } = await supa.storage.from('horario-marcaciones').list(currentArea.id, { limit: 1000 });
-    for(const carpeta of (data || []).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.name) && x.name < limite)){
-      const { data: fotos } = await supa.storage.from('horario-marcaciones').list(currentArea.id + '/' + carpeta.name, { limit: 1000 });
-      const rutas = (fotos || []).map(f => currentArea.id + '/' + carpeta.name + '/' + f.name);
-      if(rutas.length) await supa.storage.from('horario-marcaciones').remove(rutas);
-    }
-  } catch(_){}
+  const limite = prenSumarDias(horHoy(), -60);
+  for(const ar of (KIO.areas && KIO.areas.length ? KIO.areas : [currentArea])){
+    try {
+      const { data } = await supa.storage.from('horario-marcaciones').list(ar.id, { limit: 1000 });
+      for(const carpeta of (data || []).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.name) && x.name < limite)){
+        const { data: fotos } = await supa.storage.from('horario-marcaciones').list(ar.id + '/' + carpeta.name, { limit: 1000 });
+        const rutas = (fotos || []).map(f => ar.id + '/' + carpeta.name + '/' + f.name);
+        if(rutas.length) await supa.storage.from('horario-marcaciones').remove(rutas);
+      }
+    } catch(_){}
+  }
 }
 document.getElementById('horKiosco').addEventListener('click', async e => {
   const m = e.target.closest('[data-kio-marcar]');
