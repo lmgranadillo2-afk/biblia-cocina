@@ -156,6 +156,8 @@ body{
   font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer;
 }
 .logout-btn:active{background:var(--surface-2);}
+.logout-btn[hidden]{display:none;}
+#marcacionBtn{margin-bottom:8px;}
 nav.tabs button{
   display:flex; align-items:center; gap:12px; border:none; background:none; cursor:pointer; position:relative;
   color:var(--text-muted); font-family:'Inter',sans-serif; font-weight:600;
@@ -1482,6 +1484,7 @@ nav.tabs button{position:relative;}
       <button id="navMore" type="button" class="nav-more" title="Más" aria-label="Más"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg><span class="tab-label">Más</span></button>
     </nav>
     <div class="shell-user" id="shellUser">
+      <button class="logout-btn" id="marcacionBtn" type="button" title="Abrir la marcación de entrada y salida" hidden><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg><span class="tab-label">Marcación</span></button>
       <div class="who"><b id="whoName"></b><span class="role-badge" id="whoRole"></span></div>
       <button class="logout-btn" id="logoutBtn" type="button" title="Salir"><svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg><span class="tab-label">Salir</span></button>
     </div>
@@ -2789,6 +2792,8 @@ async function pickAreaForLocation(loc){
 const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','horarios'];
 
 function applyAreaModuleVisibility(modules){
+  const mb = document.getElementById('marcacionBtn');
+  if(mb) mb.hidden = !modules.includes('horarios') || esRrhh();
   MODULE_TABS.forEach(m=>{
     const tabBtn = document.getElementById('tab-'+m);
     if(tabBtn) tabBtn.style.display = modules.includes(m) ? '' : 'none';
@@ -5607,6 +5612,11 @@ function marcacionEntrar(loc, area){
   kioscoAbrir();
 }
 function marcacionEnlace(){ return location.origin + location.pathname + '?marcacion=' + currentArea.id; }
+function marcacionAbrirVentana(){
+  const w = window.open(marcacionEnlace(), 'marcacion-' + currentArea.id, 'popup=yes,width=1180,height=760');
+  if(!w) location.href = marcacionEnlace();
+}
+document.getElementById('marcacionBtn').addEventListener('click', () => { if(currentArea) marcacionAbrirVentana(); });
 async function kioscoAbrir(){
   const k = document.getElementById('horKiosco');
   k.hidden = false; document.body.style.overflow = 'hidden'; document.getElementById('app').inert = true;
@@ -5632,6 +5642,8 @@ function kioscoCerrar(){
 }
 async function kioscoCargarDatos(){
   const a = currentArea.id, hoy = horHoy(), dHoy = new Date(), dia = (dHoy.getDay() + 6) % 7 + 1, lunes = horIso(horLunesDe(dHoy));
+  const ed = await supa.rpc('horario_puede_editar', { p_area: a });
+  KIO.lider = !!ed.data;
   const [per, ros, sem, cfg, mar, nov] = await Promise.all([
     supa.from('horario_personal').select('*').eq('area_id', a).eq('activo', true).order('orden'),
     supa.from('horario_rostros').select('personal_id, descriptores').eq('area_id', a),
@@ -5728,7 +5740,7 @@ function kioscoPintar(estado, extra){
     setTimeout(() => document.getElementById(manual ? 'kioPersona' : 'kioClave')?.focus(), 50);
   }
 }
-function kioscoPie(){ return '<div class="kio-pie"><button type="button" class="kio-sec kio-plano" data-kio="manual">Marcar con la clave del líder</button>' + (KIO.separado && document.documentElement.requestFullscreen && !document.fullscreenElement ? '<button type="button" class="kio-sec kio-plano" data-kio="completa">Pantalla completa</button>' : '') + '<button type="button" class="kio-sec kio-plano" data-kio="salirclave">Salir</button></div>'; }
+function kioscoPie(){ return '<div class="kio-pie">' + (KIO.lider ? '<button type="button" class="kio-sec kio-plano" data-kio="manual">Marcar con la clave del líder</button>' : '') + (KIO.separado && document.documentElement.requestFullscreen && !document.fullscreenElement ? '<button type="button" class="kio-sec kio-plano" data-kio="completa">Pantalla completa</button>' : '') + '<button type="button" class="kio-sec kio-plano" data-kio="salirclave">Salir</button></div>'; }
 function kioscoReiniciar(){ KIO.persona = null; KIO.match = null; KIO.racha = 0; KIO.ultimo = null; kioscoPintar('espera'); kioscoBucle(); }
 async function kioscoVerificarClave(){
   const clave = document.getElementById('kioClave').value;
