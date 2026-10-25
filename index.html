@@ -3730,6 +3730,9 @@ const HOR = { areaId:null, editor:false, cfg:null, estaciones:[], personal:[], t
 // Días de la semana que están en una quincena cerrada (nadie los puede cambiar).
 function horBloqueado(dia){ return !!HOR.bloqueadas[horIso(horFecha(dia))]; }
 // Un turno de quincena cerrada solo se corrige si un admin lo habilitó (horario_turnos_habilitados, persona + día); lo corrige el líder.
+// Ya marcó entrada o salida ese día: el turno queda fijo para el líder (la llegada tarde no se puede "borrar"
+// moviendo el horario; se corrige en Registro del día). Un admin sí lo puede cambiar.
+function horMarcado(pid, dia){ return !horEsAdmin() && !!((HOR.marcas || {})[pid + '|' + horIso(horFecha(dia))] || []).length; }
 function horBloqueadoPersona(pid, dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !HOR.habilitados[pid + '|' + f]; }
 function horBloqueadoDia(dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !Object.keys(HOR.habilitados).some(k => k.endsWith('|' + f)); }
 function horRangoBloqueadoPersona(pid, desde, hasta){
@@ -4214,7 +4217,7 @@ function horGrillaHtml(v){
           sub = `<span class="h">${horNum(a.horas)} h${a.cubre_manana ? '<span class="hor-marca">M</span>' : ''}${a.cubre_cierre ? '<span class="hor-marca">C</span>' : ''}${noc ? `<span class="hor-marca noct" title="${horNum(noc)} h nocturnas">N${horNum(noc)}</span>` : ''}${a.tipo === 'otro' ? '<span class="hor-marca">OTRO</span>' : ''}</span>`;
         }
         if(lvl) cls += ' ' + lvl;
-        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${ed && !horBloqueadoPersona(p.id, d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
+        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${horMarcado(p.id, d) ? ' title="Ya marcó: no se cambia"' : ''}${ed && !horBloqueadoPersona(p.id, d) && !horMarcado(p.id, d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
       }
       const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
       const nn = horNocDe(p.id);
@@ -4254,7 +4257,11 @@ function horGrillaHtml(v){
 /* --- Acciones de la semana --- */
 document.getElementById('horSemana').addEventListener('click', async e => {
   const cell = e.target.closest('[data-hor-cell]');
-  if(cell){ const [cp, cd] = cell.dataset.horCell.split('|'); if(horEditable() && !horBloqueadoPersona(cp, Number(cd))) horAbrirCelda(cell.dataset.horCell); return; }
+  if(cell){
+    const [cp, cd] = cell.dataset.horCell.split('|');
+    if(horEditable() && horMarcado(cp, Number(cd))){ showToast('Ya marcó ese día: el turno no se cambia. Si llegó tarde o alguien lo cubrió, anótalo en Registro del día.', 'warn'); return; }
+    if(horEditable() && !horBloqueadoPersona(cp, Number(cd))) horAbrirCelda(cell.dataset.horCell); return;
+  }
   const irSub = e.target.closest('[data-hor-ir-sub]');
   if(irSub){ HOR.sub = irSub.dataset.horIrSub; horPintarSub(); horPintar(); return; }
   const ir = e.target.closest('[data-hor-ir]');
@@ -4377,8 +4384,15 @@ async function horProponerSemana(){
   const prop = horCalcularPropuesta(hist, histTareas);
   const libres = [1,2,3,4,5,6,7].filter(d => !horBloqueado(d));
   if(!libres.length){ showToast('Toda esta semana está en una quincena cerrada', 'warn'); horCargarSemana(); return; }
-  prop.filas = prop.filas.filter(x => libres.includes(x.dia)); prop.tareas = prop.tareas.filter(x => libres.includes(x.dia));
-  const del1 = await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id).in('dia', libres);
+  prop.filas = prop.filas.filter(x => libres.includes(x.dia) && !horMarcado(x.personal_id, x.dia)); prop.tareas = prop.tareas.filter(x => libres.includes(x.dia));
+  const conMarca = libres.filter(d => HOR.personal.some(p => horMarcado(p.id, d)));
+  const sinMarca = libres.filter(d => !conMarca.includes(d));
+  let del1 = sinMarca.length ? await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id).in('dia', sinMarca) : { error: null };
+  for(const d of conMarca){
+    if(del1.error) break;
+    const fijos = HOR.personal.filter(p => horMarcado(p.id, d)).map(p => p.id);
+    del1 = await supa.from('horario_asignaciones').delete().eq('semana_id', sem.id).eq('dia', d).not('personal_id', 'in', '(' + fijos.join(',') + ')');
+  }
   const del2 = await supa.from('horario_tarea_asignaciones').delete().eq('semana_id', sem.id).in('dia', libres);
   if(del1.error || del2.error){ showToast('No se pudo preparar la semana: ' + (del1.error || del2.error).message, 'danger'); horCargarSemana(); return; }
   if(prop.filas.length){
