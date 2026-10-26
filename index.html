@@ -11337,7 +11337,7 @@ function buildPedidoMessage(o){
       lines.push(categoryLabel(it.categoria).toUpperCase());
       lastCat = it.categoria;
     }
-    lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}`);
+    lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
   });
   return lines.join('\n');
 }
@@ -12590,7 +12590,7 @@ document.getElementById('consSendBtn').addEventListener('click', async ()=>{
         lines.push(categoryLabel(it.categoria).toUpperCase());
         lastCat = it.categoria;
       }
-      lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}`);
+      lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
     });
   });
 
