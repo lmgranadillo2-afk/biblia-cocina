@@ -533,6 +533,10 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+.exp-opciones{display:flex; flex-direction:column; gap:10px; margin:14px 0;}
+.exp-op{all:unset; box-sizing:border-box; cursor:pointer; display:flex; flex-direction:column; gap:2px; padding:14px 16px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface);}
+.exp-op:hover{background:var(--accent-soft);} .exp-op:focus-visible{box-shadow:var(--focus-ring);}
+.exp-op b{font-size:15px;} .exp-op span{font-size:13px; color:var(--text-muted);}
 .pren-sincerrar{margin:12px 0; padding:0 0 0 18px; max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; font-size:14px;}
 .pren-sincerrar span{color:var(--text-muted); font-size:13px;}
 .vivo-quien{position:fixed; top:12px; right:16px; z-index:60; display:flex; align-items:center; gap:4px; padding:4px 12px 4px 4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill); box-shadow:var(--shadow-1); max-width:calc(100vw - 32px);}
@@ -1796,7 +1800,7 @@ nav.tabs button{position:relative;}
       <div id="adminpanel-produccion" class="adminpanel">
         <div class="admin-header">
           <h2>Historial completo</h2>
-          <button class="btn btn-secondary btn-small" id="exportCsvBtn">Exportar CSV</button>
+          <button class="btn btn-secondary btn-small" id="exportCsvBtn">Descargar</button>
         </div>
         <div class="admin-filters">
           <div class="field"><label class="field-label">Desde</label><input type="date" id="fDesde"></div>
@@ -1875,7 +1879,7 @@ nav.tabs button{position:relative;}
       <div id="adminpanel-auditoria" class="adminpanel">
         <div class="admin-header">
           <h2>Auditoría de pedidos</h2>
-          <button class="btn btn-secondary btn-small" id="audCsv">Exportar CSV</button>
+          <button class="btn btn-secondary btn-small" id="audCsv">Descargar</button>
         </div>
         <div class="empty-note" style="margin-bottom:14px;">Pedidos de todos los puntos y áreas a los que tienes acceso. Toca un pedido para ver su detalle y su recorrido.</div>
         <div class="admin-filters">
@@ -8509,6 +8513,106 @@ function cargarJsPdf(){
   });
   return jspdfPromise;
 }
+/* ---------- Descargas en Excel (.xlsx con formato) y PDF ----------
+   exportarTabla({ formato:'xlsx'|'pdf', nombre, titulo, subtitulo, columnas:[{ t, w, tipo:'num'|'texto', total }], filas, horizontal })
+   Excel: título, subtítulo, encabezado oscuro fijo con filtros, anchos, números con formato y fila de totales.
+   PDF: misma tabla paginada, encabezado repetido y número de página. Librerías bajo demanda (cdnjs). */
+function cargarScript(url){
+  return new Promise((resolve, reject) => {
+    if(document.querySelector(`script[src="${url}"]`) && cargarScript.ok[url]) return resolve();
+    const s = document.createElement('script'); s.src = url; s.crossOrigin = 'anonymous';
+    s.onload = () => { cargarScript.ok[url] = true; resolve(); };
+    s.onerror = () => reject(new Error('No se pudo cargar ' + url.split('/').pop()));
+    document.head.appendChild(s);
+  });
+}
+cargarScript.ok = {};
+const EXP_OSCURO = '1F1810', EXP_ACENTO = 'C8935A', EXP_SUAVE = 'F7F2E8', EXP_GRIS = '62564A';
+async function exportarTabla(o){
+  const cols = o.columnas, filas = o.filas;
+  if(!filas.length){ showToast('No hay datos para descargar', 'warn'); return; }
+  const totales = cols.some(c => c.total) ? cols.map((c, i) => c.total ? filas.reduce((a, f) => a + (Number(f[i]) || 0), 0) : (i === 0 ? 'Total' : '')) : null;
+  const nombre = o.nombre.replace(/[^\w\-áéíóúñÁÉÍÓÚÑ]+/g, '_');
+  try {
+    if(o.formato === 'pdf'){
+      await cargarJsPdf();
+      await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+      const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: o.horizontal ? 'landscape' : 'portrait' });
+      const W = doc.internal.pageSize.getWidth();
+      doc.setFillColor('#' + EXP_ACENTO); doc.rect(0, 0, W, 3, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor('#' + EXP_OSCURO); doc.text(o.titulo, 14, 16);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor('#' + EXP_GRIS); doc.text(o.subtitulo || '', 14, 22);
+      const fmt = (v, c) => c.tipo === 'num' && v !== '' && v != null && !isNaN(Number(v)) ? Number(v).toLocaleString('es-CO', { maximumFractionDigits: 2 }) : (v == null ? '' : String(v));
+      doc.autoTable({
+        startY: 27, head: [cols.map(c => c.t)], body: filas.map(f => f.map((v, i) => fmt(v, cols[i]))),
+        foot: totales ? [totales.map((v, i) => fmt(v, cols[i]))] : undefined, showFoot: 'lastPage',
+        styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.8, textColor: '#' + EXP_OSCURO, lineColor: '#DDD0B6', lineWidth: 0.1 },
+        headStyles: { fillColor: '#' + EXP_OSCURO, textColor: '#F7F2E8', fontStyle: 'bold' },
+        footStyles: { fillColor: '#EFE6D4', textColor: '#' + EXP_OSCURO, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: '#FBF8F2' },
+        columnStyles: Object.fromEntries(cols.map((c, i) => [i, c.tipo === 'num' ? { halign: 'right' } : {}])),
+        margin: { left: 10, right: 10, bottom: 14 },
+        didDrawPage: d => {
+          doc.setFontSize(8); doc.setTextColor('#' + EXP_GRIS);
+          doc.text('Biblia de Cocina · ' + new Date().toLocaleString('es-CO'), 10, doc.internal.pageSize.getHeight() - 7);
+          doc.text('Página ' + d.pageNumber, W - 10, doc.internal.pageSize.getHeight() - 7, { align: 'right' });
+        },
+      });
+      doc.save(nombre + '.pdf');
+    } else {
+      await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js');
+      const wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet((o.hoja || 'Datos').slice(0, 31));
+      const n = cols.length;
+      ws.columns = cols.map(c => ({ width: c.w || 14 }));
+      ws.mergeCells(1, 1, 1, n); ws.getCell(1, 1).value = o.titulo;
+      ws.getCell(1, 1).font = { bold: true, size: 15, color: { argb: 'FF' + EXP_OSCURO } };
+      ws.mergeCells(2, 1, 2, n); ws.getCell(2, 1).value = o.subtitulo || '';
+      ws.getCell(2, 1).font = { size: 10, color: { argb: 'FF' + EXP_GRIS } };
+      ws.getRow(1).height = 24;
+      const head = ws.getRow(4); head.values = cols.map(c => c.t); head.height = 22;
+      head.eachCell(c => { c.font = { bold: true, color: { argb: 'FFF7F2E8' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + EXP_OSCURO } }; c.alignment = { vertical: 'middle', wrapText: true }; });
+      filas.forEach((f, k) => {
+        const r = ws.addRow(f.map((v, i) => cols[i].tipo === 'num' && v !== '' && v != null && !isNaN(Number(v)) ? Number(v) : (v == null ? '' : v)));
+        r.eachCell({ includeEmpty: true }, (c, i) => {
+          if(cols[i - 1] && cols[i - 1].tipo === 'num') c.numFmt = '#,##0.##';
+          c.alignment = { vertical: 'top', wrapText: true };
+          c.border = { bottom: { style: 'hair', color: { argb: 'FFDDD0B6' } } };
+          if(k % 2) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBF8F2' } };
+        });
+        if(o.resaltar && o.resaltar(k)) r.eachCell({ includeEmpty: true }, c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7EAD0' } }; });
+      });
+      if(totales){
+        const t = ws.addRow(totales);
+        t.eachCell({ includeEmpty: true }, (c, i) => { c.font = { bold: true }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFE6D4' } }; if(cols[i - 1] && cols[i - 1].tipo === 'num') c.numFmt = '#,##0.##'; });
+      }
+      ws.views = [{ state: 'frozen', ySplit: 4 }];
+      ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: n } };
+      const buf = await wb.xlsx.writeBuffer();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = nombre + '.xlsx'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+    showToast(o.formato === 'pdf' ? 'PDF descargado' : 'Excel descargado', 'ok');
+  } catch(e){ showToast('No se pudo descargar: ' + e.message, 'danger'); }
+}
+// Ventana pequeña para elegir el formato. opciones: [{ k, t, d }] → resuelve la k elegida o null.
+function elegirFormato(titulo, opciones){
+  return new Promise(res => {
+    let m = document.getElementById('expFormatoModal');
+    if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'expFormatoModal'; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="expFmtTit"><h3 id="expFmtTit">${escapeHtml(titulo)}</h3>
+      <div class="exp-opciones">${opciones.map(x => `<button type="button" class="exp-op" data-exp="${x.k}"><b>${escapeHtml(x.t)}</b><span>${escapeHtml(x.d)}</span></button>`).join('')}</div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" data-exp="">Cancelar</button></div></div>`;
+    m.classList.add('open');
+    const fin = v => { m.classList.remove('open'); m.onclick = null; document.removeEventListener('keydown', esc); res(v || null); };
+    const esc = e => { if(e.key === 'Escape') fin(null); };
+    document.addEventListener('keydown', esc);
+    m.onclick = e => { const b = e.target.closest('[data-exp]'); if(b) fin(b.dataset.exp); else if(e.target === m) fin(null); };
+    m.querySelector('.exp-op').focus();
+  });
+}
+const EXP_OPC = [{ k: 'xlsx', t: 'Excel', d: 'Con títulos, totales y filtros' }, { k: 'pdf', t: 'PDF', d: 'Para imprimir o enviar' }];
 async function eventoDescargarPdf(d){
   const pl = plantillaCotizacion(d);
   if(!pl) throw new Error('Este restaurante todavía no tiene plantilla de cotización');
@@ -9968,6 +10072,7 @@ async function loadAdminHistory(){
 
 document.getElementById('fApply').addEventListener('click', applyAdminFilters);
 
+let adminFiltrados = null;
 function applyAdminFilters(){
   const desde = document.getElementById('fDesde').value;
   const hasta = document.getElementById('fHasta').value;
@@ -9979,6 +10084,7 @@ function applyAdminFilters(){
   if(hasta) list = list.filter(p => p.fecha <= hasta);
   if(receta) list = list.filter(p => p.recipe_name.toUpperCase().includes(receta) || p.recipe_code.toUpperCase().includes(receta));
   if(responsable) list = list.filter(p => p.responsable.toUpperCase().includes(responsable));
+  adminFiltrados = list;
 
   renderProdHistory(list, document.getElementById('adminList'), document.getElementById('adminCount'), true);
 }
@@ -10419,26 +10525,25 @@ async function loadUsers(){
   });
 }
 
-document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
-  const rows = adminRows;
+// Historial de producción (con los filtros de la pantalla) en Excel o PDF.
+document.getElementById('exportCsvBtn').addEventListener('click', async ()=>{
+  const rows = adminFiltrados || adminRows;
   if(rows.length === 0){ showToast('No hay datos para exportar'); return; }
-  const headers = ['fecha','receta_codigo','receta_nombre','cantidad','rendimiento_esperado','responsable','rendimiento_real','observacion','estado','anulado_por','anulado_motivo','registrado_en'];
-  const lines = [headers.join(',')];
-  rows.forEach(p=>{
-    const row = [
-      p.fecha, p.recipe_code, p.recipe_name, p.cantidad_label, p.rendimiento_esperado||'',
-      p.responsable, p.rendimiento_real||'', (p.observacion||'').replace(/,/g,';').replace(/\n/g,' '),
-      p.status, p.anulado_por||'', (p.anulado_motivo||'').replace(/,/g,';').replace(/\n/g,' '),
-      p.created_at
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`);
-    lines.push(row.join(','));
+  const formato = await elegirFormato('Descargar producción', EXP_OPC); if(!formato) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const rango = desde || hasta ? (desde ? fmtDia(desde) : 'inicio') + ' a ' + (hasta ? fmtDia(hasta) : 'hoy') : 'todo el historial';
+  const activas = rows.filter(p => p.status !== 'anulado').length;
+  exportarTabla({
+    formato, horizontal: true, hoja: 'Producción',
+    nombre: 'produccion_' + (currentLocation ? currentLocation.name : '') + '_' + (currentArea ? currentArea.name : '') + '_' + toISODate(new Date()),
+    titulo: 'Producción · ' + (currentArea ? currentArea.name : '') + ' · ' + (currentLocation ? currentLocation.name : ''),
+    subtitulo: rango + ' · ' + rows.length + ' registros (' + activas + ' activos, ' + (rows.length - activas) + ' anulados)',
+    columnas: [{ t: 'Fecha', w: 12 }, { t: 'Receta', w: 34 }, { t: 'Código', w: 11 }, { t: 'Cantidad', w: 14 }, { t: 'Rinde esperado', w: 16 },
+      { t: 'Rinde real', w: 14 }, { t: 'Responsable', w: 20 }, { t: 'Estado', w: 11 }, { t: 'Observación', w: 32 }, { t: 'Anulado por / motivo', w: 28 }],
+    filas: rows.map(p => [p.fecha, p.recipe_name, p.recipe_code, p.cantidad_label, p.rendimiento_esperado || '', p.rendimiento_real || '', p.responsable,
+      p.status === 'anulado' ? 'Anulado' : 'Activo', p.observacion || '', p.status === 'anulado' ? [p.anulado_por, p.anulado_motivo].filter(Boolean).join(': ') : '']),
+    resaltar: k => rows[k].status === 'anulado',
   });
-  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'produccion_biblia_cocina.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 });
 
 /* ---------- CRONOGRAMA (calendario mensual) ---------- */
@@ -11308,7 +11413,7 @@ function orderKanbanCardHtml(o, mode){
       let sendBtns = '<div class="kc-actions">';
       sendBtns += `<button class="btn btn-secondary btn-small" data-wa-id="${o.id}" title="Enviar el pedido por WhatsApp">WhatsApp</button>`;
       if(o.proveedor_correo) sendBtns += `<button class="btn btn-secondary btn-small" data-mail-id="${o.id}" title="Enviar el pedido por correo">Correo</button>`;
-      sendBtns += `<button class="btn btn-secondary btn-small" data-file-id="${o.id}" title="Descargar el pedido en Excel (CSV) para subirlo al portal del proveedor">Archivo</button>`;
+      sendBtns += `<button class="btn btn-secondary btn-small" data-file-id="${o.id}" title="Descargar el pedido en Excel, PDF o CSV (portal del proveedor)">Archivo</button>`;
       sendBtns += '</div>';
       actions += sendBtns;
     }
@@ -11378,10 +11483,27 @@ function sendPedidoEmail(o){
 }
 
 // Pedido en CSV (abre en Excel: separador ";" y coma decimal) para subirlo al portal del proveedor (ej. Diez Equis).
-function descargarPedidoArchivo(o){
+async function descargarPedidoArchivo(o){
   if(o.enviado){ showToast('Este pedido ya fue enviado'); return; }
   const items = sortByCategoria(o.order_items || []);
   if(items.length === 0){ showToast('El pedido no tiene insumos', 'warn'); return; }
+  const formato = await elegirFormato('Pedido ' + (o.codigo || '') + ' · ' + (o.proveedor || ''),
+    EXP_OPC.concat([{ k: 'csv', t: 'CSV para el portal', d: 'El formato que piden algunos proveedores (ej. Diez Equis)' }]));
+  if(!formato) return;
+  if(formato !== 'csv'){
+    const sedeN = currentLocation ? currentLocation.name : '';
+    await exportarTabla({
+      formato, hoja: 'Pedido',
+      nombre: ['pedido', o.codigo, o.proveedor, sedeN].filter(Boolean).join('_'),
+      titulo: 'Pedido ' + (o.codigo || '') + ' · ' + (o.proveedor || ''),
+      subtitulo: [sedeN, currentArea ? currentArea.name : '', fmtDia(o.fecha), o.creado_por_nombre ? 'pidió ' + o.creado_por_nombre : ''].filter(Boolean).join(' · '),
+      columnas: [{ t: 'Categoría', w: 16 }, { t: 'Producto', w: 36 }, { t: 'Cód. proveedor', w: 14 }, { t: 'Cantidad', w: 10, tipo: 'num' }, { t: 'Unidad', w: 12 }, { t: 'Nota', w: 28 }],
+      filas: items.map(it => [categoryLabel(it.categoria), PROVEEDOR_ALIAS[o.proveedor_id + '|' + it.ingredient_code] || it.ingredient_name,
+        PROVEEDOR_CODIGO[o.proveedor_id + '|' + it.ingredient_code] || '', Number(it.cantidad), it.unidad, it.nota || '']),
+    });
+    markOrderAsSent(o.id);
+    return;
+  }
   const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const sede = currentLocation ? currentLocation.name : '';
   const filas = [['Pedido', 'Fecha', 'Sede', 'Área', 'Proveedor', 'Categoría', 'Código', 'Producto', 'Cantidad', 'Unidad', 'Nota']];
@@ -12812,7 +12934,31 @@ function exportarAuditoriaCsv(){
 document.getElementById('audPunto').addEventListener('change', llenarAreasAuditoria);
 document.getElementById('audFiltrar').addEventListener('click', cargarAuditoria);
 document.getElementById('audBuscar').addEventListener('input', renderAuditoria);
-document.getElementById('audCsv').addEventListener('click', exportarAuditoriaCsv);
+// Auditoría en Excel o PDF (una fila por insumo); el CSV de antes sigue disponible.
+document.getElementById('audCsv').addEventListener('click', async () => {
+  const lista = pedidosAuditoriaFiltrados();
+  if(lista.length === 0){ showToast('No hay pedidos para exportar con estos filtros', 'warn'); return; }
+  const formato = await elegirFormato('Descargar pedidos', EXP_OPC.concat([{ k: 'csv', t: 'CSV', d: 'Texto plano, como antes' }])); if(!formato) return;
+  if(formato === 'csv'){ exportarAuditoriaCsv(); return; }
+  const fh = iso => iso ? new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  const filas = [];
+  lista.forEach(o => {
+    const base = it => [o.fecha, o.codigo, (aud.puntos[o.location_id] || {}).name || '', (aud.areas[o.area_id] || {}).name || '', o.proveedor || '', AUD_ESTADO_TEXTO[o._estado] || '',
+      it ? it.ingredient_name : '', it ? Number(it.cantidad) : '', it ? it.unidad : '', it ? (it.nota || '') : '', o.creado_por_nombre || '', fh(o.enviado_at), fh(o.recibido_at)];
+    const items = sortByCategoria(o.order_items || []);
+    if(items.length === 0) filas.push(base(null)); else items.forEach(it => filas.push(base(it)));
+  });
+  const d = document.getElementById('audDesde').value, h = document.getElementById('audHasta').value;
+  exportarTabla({
+    formato, horizontal: true, hoja: 'Pedidos',
+    nombre: 'pedidos_' + (d || 'inicio') + '_' + (h || 'hoy'),
+    titulo: 'Pedidos · auditoría',
+    subtitulo: (d ? fmtDia(d) : 'inicio') + ' a ' + (h ? fmtDia(h) : 'hoy') + ' · ' + lista.length + ' pedidos · ' + filas.length + ' líneas',
+    columnas: [{ t: 'Fecha', w: 11 }, { t: 'Pedido', w: 11 }, { t: 'Punto', w: 20 }, { t: 'Área', w: 12 }, { t: 'Proveedor', w: 20 }, { t: 'Estado', w: 12 },
+      { t: 'Insumo', w: 32 }, { t: 'Cantidad', w: 10, tipo: 'num' }, { t: 'Unidad', w: 10 }, { t: 'Nota', w: 22 }, { t: 'Pidió', w: 20 }, { t: 'Enviado', w: 16 }, { t: 'Recibido', w: 16 }],
+    filas,
+  });
+});
 document.getElementById('audEstados').addEventListener('click', e => {
   const b = e.target.closest('[data-estado]');
   if(!b) return;
