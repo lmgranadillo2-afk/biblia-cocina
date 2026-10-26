@@ -11500,7 +11500,7 @@ async function desmarcarRecibido(orderId){
 // Enviado por error: vuelve a aprobado y sin enviar (sigue aprobado), para que se envíe desde el área o el Consolidado.
 async function desmarcarEnviado(orderId){
   if(!confirm('¿Desmarcar el envío? El pedido vuelve a quedar aprobado y sin enviar.')) return;
-  const { error } = await supa.from('orders').update({ enviado: false, enviado_at: null, enviado_por: null }).eq('id', orderId);
+  const { error } = await supa.rpc('desmarcar_pedido_enviado', { p_order_id: orderId });
   if(error){ showToast('No se pudo desmarcar: ' + error.message, 'danger'); return; }
   showToast('Listo: el pedido quedó aprobado y sin enviar', 'ok');
   loadAdminOrders();
