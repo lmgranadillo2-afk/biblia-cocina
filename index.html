@@ -6450,20 +6450,27 @@ let PROVEEDORES = [];
 let PROVEEDOR_INSUMOS_MAP = {};
 // Nombre con que el proveedor conoce el insumo (ej. Zumeats: Strip loin = New York): proveedor|código → nombre.
 let PROVEEDOR_ALIAS = {};
+// Código del producto en el proveedor (ej. PriceSmart 176353): proveedor|código → código del proveedor.
+let PROVEEDOR_CODIGO = {};
 
 async function loadProveedorInsumosMap(){
-  let { data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, nombre_proveedor, group_ingredients(code)');
+  let { data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, nombre_proveedor, codigo_proveedor, group_ingredients(code)');
+  if(error) ({ data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, nombre_proveedor, group_ingredients(code)'));
   if(error) ({ data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, group_ingredients(code)'));
-  PROVEEDOR_INSUMOS_MAP = {}; PROVEEDOR_ALIAS = {};
+  PROVEEDOR_INSUMOS_MAP = {}; PROVEEDOR_ALIAS = {}; PROVEEDOR_CODIGO = {};
   if(error) return;
   (data || []).forEach(r=>{
     if(!r.group_ingredients) return;
     if(!PROVEEDOR_INSUMOS_MAP[r.proveedor_id]) PROVEEDOR_INSUMOS_MAP[r.proveedor_id] = new Set();
     PROVEEDOR_INSUMOS_MAP[r.proveedor_id].add(r.group_ingredients.code);
     if(r.nombre_proveedor && String(r.nombre_proveedor).trim()) PROVEEDOR_ALIAS[r.proveedor_id + '|' + r.group_ingredients.code] = String(r.nombre_proveedor).trim();
+    if(r.codigo_proveedor && String(r.codigo_proveedor).trim()) PROVEEDOR_CODIGO[r.proveedor_id + '|' + r.group_ingredients.code] = String(r.codigo_proveedor).trim();
   });
 }
-function nombreParaProveedor(provId, it){ return PROVEEDOR_ALIAS[provId + '|' + it.ingredient_code] || it.ingredient_name; }
+function nombreParaProveedor(provId, it){
+  const k = provId + '|' + it.ingredient_code, cod = PROVEEDOR_CODIGO[k];
+  return (PROVEEDOR_ALIAS[k] || it.ingredient_name) + (cod ? ' (cód. ' + cod + ')' : '');
+}
 
 async function loadProveedores(){
   const { data, error } = await supa.from('area_proveedores').select('proveedor_id, proveedores(*)').eq('area_id', currentArea.id);
@@ -11767,10 +11774,11 @@ document.getElementById('orderReviewApprove').addEventListener('click', async ()
   const rows = readOrderRows(document.getElementById('orderReviewRows'));
   if(rows.length === 0){ showToast('El pedido debe tener al menos un insumo'); return; }
   await saveReviewedItems(currentReviewOrderId);
-  const { error } = await supa.from('orders').update({
+  const apr = await supa.from('orders').update({
     status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
-  }).eq('id', currentReviewOrderId);
-  if(error){ showToast('Error al aprobar: ' + error.message); return; }
+  }).eq('id', currentReviewOrderId).select('id');
+  if(apr.error){ showToast('Error al aprobar: ' + apr.error.message); return; }
+  if(!(apr.data || []).length){ showToast('La base de datos no dejó aprobar este pedido (no cambió nada). Recarga y revisa su estado.', 'danger'); return; }
   showToast('Pedido aprobado');
   document.getElementById('orderReviewModal').classList.remove('open');
   currentReviewOrderId = null;
@@ -11787,10 +11795,11 @@ document.getElementById('orderReviewReject').addEventListener('click', async ()=
   const motivo = document.getElementById('orderRejectMotivo').value.trim();
   if(!motivo){ showToast('Escribe el motivo de rechazo'); return; }
   await saveReviewedItems(currentReviewOrderId);
-  const { error } = await supa.from('orders').update({
+  const rec = await supa.from('orders').update({
     status: 'rechazado', rechazo_motivo: motivo, resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
-  }).eq('id', currentReviewOrderId);
-  if(error){ showToast('Error al rechazar: ' + error.message); return; }
+  }).eq('id', currentReviewOrderId).select('id');
+  if(rec.error){ showToast('Error al rechazar: ' + rec.error.message); return; }
+  if(!(rec.data || []).length){ showToast('La base de datos no dejó rechazar este pedido (no cambió nada). Recarga y revisa su estado.', 'danger'); return; }
   showToast('Pedido rechazado');
   document.getElementById('orderReviewModal').classList.remove('open');
   currentReviewOrderId = null;
