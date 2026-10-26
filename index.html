@@ -6448,17 +6448,22 @@ async function initApp(){
 /* ---------- PROVEEDORES ---------- */
 let PROVEEDORES = [];
 let PROVEEDOR_INSUMOS_MAP = {};
+// Nombre con que el proveedor conoce el insumo (ej. Zumeats: Strip loin = New York): proveedor|código → nombre.
+let PROVEEDOR_ALIAS = {};
 
 async function loadProveedorInsumosMap(){
-  const { data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, group_ingredients(code)');
-  PROVEEDOR_INSUMOS_MAP = {};
+  let { data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, nombre_proveedor, group_ingredients(code)');
+  if(error) ({ data, error } = await supa.from('group_ingredient_proveedores').select('proveedor_id, group_ingredients(code)'));
+  PROVEEDOR_INSUMOS_MAP = {}; PROVEEDOR_ALIAS = {};
   if(error) return;
   (data || []).forEach(r=>{
     if(!r.group_ingredients) return;
     if(!PROVEEDOR_INSUMOS_MAP[r.proveedor_id]) PROVEEDOR_INSUMOS_MAP[r.proveedor_id] = new Set();
     PROVEEDOR_INSUMOS_MAP[r.proveedor_id].add(r.group_ingredients.code);
+    if(r.nombre_proveedor && String(r.nombre_proveedor).trim()) PROVEEDOR_ALIAS[r.proveedor_id + '|' + r.group_ingredients.code] = String(r.nombre_proveedor).trim();
   });
 }
+function nombreParaProveedor(provId, it){ return PROVEEDOR_ALIAS[provId + '|' + it.ingredient_code] || it.ingredient_name; }
 
 async function loadProveedores(){
   const { data, error } = await supa.from('area_proveedores').select('proveedor_id, proveedores(*)').eq('area_id', currentArea.id);
@@ -11337,7 +11342,7 @@ function buildPedidoMessage(o){
       lines.push(categoryLabel(it.categoria).toUpperCase());
       lastCat = it.categoria;
     }
-    lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
+    lines.push(`- ${nombreParaProveedor(o.proveedor_id, it)}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
   });
   return lines.join('\n');
 }
@@ -12590,7 +12595,7 @@ document.getElementById('consSendBtn').addEventListener('click', async ()=>{
         lines.push(categoryLabel(it.categoria).toUpperCase());
         lastCat = it.categoria;
       }
-      lines.push(`- ${it.ingredient_name}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
+      lines.push(`- ${nombreParaProveedor(currentConsolidadoProveedor.id, it)}: ${fmtQty(it.cantidad)} ${it.unidad}${it.nota && String(it.nota).trim() ? ` (${String(it.nota).trim()})` : ''}`);
     });
   });
 
