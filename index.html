@@ -3443,6 +3443,8 @@ function vivoVistaActual(){
   const v = document.querySelector('.view.active'); if(!v) return '';
   if(v.id === 'view-horarios') return 'horarios:' + (HOR.lunes ? horIso(HOR.lunes) : '') + ':' + (HOR.sub || 'semana');
   if(v.id === 'view-produccion') return 'produccion';
+  if(v.id === 'view-pedidos') return 'pedidos';
+  if(v.id === 'view-admin'){ const p = ['pedidos', 'consolidado', 'auditoria'].find(n => { const el = document.getElementById('adminpanel-' + n); return el && el.classList.contains('active'); }); return p ? 'admin-' + p : ''; }
   return '';
 }
 function vivoTrack(){
@@ -3507,6 +3509,24 @@ function vivoProduccion(){
     if(ap && ap.classList.contains('active') && document.getElementById('view-admin').classList.contains('active')) loadAdminHistory();
   });
 }
+// Pedidos: los avisos de pedido nuevo / aprobado ya los da setupRealtime; aquí se refresca lo que esté en pantalla
+// (también cambios de cantidades e ítems y lo que hagan otras áreas del punto, para el Consolidado).
+function vivoPedidos(){
+  const propio = Date.now() - VIVO.yo < 4000;
+  vivoProgramar('ped', () => {
+    const activa = id => { const el = document.getElementById(id); return !!(el && el.classList.contains('active')); };
+    const enAdmin = activa('view-admin');
+    const tareas = [];
+    if(activa('view-pedidos')) tareas.push(() => loadMyOrders());
+    if(enAdmin && activa('adminpanel-pedidos')) tareas.push(() => loadAdminOrders());
+    if(enAdmin && activa('adminpanel-consolidado')) tareas.push(() => loadConsolidadoProveedores());
+    if(enAdmin && activa('adminpanel-auditoria') && typeof cargarAuditoria === 'function') tareas.push(() => cargarAuditoria());
+    if(!tareas.length) return;
+    const recargar = () => { vivoBarra(null); tareas.forEach(t => t()); };
+    if(document.querySelector('.modal-overlay.open') || vivoOcupado(enAdmin ? 'view-admin' : 'view-pedidos')){ vivoBarra((propio ? 'Hay cambios nuevos' : 'Cambios de ' + vivoQuienCambio()) + ' en los pedidos', recargar); return; }
+    recargar();
+  });
+}
 function vivoIniciar(){
   if(!currentArea || (VIVO.canal && VIVO.area === currentArea.id)) return;
   if(VIVO.canal){ supa.removeChannel(VIVO.canal); VIVO.canal = null; }
@@ -3520,6 +3540,8 @@ function vivoIniciar(){
   ['horario_asignaciones', 'horario_tarea_asignaciones']
     .forEach(t => c.on('postgres_changes', { event: '*', schema: 'public', table: t }, p => { if(deLaSemana(p)) vivoHorarios(); }));
   c.on('postgres_changes', { event: '*', schema: 'public', table: 'productions', filter: filtro }, vivoProduccion);
+  if(currentLocation) c.on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: 'location_id=eq.' + currentLocation.id }, vivoPedidos);
+  c.on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, vivoPedidos);
   c.on('presence', { event: 'sync' }, () => {
     const st = c.presenceState();
     VIVO.otros = Object.entries(st).filter(([k]) => k !== session.user.id).map(([, v]) => v[v.length - 1] || {}).filter(o => o.nombre);
@@ -10000,6 +10022,7 @@ function adminPintarInicio(){
 }
 document.getElementById('adminpanel-inicio').addEventListener('click', e => { const b = e.target.closest('[data-air]'); if(b) switchAdminSub(b.dataset.air); });
 function switchAdminSub(name){
+  setTimeout(vivoTrack, 0);
   adminMostrarGrupo(name === 'inicio' ? 'inicio' : (Object.keys(ADMIN_GRUPOS).find(g => ADMIN_GRUPOS[g].includes(name)) || 'inicio'));
   document.getElementById('adminpanel-inicio').classList.toggle('active', name === 'inicio');
   if(name === 'inicio'){ adminPintarInicio(); adminActualizarConteos(); }
