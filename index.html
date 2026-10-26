@@ -1152,6 +1152,8 @@ nav.tabs button{position:relative;}
 .hor-sop-add input{position:absolute; width:1px; height:1px; opacity:0;}
 .pren-aviso.ok{background:var(--ok-bg); color:var(--text);} .pren-aviso.ok b{color:var(--ok);}
 .hor-grid thead th.bloq{color:var(--text-dim);}
+.hor-grid thead th.puente{color:var(--info); background:var(--info-bg);}
+.hor-grid td.puente{background:var(--info-bg);}
 .hor-bloq{display:block; font:600 9px 'IBM Plex Mono',monospace; letter-spacing:.6px; color:var(--text-dim);}
 .quin-lista{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
 .quin-lista li{display:flex; gap:10px; align-items:flex-start; font-size:14px; line-height:1.4;}
@@ -3533,6 +3535,7 @@ function vivoIniciar(){
   const area = currentArea.id, filtro = 'area_id=eq.' + area;
   // Casillas y tareas no tienen área: llegan todas las que el usuario puede ver y se filtran por la semana en pantalla.
   const deLaSemana = p => { const r = p.new && Object.keys(p.new).length ? p.new : p.old || {};
+    if(HOR.semanaSig && r.semana_id === HOR.semanaSig.id) return true;
     return !HOR.semana || !r.semana_id ? !!(p.old && p.old.id && Object.values(HOR.asig || {}).some(a => a.id === p.old.id)) : r.semana_id === HOR.semana.id; };
   const c = supa.channel('vivo-' + area, { config: { presence: { key: session.user.id } } });
   ['horario_semanas', 'horario_novedades', 'horario_registro_dia', 'horario_dias_cerrados', 'horario_turnos_habilitados']
@@ -3755,6 +3758,35 @@ function horBloqueado(dia){ return !!HOR.bloqueadas[horIso(horFecha(dia))]; }
 // Un turno de quincena cerrada solo se corrige si un admin lo habilitó (horario_turnos_habilitados, persona + día); lo corrige el líder.
 // Ya marcó entrada o salida ese día: el turno queda fijo para el líder (la llegada tarde no se puede "borrar"
 // moviendo el horario; se corrige en Registro del día). Un admin sí lo puede cambiar.
+// Días de la grilla: 7, u 8 si el lunes siguiente es festivo (puente). El día 8 vive en la semana siguiente (día 1).
+function horDias(){ return HOR.puente ? 8 : 7; }
+function horDiaNombre(d, corto){ return (corto ? HOR_DC : HOR_DIAS)[(d - 1) % 7]; }
+function horEditableDia(d){ return d === 8 ? !!(HOR.editor && HOR.puente && (!HOR.semanaSig || HOR.semanaSig.estado === 'borrador')) : horEditable(); }
+// Guarda (fila) o borra (null) una casilla; el día 8 va al lunes de la semana siguiente (la crea en borrador si falta).
+async function horGuardarCasilla(pid, d, fila){
+  let semId = HOR.semana && HOR.semana.id, dia = d;
+  if(d === 8){
+    dia = 1;
+    if(!HOR.semanaSig){
+      const { data, error } = await supa.from('horario_semanas').insert({ area_id: HOR.areaId, lunes: horIso(horFecha(8)) }).select().single();
+      if(error) return { error };
+      HOR.semanaSig = data;
+    }
+    semId = HOR.semanaSig.id;
+  }
+  const k = pid + '|' + d;
+  if(fila){
+    const { data, error } = await supa.from('horario_asignaciones')
+      .upsert({ semana_id: semId, personal_id: pid, dia, ...fila, updated_at: new Date().toISOString() }, { onConflict: 'semana_id,personal_id,dia' }).select().single();
+    if(error) return { error };
+    HOR.asig[k] = data;
+  } else if(HOR.asig[k]){
+    const { error } = await supa.from('horario_asignaciones').delete().eq('id', HOR.asig[k].id);
+    if(error) return { error };
+    delete HOR.asig[k];
+  }
+  return {};
+}
 function horMarcado(pid, dia){ return !horEsAdmin() && !!((HOR.marcas || {})[pid + '|' + horIso(horFecha(dia))] || []).length; }
 function horBloqueadoPersona(pid, dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !HOR.habilitados[pid + '|' + f]; }
 function horBloqueadoDia(dia){ const f = horIso(horFecha(dia)); return !!HOR.bloqueadas[f] && !Object.keys(HOR.habilitados).some(k => k.endsWith('|' + f)); }
@@ -3924,7 +3956,17 @@ async function horCargarSemana(){
     consultas.push(supa.from('horario_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { asig[x.personal_id + '|' + x.dia] = x; })));
     consultas.push(supa.from('horario_tarea_asignaciones').select('*').eq('semana_id', sem.data.id).then(r => (r.data || []).forEach(x => { tareaAsig[x.tarea_id + '|' + x.dia] = x.personal_id; })));
   }
-  const domingo = horIso(horFecha(7));
+  const lunesSig = horIso(horFecha(8));
+  const [fest, semSig] = await Promise.all([
+    supa.from('horario_festivos').select('fecha, nombre').eq('fecha', lunesSig).maybeSingle(),
+    supa.from('horario_semanas').select('*').eq('area_id', HOR.areaId).eq('lunes', lunesSig).maybeSingle(),
+  ]);
+  if(carga !== HOR.carga) return;
+  const puente = fest.data ? { fecha: lunesSig, nombre: fest.data.nombre } : null;
+  if(puente && semSig.data){
+    consultas.push(supa.from('horario_asignaciones').select('*').eq('semana_id', semSig.data.id).eq('dia', 1).then(r => (r.data || []).forEach(x => { asig[x.personal_id + '|8'] = x; })));
+  }
+  const domingo = horIso(horFecha(puente ? 8 : 7));
   let nov = [], reg = {}, cerrados = {}, regError = null;
   let quincenas = [], habilitados = {}, marcas = {};
   consultas.push(supa.from('horario_quincenas_cerradas').select('*').eq('area_id', HOR.areaId).lte('desde', domingo).gte('hasta', lunes)
@@ -3950,9 +3992,10 @@ async function horCargarSemana(){
   }
   await Promise.all(consultas);
   if(carga !== HOR.carga) return;
+  Object.assign(HOR, { puente, semanaSig: puente ? (semSig.data || null) : null });
   Object.assign(HOR, { semana: sem.data || null, asig, tareaAsig, domPasadoTemprano: domPasado, haySemanaAnterior: !!ant.data, imgBlob: null, confirmar: false, nov, reg, cerrados, regError, quincenas, habilitados, marcas });
   HOR.bloqueadas = {};
-  quincenas.forEach(q => { for(let d = 1; d <= 7; d++){ const f = horIso(horFecha(d)); if(f >= q.desde && f <= q.hasta) HOR.bloqueadas[f] = q; } });
+  quincenas.forEach(q => { for(let d = 1; d <= horDias(); d++){ const f = horIso(horFecha(d)); if(f >= q.desde && f <= q.hasta) HOR.bloqueadas[f] = q; } });
   horPintar();
 }
 
@@ -4218,16 +4261,17 @@ function horGrillaHtml(v){
   const ed = horEditable(), jornada = horJornada();
   let h = `<div class="hor-grid-wrap"><table class="hor-grid"><thead><tr><th class="hor-first">Persona</th>`;
   for(let d = 1; d <= 7; d++) h += `<th class="${horBloqueado(d) ? 'bloq' : horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small>${horBloqueado(d) ? '<span class="hor-bloq">CERRADO</span>' : ''}</th>`;
+  if(HOR.puente) h += `<th class="puente" title="${escapeHtml(HOR.puente.nombre)} · cuenta en la semana siguiente">${HOR_DC[0]}<small>${horFecha(8).getDate()}</small><span class="hor-bloq">FESTIVO</span></th>`;
   h += `<th class="hor-horas">Horas</th></tr></thead><tbody>`;
   const grupos = horGrupos();
   for(const { e, gente } of grupos){
     if(!gente.length) continue;
-    h += `<tr class="hor-est"><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td><td colspan="8"></td></tr>`;
+    h += `<tr class="hor-est"><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td><td colspan="${horDias() + 1}"></td></tr>`;
     for(const p of gente){
       const yo = p.user_id && session && p.user_id === session.user.id;
       h += `<tr${yo ? ' class="hor-yo"' : ''}><td class="hor-first"><span class="hor-pname">${escapeHtml(p.nombre)}${p.activo ? '' : ' <span class="badge neutral">Inactivo</span>'}</span><span class="hor-pmeta">${horDescansoTexto(p)}</span></td>`;
-      for(let d = 1; d <= 7; d++){
-        const k = p.id + '|' + d, a = HOR.asig[k], lvl = ed ? (v.cel[k] || '') : '';
+      for(let d = 1; d <= horDias(); d++){
+        const k = p.id + '|' + d, a = HOR.asig[k], lvl = ed && d < 8 ? (v.cel[k] || '') : '';
         let cls = 'hor-cell', c, sub = '', txt;
         const nov = horNovedad(p.id, d);
         if(nov){ cls += ' nov'; c = horEtiquetaNov(nov); txt = nov.tipo && HOR.editor ? HOR_TIPOS[nov.tipo].toLowerCase() : 'no viene'; if(a && a.tipo !== 'descanso') sub = `<span class="h">era ${escapeHtml(a.codigo || '')}</span>`; }
@@ -4240,7 +4284,7 @@ function horGrillaHtml(v){
           sub = `<span class="h">${horNum(a.horas)} h${a.cubre_manana ? '<span class="hor-marca">M</span>' : ''}${a.cubre_cierre ? '<span class="hor-marca">C</span>' : ''}${noc ? `<span class="hor-marca noct" title="${horNum(noc)} h nocturnas">N${horNum(noc)}</span>` : ''}${a.tipo === 'otro' ? '<span class="hor-marca">OTRO</span>' : ''}</span>`;
         }
         if(lvl) cls += ' ' + lvl;
-        h += `<td class="hor-cw"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + HOR_DIAS[d - 1] + ': ' + txt)}"${horMarcado(p.id, d) ? ' title="Ya marcó: no se cambia"' : ''}${ed && !horBloqueadoPersona(p.id, d) && !horMarcado(p.id, d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
+        h += `<td class="hor-cw${d === 8 ? ' puente' : ''}"><button type="button" class="${cls}" id="horc-${k.replace('|', '-')}" data-hor-cell="${k}" aria-label="${escapeHtml(p.nombre + ', ' + horDiaNombre(d) + (d === 8 ? ' festivo' : '') + ': ' + txt)}"${horMarcado(p.id, d) ? ' title="Ya marcó: no se cambia"' : ''}${horEditableDia(d) && !horBloqueadoPersona(p.id, d) && !horMarcado(p.id, d) ? '' : ' aria-disabled="true" tabindex="-1"'}><span class="c">${c}</span>${sub}</button></td>`;
       }
       const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
       const nn = horNocDe(p.id);
@@ -4249,13 +4293,14 @@ function horGrillaHtml(v){
   }
   const conMinimos = grupos.filter(g => g.e.id && g.gente.length);
   if(conMinimos.length){
-    h += `<tr class="hor-covh"><td class="hor-first">Cobertura</td><td colspan="8">personas trabajando / mínimo del día</td></tr>`;
+    h += `<tr class="hor-covh"><td class="hor-first">Cobertura</td><td colspan="${horDias() + 1}">personas trabajando / mínimo del día</td></tr>`;
     for(const { e } of conMinimos){
       h += `<tr><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td>`;
       for(let d = 1; d <= 7; d++){
         const c = v.cov[e.id + '|' + d] || { n: 0, lvl: 'na' }, m = Number((e.minimo_por_dia || [])[d - 1]) || 0;
         h += `<td class="hor-cov ${c.lvl}" id="horc-cov-${e.id}-${d}">${c.lvl === 'na' ? (c.n || '—') : c.n + '/' + m}</td>`;
       }
+      if(HOR.puente) h += '<td class="hor-cov na puente">—</td>';
       h += '<td></td></tr>';
     }
   }
@@ -4272,6 +4317,7 @@ function horGrillaHtml(v){
         h += `<td class="hor-cw"><b>${p ? escapeHtml(horCorto(p)) : '—'}</b></td>`;
       }
     }
+    if(HOR.puente) h += '<td class="hor-cw puente"></td>';
     h += '<td></td></tr>';
   }
   return h + '</tbody></table></div>';
@@ -4282,8 +4328,9 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   const cell = e.target.closest('[data-hor-cell]');
   if(cell){
     const [cp, cd] = cell.dataset.horCell.split('|');
-    if(horEditable() && horMarcado(cp, Number(cd))){ showToast('Ya marcó ese día: el turno no se cambia. Si llegó tarde o alguien lo cubrió, anótalo en Registro del día.', 'warn'); return; }
-    if(horEditable() && !horBloqueadoPersona(cp, Number(cd))) horAbrirCelda(cell.dataset.horCell); return;
+    if(horEditableDia(Number(cd)) && horMarcado(cp, Number(cd))){ showToast('Ya marcó ese día: el turno no se cambia. Si llegó tarde o alguien lo cubrió, anótalo en Registro del día.', 'warn'); return; }
+    if(Number(cd) === 8 && HOR.editor && !horEditableDia(8)){ showToast('El lunes festivo ya está publicado en la semana siguiente: vuelve esa semana a borrador para cambiarlo', 'warn'); return; }
+    if(horEditableDia(Number(cd)) && !horBloqueadoPersona(cp, Number(cd))) horAbrirCelda(cell.dataset.horCell); return;
   }
   const irSub = e.target.closest('[data-hor-ir-sub]');
   if(irSub){ HOR.sub = irSub.dataset.horIrSub; horPintarSub(); horPintar(); return; }
@@ -4423,6 +4470,13 @@ async function horProponerSemana(){
     if(error){ showToast('No se pudo guardar la propuesta: ' + error.message, 'danger'); horCargarSemana(); return; }
   }
   if(prop.tareas.length) await supa.from('horario_tarea_asignaciones').insert(prop.tareas.map(x => ({ semana_id: sem.id, ...x })));
+  if(HOR.puente && horEditableDia(8)){
+    for(const x of prop.filas.filter(x => x.dia === 1)){
+      if(HOR.asig[x.personal_id + '|8'] || horMarcado(x.personal_id, 8)) continue;
+      const { personal_id, dia, ...resto } = horFilaCompleta(x);
+      await horGuardarCasilla(personal_id, 8, resto);
+    }
+  }
   HOR.pedirReemplazo = false;
   await horCargarSemana();
   // Los riesgos se calculan con la grilla ya guardada (cobertura con novedades, horas).
@@ -4557,7 +4611,7 @@ function horAbrirCelda(k){
   const est = HOR.estaciones.find(e => e.id === p.estacion_id);
   const box = document.getElementById('horCeldaBox');
   box.setAttribute('aria-labelledby', 'horCeldaTit');
-  box.innerHTML = `<h3 id="horCeldaTit">${escapeHtml(p.nombre)} · ${HOR_DIAS[dia - 1]} ${horFecha(dia).getDate()}</h3>
+  box.innerHTML = `<h3 id="horCeldaTit">${escapeHtml(p.nombre)} · ${horDiaNombre(dia)} ${horFecha(dia).getDate()}${dia === 8 ? ' (festivo)' : ''}</h3>
     <div class="modal-sub">${est ? escapeHtml(est.nombre) + ' · ' : ''}${horDescansoTexto(p, true) + (horDescansoDe(p).includes(dia) ? ' (hoy)' : '')}${horNovedad(pid, dia) ? ' · tiene ' + HOR_TIPOS[horNovedad(pid, dia).tipo].toLowerCase() + ' este día' : ''}</div>
     <div class="hor-opts">
       ${HOR.turnos.filter(t => t.activo).map(t => `<button type="button" class="hor-opt${a && a.tipo === 'turno' && a.turno_id === t.id ? ' on' : ''}" data-hor-set="${t.id}"><span class="c">${escapeHtml(t.codigo)}</span><small>${horNum(t.horas)} h${horDesglose(t.tramos).noct ? ' · ' + horNum(horDesglose(t.tramos).noct) + ' nocturnas' : ''}${t.cubre_manana || t.cubre_cierre ? ' · ' + [t.cubre_manana ? 'mañana' : '', t.cubre_cierre ? 'cierre' : ''].filter(Boolean).join(' y ') : ''}</small>${(t.tramos || []).length ? `<small>${escapeHtml(horTramosTexto(t.tramos))}</small>` : ''}</button>`).join('')}
@@ -4602,17 +4656,8 @@ document.getElementById('horCeldaModal').addEventListener('click', async e => {
     fila = { tipo: 'turno', turno_id: t.id, codigo: t.codigo, horas: t.horas, cubre_manana: t.cubre_manana, cubre_cierre: t.cubre_cierre, tramos: t.tramos || [] };
   }
   b.disabled = true;
-  if(fila){
-    const { data, error } = await supa.from('horario_asignaciones')
-      .upsert({ semana_id: HOR.semana.id, personal_id: pid, dia: Number(d), ...fila, updated_at: new Date().toISOString() }, { onConflict: 'semana_id,personal_id,dia' })
-      .select().single();
-    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
-    HOR.asig[k] = data;
-  } else if(HOR.asig[k]){
-    const { error } = await supa.from('horario_asignaciones').delete().eq('id', HOR.asig[k].id);
-    if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
-    delete HOR.asig[k];
-  }
+  const { error } = await horGuardarCasilla(pid, Number(d), fila);
+  if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
   HOR.confirmar = false;
   document.getElementById('horCeldaModal').classList.remove('open');
   horPintarSemana();
@@ -4632,8 +4677,8 @@ document.getElementById('horCeldaModal').addEventListener('input', e => {
 function horMensaje(){
   let m = `*Horario ${currentArea.name} · ${currentLocation.name}*\n_Semana ${horRango(true)}_\n`;
   const personas = horPersonasSemana();
-  for(let d = 1; d <= 7; d++){
-    m += `\n*${HOR_DIAS[d - 1]} ${horFecha(d).getDate()}*\n`;
+  for(let d = 1; d <= horDias(); d++){
+    m += `\n*${horDiaNombre(d)} ${horFecha(d).getDate()}${d === 8 ? ' (festivo)' : ''}*\n`;
     const porCodigo = new Map();
     personas.forEach(p => { const a = HOR.asig[p.id + '|' + d]; if(horTrabaja(p.id, d)){ const c = a.codigo || '?'; if(!porCodigo.has(c)) porCodigo.set(c, []); porCodigo.get(c).push(horCorto(p)); } });
     const orden = HOR.turnos.map(t => t.codigo);
@@ -4653,7 +4698,7 @@ async function horDibujarImagen(){
   const css = getComputedStyle(document.documentElement), c = n => css.getPropertyValue(n).trim();
   const grupos = horGrupos().filter(g => g.gente.length);
   const tareas = HOR.tareas.filter(t => [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]));
-  const W = 1080, M = 36, NAME = 200, COL = (W - 2 * M - NAME) / 7, RH = 54, EH = 36, HEAD = 176;
+  const W = 1080, M = 36, NAME = 200, COL = (W - 2 * M - NAME) / horDias(), RH = 54, EH = 36, HEAD = 176;
   let H = HEAD + 46;
   grupos.forEach(g => { H += EH + g.gente.length * RH; });
   H += tareas.length ? 10 + tareas.length * (RH + 6) : 0;
@@ -4677,9 +4722,9 @@ async function horDibujarImagen(){
   txt(('Semana ' + horRango(true) + ' ' + HOR.lunes.getFullYear()).toUpperCase(), M, 140, '600 15px ' + MONO, c('--accent-strong'));
   let y = HEAD;
   rr(M, y, W - 2 * M, 46, 8, c('--surface-2'));
-  for(let d = 1; d <= 7; d++){
+  for(let d = 1; d <= horDias(); d++){
     const cx = M + NAME + COL * (d - 1) + COL / 2;
-    txt(HOR_DC[d - 1].toUpperCase(), cx, y + 16, '600 13px ' + MONO, horDiasSinDescanso().includes(d) ? c('--accent-strong') : c('--text-muted'), 'center');
+    txt(d === 8 ? 'LUN · FEST.' : HOR_DC[d - 1].toUpperCase(), cx, y + 16, '600 13px ' + MONO, d === 8 || horDiasSinDescanso().includes(d) ? c('--accent-strong') : c('--text-muted'), 'center');
     txt(String(horFecha(d).getDate()), cx, y + 33, '600 15px ' + MONO, c('--text'), 'center');
   }
   y += 46;
@@ -4690,7 +4735,7 @@ async function horDibujarImagen(){
     y += EH;
     for(const p of gente){
       txt(p.nombre, M + 4, y + RH / 2, '600 18px ' + SANS, c('--text'), 'left', NAME - 12);
-      for(let d = 1; d <= 7; d++){
+      for(let d = 1; d <= horDias(); d++){
         const a = HOR.asig[p.id + '|' + d];
         const X = M + NAME + COL * (d - 1) + 3, Y = y + 4, w = COL - 6, h = RH - 8, cx = X + w / 2;
         if(horNovedad(p.id, d)){ rr(X, Y, w, h, 8, c('--warn-bg')); txt('NO VIENE', cx, Y + h / 2, '600 12px ' + MONO, c('--warn'), 'center', w - 8); continue; }
