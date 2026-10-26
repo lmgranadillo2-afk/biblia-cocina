@@ -533,6 +533,7 @@ main .ev-table tfoot td{padding:8px 12px;}
 main .ev-table tfoot tr:first-child td{border-top:1px solid var(--border-strong);}
 main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padding-top:12px; padding-bottom:12px;}
 .adminpanel{display:none;}
+#bajaDatoBox[hidden], #bajaDato[hidden], #bajaPedido[hidden], #bajaReviewFoto[hidden], #bajaReviewSoloSA[hidden], #bajaReviewApprove[hidden], #bajaReviewReject[hidden]{display:none;}
 .exp-opciones{display:flex; flex-direction:column; gap:10px; margin:14px 0;}
 .exp-op{all:unset; box-sizing:border-box; cursor:pointer; display:flex; flex-direction:column; gap:2px; padding:14px 16px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface);}
 .exp-op:hover{background:var(--accent-soft);} .exp-op:focus-visible{box-shadow:var(--focus-ring);}
@@ -2373,8 +2374,28 @@ nav.tabs button{position:relative;}
       </div>
     </div>
     <div class="field">
-      <label class="field-label" for="bajaMotivo">Motivo</label>
-      <textarea id="bajaMotivo" placeholder="Ej: se dañó por corte de luz, venció, se cayó..."></textarea>
+      <label class="field-label" for="bajaCausa">¿Por qué se da de baja? (obligatorio)</label>
+      <select id="bajaCausa">
+        <option value="">Elige la causa…</option>
+        <option value="vencido">Vencido</option>
+        <option value="proveedor">Llegó en mal estado del proveedor</option>
+        <option value="almacenamiento">Se dañó en almacenamiento</option>
+        <option value="preparacion">Error de preparación</option>
+        <option value="prueba">Prueba o degustación (la aprueba el super admin)</option>
+      </select>
+    </div>
+    <div class="field" id="bajaDatoBox" hidden>
+      <label class="field-label" for="bajaDato" id="bajaDatoLabel">Dato</label>
+      <input type="text" id="bajaDato" maxlength="200">
+      <select id="bajaPedido" hidden></select>
+    </div>
+    <div class="field">
+      <label class="field-label" for="bajaMotivo">Detalle de lo que pasó (obligatorio)</label>
+      <textarea id="bajaMotivo" placeholder="Cuenta qué pasó con el producto"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="bajaFoto">Foto (opcional) · se publica en el grupo del punto</label>
+      <input type="file" id="bajaFoto" accept="image/*" capture="environment">
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="bajaCancel">Cancelar</button>
@@ -2390,9 +2411,12 @@ nav.tabs button{position:relative;}
       <div><span>Tipo</span><b id="bajaReviewTipo"></b></div>
       <div><span>Ítem</span><b id="bajaReviewItem"></b></div>
       <div><span>Cantidad</span><b id="bajaReviewCantidad"></b></div>
-      <div><span>Motivo</span><b id="bajaReviewMotivo"></b></div>
+      <div><span>Causa</span><b id="bajaReviewCausa"></b></div>
+      <div><span>Detalle</span><b id="bajaReviewMotivo"></b></div>
       <div><span>Registrado por</span><b id="bajaReviewQuien"></b></div>
     </div>
+    <img id="bajaReviewFoto" alt="Foto de la baja" hidden style="width:100%; max-height:260px; object-fit:contain; border-radius:12px; background:var(--surface-2); margin-top:10px">
+    <p class="field-help" id="bajaReviewSoloSA" hidden>Esta es una baja de prueba: solo el super admin la puede ingresar o denegar.</p>
     <div class="field" id="bajaRejectBox" style="display:none;">
       <label class="field-label" for="bajaRejectMotivo">Motivo por el que se deniega</label>
       <textarea id="bajaRejectMotivo" placeholder="Explica por qué se deniega..."></textarea>
@@ -11973,7 +11997,54 @@ document.getElementById('bajaTipo').addEventListener('change', ()=>{
   document.getElementById('bajaRecetaFields').style.display = isInsumo ? 'none' : 'block';
 });
 
+// Causas de baja: cada una pide un dato que la respalda.
+const BAJA_CAUSAS = {
+  vencido: { t: 'Vencido', dato: 'Fecha de vencimiento', tipo: 'date' },
+  proveedor: { t: 'Llegó mal del proveedor', dato: 'Pedido en que llegó', tipo: 'pedido' },
+  almacenamiento: { t: 'Se dañó en almacenamiento', dato: '¿Dónde estaba y qué falló? (ej. nevera 2, se apagó)', tipo: 'text' },
+  preparacion: { t: 'Error de preparación', dato: '¿Quién preparó?', tipo: 'text' },
+  prueba: { t: 'Prueba o degustación', dato: '¿Para qué fue la prueba?', tipo: 'text' },
+};
+function bajaCausaTexto(b){
+  const c = BAJA_CAUSAS[b.causa]; if(!c) return '';
+  const dato = b.causa === 'vencido' && b.causa_dato ? 'vence ' + fmtDia(b.causa_dato) : b.causa_dato;
+  return c.t + (dato ? ' · ' + dato : '');
+}
+async function bajaPintarDato(){
+  const causa = document.getElementById('bajaCausa').value, c = BAJA_CAUSAS[causa];
+  const box = document.getElementById('bajaDatoBox'), inp = document.getElementById('bajaDato'), sel = document.getElementById('bajaPedido');
+  box.hidden = !c; if(!c) return;
+  document.getElementById('bajaDatoLabel').textContent = c.dato + ' (obligatorio)';
+  inp.hidden = c.tipo === 'pedido'; sel.hidden = c.tipo !== 'pedido';
+  inp.type = c.tipo === 'date' ? 'date' : 'text'; inp.value = '';
+  if(c.tipo === 'pedido'){
+    sel.innerHTML = '<option value="">Cargando pedidos…</option>';
+    const { data } = await supa.from('orders').select('id, codigo, proveedor, fecha, recibido_at').eq('area_id', currentArea.id)
+      .eq('recibido', true).order('recibido_at', { ascending: false }).limit(25);
+    sel.innerHTML = '<option value="">Elige el pedido…</option>' + (data || []).map(o => `<option value="${o.id}">${escapeHtml((o.codigo || '') + ' · ' + (o.proveedor || '') + ' · recibido ' + fmtDia((o.recibido_at || o.fecha || '').slice(0, 10)))}</option>`).join('');
+    if(!(data || []).length) sel.innerHTML = '<option value="">No hay pedidos recibidos en esta área</option>';
+  }
+}
+document.getElementById('bajaCausa').addEventListener('change', bajaPintarDato);
+// Si hay foto: se publica en el chat del grupo del punto con el resumen de la baja; devuelve la ruta o null.
+async function bajaPublicarFoto(b, file){
+  try {
+    const { data: conv, error } = await supa.rpc('chat_grupo_punto', { p_location_id: currentLocation.id });
+    if(error || !conv) return null;
+    const blob = await chatComprimirFoto(file);
+    const path = conv + '/' + crypto.randomUUID() + '.jpg';
+    const up = await supa.storage.from('chat-fotos').upload(path, blob, { contentType: 'image/jpeg' });
+    if(up.error) return null;
+    await supa.from('chat_mensajes').insert({ conversacion_id: conv, foto_path: path, autor_nombre: profile.name || session.user.email, autor_area: currentArea ? currentArea.name : null,
+      texto: 'Baja ' + (b.codigo || '') + ' · ' + b.item_name + ' · ' + fmtQty(b.cantidad) + ' ' + b.unidad + '\nCausa: ' + bajaCausaTexto(b) + '\n' + b.motivo });
+    await supa.from('bajas').update({ foto_path: path }).eq('id', b.id);
+    return path;
+  } catch(_){ return null; }
+}
 document.getElementById('bajaOpenNew').addEventListener('click', ()=>{
+  document.getElementById('bajaCausa').value = '';
+  document.getElementById('bajaDatoBox').hidden = true;
+  document.getElementById('bajaFoto').value = '';
   document.getElementById('bajaFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('bajaTipo').value = 'insumo';
   document.getElementById('bajaInsumoFields').style.display = 'block';
@@ -11995,8 +12066,15 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
   const cantidad = document.getElementById('bajaCantidad').value.trim();
   const unidad = document.getElementById('bajaUnidad').value;
   const motivo = document.getElementById('bajaMotivo').value.trim();
+  const causa = document.getElementById('bajaCausa').value, c = BAJA_CAUSAS[causa];
+  const pedidoId = c && c.tipo === 'pedido' ? document.getElementById('bajaPedido').value : '';
+  const causaDato = c && c.tipo === 'pedido' ? (document.getElementById('bajaPedido').selectedOptions[0] || {}).text || '' : document.getElementById('bajaDato').value.trim();
+  const foto = document.getElementById('bajaFoto').files[0] || null;
 
-  if(!fecha || !cantidad || !motivo){ showToast('Completa fecha, cantidad y motivo'); return; }
+  if(!fecha || !cantidad){ showToast('Completa fecha y cantidad'); return; }
+  if(!c){ showToast('Elige por qué se da de baja', 'warn'); return; }
+  if(c.tipo === 'pedido' ? !pedidoId : !causaDato){ showToast('Falta: ' + c.dato.toLowerCase(), 'warn'); return; }
+  if(motivo.length < 10){ showToast('Cuenta con más detalle qué pasó', 'warn'); return; }
 
   let itemCode, itemName, categoria = null;
   if(tipo === 'insumo'){
@@ -12011,14 +12089,19 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
     itemCode = match.code; itemName = match.name;
   }
 
-  const { error } = await supa.from('bajas').insert({
+  const btnEnviar = document.getElementById('bajaSubmit'); btnEnviar.disabled = true;
+  const { data: nueva, error } = await supa.from('bajas').insert({
     location_id: currentLocation.id, area_id: currentArea.id, fecha, tipo, item_code: itemCode, item_name: itemName, categoria,
-    cantidad: parseFloat(cantidad.replace(',','.')) || 0, unidad, motivo,
+    cantidad: parseFloat(cantidad.replace(',','.')) || 0, unidad, motivo, causa, causa_dato: causaDato, pedido_id: pedidoId || null,
     created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
-  });
+  }).select().single();
+  btnEnviar.disabled = false;
   if(error){ showToast('Error al registrar la baja: ' + error.message); return; }
+  if(foto) await bajaPublicarFoto(nueva, foto);
+  let avisados = 0;
+  if(causa === 'prueba'){ const r = await supa.rpc('baja_avisar_super_admin', { p_baja: nueva.id }); avisados = r.data || 0; }
 
-  showToast('Baja registrada');
+  showToast('Baja registrada' + (foto ? ' · foto en el grupo' : '') + (causa === 'prueba' ? ' · la aprueba el super admin' + (avisados ? ' (ya le llegó el aviso)' : '') : ''), 'ok');
   document.getElementById('bajaModal').classList.remove('open');
   loadMyBajas();
 });
@@ -12061,7 +12144,8 @@ function bajaKanbanCardHtml(b, mode){
     <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges">${b.area_id ? '' : '<span class="badge warn" title="Baja anterior a la separación por áreas">Sin área</span>'}<span class="badge neutral">${tipoLabel}</span></span></div>
     <div class="kc-title">${escapeHtml(b.item_name)}</div>
     <div class="kc-meta"><span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${fechaCorta}${mode==='admin' ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
-    <div class="kc-items"><span class="kc-label">Motivo</span>${escapeHtml(b.motivo)}</div>
+    ${b.causa ? `<div class="kc-items"><span class="kc-label">Causa</span>${escapeHtml(bajaCausaTexto(b))}${b.causa === 'prueba' ? ' <span class="badge info">Super admin</span>' : ''}</div>` : ''}
+    <div class="kc-items"><span class="kc-label">${b.causa ? 'Detalle' : 'Motivo'}</span>${escapeHtml(b.motivo)}</div>
     ${extra}
   </div>`;
 }
@@ -12113,6 +12197,12 @@ function openBajaReview(bajaId, list){
   document.getElementById('bajaReviewItem').textContent = baja.item_name;
   document.getElementById('bajaReviewCantidad').textContent = `${fmtQty(baja.cantidad)} ${baja.unidad}`;
   document.getElementById('bajaReviewMotivo').textContent = baja.motivo;
+  document.getElementById('bajaReviewCausa').textContent = baja.causa ? bajaCausaTexto(baja) : 'Sin causa (baja anterior)';
+  const soloSA = baja.causa === 'prueba' && !(profile && profile.is_super_admin);
+  document.getElementById('bajaReviewSoloSA').hidden = !soloSA;
+  document.getElementById('bajaReviewApprove').hidden = soloSA; document.getElementById('bajaReviewReject').hidden = soloSA;
+  const img = document.getElementById('bajaReviewFoto'); img.hidden = true; img.removeAttribute('src');
+  if(baja.foto_path) supa.storage.from('chat-fotos').createSignedUrl(baja.foto_path, 3600).then(({ data }) => { if(data && currentReviewBajaId === baja.id){ img.src = data.signedUrl; img.hidden = false; } });
   document.getElementById('bajaReviewQuien').textContent = `${baja.creado_por_nombre || ''} · ${baja.fecha}`;
   document.getElementById('bajaRejectBox').style.display = 'none';
   document.getElementById('bajaRejectMotivo').value = '';
@@ -12255,11 +12345,11 @@ document.getElementById('bhDownloadCsv').addEventListener('click', async ()=>{
   if(adminBajaHistoryCache.length === 0){ showToast('No hay datos para exportar'); return; }
   const formato = await elegirFormato('Descargar bajas', EXP_OPC_CSV); if(!formato) return;
   const filas = adminBajaHistoryCache.map(b => [b.fecha, b.codigo || '', b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada', b.item_name, Number(b.cantidad), b.unidad,
-    b.motivo || '', BAJA_ESTADO_LABEL[b.status] || b.status, b.creado_por_nombre || '', b.resuelto_por || '', b.rechazo_motivo || '']);
+    b.causa ? bajaCausaTexto(b) : '', b.motivo || '', BAJA_ESTADO_LABEL[b.status] || b.status, b.creado_por_nombre || '', b.resuelto_por || '', b.rechazo_motivo || '']);
   descargarFilas({ formato, horizontal: true, hoja: 'Bajas',
     nombre: 'bajas_' + currentLocation.name + '_' + toISODate(new Date()),
     titulo: 'Bajas · ' + currentLocation.name + (currentArea ? ' · ' + currentArea.name : ''), subtitulo: filas.length + ' bajas',
-    cab: ['Fecha', 'Código', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Motivo', 'Estado', 'Registró', 'Resolvió', 'Motivo del rechazo'], filas,
+    cab: ['Fecha', 'Código', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Causa', 'Detalle', 'Estado', 'Registró', 'Resolvió', 'Motivo del rechazo'], filas,
     resaltar: k => adminBajaHistoryCache[k].status === 'rechazado' });
 });
 
