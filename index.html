@@ -1029,7 +1029,7 @@ nav.tabs button{position:relative;}
 .hor-dot{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:8px; vertical-align:-1px;}
 .hor-pname{display:block; font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .hor-pmeta{font:500 11px 'IBM Plex Mono',monospace; color:var(--text-dim);}
-.hor-grid td.hor-cw{padding:3px; min-width:96px;}
+.hor-grid td.hor-cw{padding:3px; min-width:84px;}
 .hor-cell{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; width:100%; min-height:52px; padding:4px 3px; cursor:pointer; border:2px solid transparent; border-radius:8px; background:transparent; font:inherit; color:var(--text); transition:background .15s ease-out;}
 .hor-cell:hover{background:var(--accent-soft);}
 .hor-cell:focus-visible{outline:none; box-shadow:var(--focus-ring);}
@@ -1244,7 +1244,8 @@ nav.tabs button{position:relative;}
 .hor-cell.flash, .hor-grid select.flash, .hor-cov.flash{animation:hor-flash 1.2s ease-out;}
 @keyframes hor-flash{0%,40%{box-shadow:0 0 0 4px var(--accent);} 100%{box-shadow:0 0 0 0 transparent;}}
 .hor-marca{display:inline-block; font:600 9.5px 'IBM Plex Mono',monospace; padding:0 4px; border-radius:4px; background:var(--surface-3); color:var(--text-muted); margin-left:2px;}
-.hor-horas{font:600 13.5px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; padding:0 10px; white-space:nowrap; text-align:right !important;}
+.hor-horas{font:600 13.5px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; min-width:96px; white-space:nowrap; text-align:right !important;}
+.hor-grid .hor-horas{padding:6px 14px 6px 8px;}
 .hor-horas small{display:block; font-size:10.5px; font-weight:500;}
 .hor-horas.warn{color:var(--warn);}
 .hor-grid tr.hor-covh td{background:var(--surface-2); text-align:left; padding:8px 12px; font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); border-top:2px solid var(--border-strong);}
@@ -4195,7 +4196,7 @@ function horGrillaHtml(v){
   const ed = horEditable(), jornada = horJornada();
   let h = `<div class="hor-grid-wrap"><table class="hor-grid"><thead><tr><th class="hor-first">Persona</th>`;
   for(let d = 1; d <= 7; d++) h += `<th class="${horBloqueado(d) ? 'bloq' : horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small>${horBloqueado(d) ? '<span class="hor-bloq">CERRADO</span>' : ''}</th>`;
-  h += `<th>Horas</th></tr></thead><tbody>`;
+  h += `<th class="hor-horas">Horas</th></tr></thead><tbody>`;
   const grupos = horGrupos();
   for(const { e, gente } of grupos){
     if(!gente.length) continue;
@@ -4221,7 +4222,7 @@ function horGrillaHtml(v){
       }
       const hh = horHoras(p.id), lv = HOR.editor ? v.horas[p.id] : 'ok';
       const nn = horNocDe(p.id);
-      h += `<td class="hor-horas ${lv === 'warn' ? 'warn' : ''}" id="horc-${p.id}-h">${horNum(hh)}<small>${lv === 'warn' ? '+' + horNum(hh - jornada) + ' sobre ' + horNum(jornada) : '&nbsp;'}</small>${nn ? `<small style="color:var(--info)">${horNum(nn)} noct.</small>` : ''}</td></tr>`;
+      h += `<td class="hor-horas ${lv === 'warn' ? 'warn' : ''}" id="horc-${p.id}-h" title="${lv === 'warn' ? 'Pasa la jornada máxima de ' + horNum(jornada) + ' h' : ''}">${horNum(hh)}<small>${lv === 'warn' ? '+' + horNum(hh - jornada) + ' extra' : '&nbsp;'}</small>${nn ? `<small style="color:var(--info)">${horNum(nn)} noct.</small>` : ''}</td></tr>`;
     }
   }
   const conMinimos = grupos.filter(g => g.e.id && g.gente.length);
