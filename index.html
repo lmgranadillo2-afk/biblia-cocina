@@ -11200,7 +11200,7 @@ function recepcionPedidoHtml(o, mode){
   }
   const seg = ultimoSeguimiento(o);
   const segHtml = seg ? `<div class="kc-note recepcion"><b>Seguimiento · ${escapeHtml(seg.creado_por_nombre || '')} · ${fmtFechaHora(seg.created_at)}</b>${escapeHtml(seg.nota)}</div>` : '';
-  return `${segHtml}<div class="kc-actions">${enviado}</div>
+  return `${segHtml}<div class="kc-actions">${enviado}${mode === 'admin' ? `<button class="btn btn-secondary btn-small" data-unsend-id="${o.id}" title="Vuelve a quedar aprobado y sin enviar">Desmarcar enviado</button>` : ''}</div>
     <div class="kc-actions"><button class="btn btn-secondary btn-small" data-follow-id="${o.id}">Seguimiento</button><button class="btn btn-ok btn-small" data-receive-id="${o.id}">Marcar recibido</button></div>`;
 }
 
@@ -11402,6 +11402,9 @@ function renderOrderKanban(list, boardEl, mode){
       if(order) abrirRecepcion(order, mode);
     });
   });
+  boardEl.querySelectorAll('[data-unsend-id]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); desmarcarEnviado(btn.dataset.unsendId); });
+  });
   boardEl.querySelectorAll('[data-unreceive-id]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{ e.stopPropagation(); desmarcarRecibido(btn.dataset.unreceiveId); });
   });
@@ -11491,6 +11494,15 @@ async function desmarcarRecibido(orderId){
   const { error } = await supa.rpc('desmarcar_pedido_recibido', { p_order_id: orderId });
   if(error){ showToast('No se pudo desmarcar: ' + error.message, 'danger'); return; }
   showToast('El pedido vuelve a estar por recibir');
+  loadAdminOrders();
+}
+
+// Enviado por error: vuelve a aprobado y sin enviar (sigue aprobado), para que se envíe desde el área o el Consolidado.
+async function desmarcarEnviado(orderId){
+  if(!confirm('¿Desmarcar el envío? El pedido vuelve a quedar aprobado y sin enviar.')) return;
+  const { error } = await supa.from('orders').update({ enviado: false, enviado_at: null, enviado_por: null }).eq('id', orderId);
+  if(error){ showToast('No se pudo desmarcar: ' + error.message, 'danger'); return; }
+  showToast('Listo: el pedido quedó aprobado y sin enviar', 'ok');
   loadAdminOrders();
 }
 
