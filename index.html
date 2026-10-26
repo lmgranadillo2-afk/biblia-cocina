@@ -1931,7 +1931,7 @@ nav.tabs button{position:relative;}
               </select>
             </div>
             <button class="btn btn-secondary" id="bhFilterApply">Filtrar</button>
-            <button class="btn btn-secondary btn-small" id="bhDownloadCsv">Descargar CSV</button>
+            <button class="btn btn-secondary btn-small" id="bhDownloadCsv">Descargar</button>
           </div>
           <span class="list-count" id="bhCount"></span>
           <div id="bhList" style="margin-top:10px;"></div>
@@ -5396,6 +5396,7 @@ function prenConfirmarSinCerrar(grupos){
 const prenPendientes = res => res.filter(r => r.prog > 0).map(r => ({ nombre: r.p.nombre, dias: r.prog }));
 async function prenCsvTodos(btn){
   const per = PREN.datos.per;
+  const formato = await elegirFormato('Pre-nómina de todos los puntos', EXP_OPC_CSV); if(!formato) return;
   btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Armando…';
   const guardado = { areaId: HOR.areaId, cfg: HOR.cfg, estaciones: HOR.estaciones, personal: HOR.personal, turnos: HOR.turnos };
   const filas = [], grupos = [];
@@ -5416,7 +5417,7 @@ async function prenCsvTodos(btn){
         if(datos.error) continue;
         const res = prenCalcular(datos, per);
         grupos.push({ titulo: loc.name + ' · ' + a.name, cerrada: !!datos.cerrada, personas: prenPendientes(res) });
-        const n = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
+        const n = m => Math.round(m / 60 * 100) / 100;
         const hm = prenPct('horas_mes', 210) || 210;
         res.forEach(r => filas.push([loc.name, a.name, r.p.nombre, (HOR.estaciones.find(e => e.id === r.p.estacion_id) || {}).nombre || '', r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias,
           ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.falta, r.tarde, r.tardeMin, r.prog,
@@ -5430,19 +5431,16 @@ async function prenCsvTodos(btn){
   if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
   if(!(await prenConfirmarSinCerrar(grupos))) return;
   const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
-  const celda = v => { const t = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
-  const csv = '\uFEFF' + [cab].concat(filas).map(f => f.map(celda).join(';')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta) + '.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  showToast('Archivo descargado con ' + filas.length + ' personas', 'ok');
+  await descargarFilas({ formato, cab, filas, horizontal: true, hoja: 'Pre-nómina',
+    nombre: 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta),
+    titulo: 'Pre-nómina · todos los puntos', subtitulo: 'Quincena ' + horIso(per.desde) + ' a ' + horIso(per.hasta) + ' · ' + filas.length + ' personas',
+    resaltar: k => filas[k][cab.indexOf('Quincena')] === 'Sin cerrar' });
+
 }
-function prenCsv(detalle){
+async function prenCsv(detalle){
   const { res, per } = PREN.datos;
-  const celda = v => { const s = v === null || v === undefined ? '' : String(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const n = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
+  const formato = await elegirFormato(detalle ? 'Pre-nómina · detalle por día' : 'Pre-nómina · resumen', EXP_OPC_CSV); if(!formato) return;
+  const n = m => Math.round(m / 60 * 100) / 100;
   const est = id => { const e = HOR.estaciones.find(x => x.id === id); return e ? e.nombre : ''; };
   let filas;
   if(!detalle){
@@ -5460,14 +5458,13 @@ function prenCsv(detalle){
         x.tipo === 'turno' ? (x.x.prog ? 'Programado' : 'Cerrado') : '', [x.x.reg && x.x.reg.estado === 'tarde' ? 'Llegó ' + (x.x.reg.minutos_tarde || '?') + ' min tarde' : '', x.x.reg && x.x.reg.nota || '', x.x.nov && x.x.nov.nota || ''].filter(Boolean).join(' · ')]);
     }));
   }
-  const csv = '﻿' + filas.map(f => f.map(celda).join(';')).join('\r\n');
-  const nombre = ['prenomina', detalle ? 'detalle' : '', currentLocation.name, currentArea.name, horIso(per.desde) + '_al_' + horIso(per.hasta)].filter(Boolean).join('_').replace(/[^\w\-áéíóúñÁÉÍÓÚÑ]+/g, '_');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = nombre + '.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  showToast('Archivo descargado', 'ok');
+  const nombre = ['prenomina', detalle ? 'detalle' : '', currentLocation.name, currentArea.name, horIso(per.desde) + '_al_' + horIso(per.hasta)].filter(Boolean).join('_');
+  const cab = filas[0], cuerpo = filas.slice(1);
+  await descargarFilas({ formato, cab, filas: cuerpo, horizontal: true, hoja: 'Pre-nómina', nombre,
+    titulo: 'Pre-nómina ' + (detalle ? '· detalle por día · ' : '· ') + currentArea.name + ' · ' + currentLocation.name,
+    subtitulo: 'Quincena ' + horIso(per.desde) + ' a ' + horIso(per.hasta) + (PREN.datos.cerrada ? ' · cerrada' : ' · SIN CERRAR'),
+    resaltar: k => detalle ? cuerpo[k][cab.indexOf('Estado')] === 'Programado' : Number(cuerpo[k][cab.indexOf('Días sin cerrar')]) > 0 });
+
 }
 
 document.getElementById('horSemana').addEventListener('click', e => {
@@ -8612,6 +8609,31 @@ function elegirFormato(titulo, opciones){
     m.querySelector('.exp-op').focus();
   });
 }
+// Columnas a partir del encabezado: numéricas si todos sus valores son números; ancho según el contenido.
+function columnasAuto(cab, filas){
+  return cab.map((t, i) => {
+    const vals = filas.map(f => f[i]).filter(v => v !== '' && v != null);
+    const num = vals.length > 0 && vals.every(v => typeof v === 'number');
+    const w = Math.min(40, Math.max(9, String(t).length + 2, ...vals.slice(0, 300).map(v => String(v).length + 2)));
+    return { t, w, tipo: num ? 'num' : undefined };
+  });
+}
+// CSV (separador ";", coma decimal, BOM) o exportarTabla con el mismo contenido.
+async function descargarFilas(o){
+  if(o.formato === 'csv'){
+    const celda = v => { const t = v === null || v === undefined ? '' : typeof v === 'number' ? String(v).replace('.', ',') : String(v); return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const csv = '\uFEFF' + [o.cab].concat(o.filas).map(fl => fl.map(celda).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = o.nombre.replace(/[^\w\-áéíóúñÁÉÍÓÚÑ]+/g, '_') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    showToast('CSV descargado', 'ok');
+    return;
+  }
+  return exportarTabla({ ...o, columnas: o.columnas || columnasAuto(o.cab, o.filas) });
+}
+const EXP_OPC_CSV = [{ k: 'xlsx', t: 'Excel', d: 'Con títulos, filtros y números listos para sumar' }, { k: 'pdf', t: 'PDF', d: 'Para imprimir o enviar' }, { k: 'csv', t: 'CSV', d: 'Texto plano, como antes' }];
 const EXP_OPC = [{ k: 'xlsx', t: 'Excel', d: 'Con títulos, totales y filtros' }, { k: 'pdf', t: 'PDF', d: 'Para imprimir o enviar' }];
 async function eventoDescargarPdf(d){
   const pl = plantillaCotizacion(d);
@@ -12229,25 +12251,16 @@ function renderMyBajaHistory(){
 
 document.getElementById('mbhFilterApply').addEventListener('click', renderMyBajaHistory);
 
-document.getElementById('bhDownloadCsv').addEventListener('click', ()=>{
+document.getElementById('bhDownloadCsv').addEventListener('click', async ()=>{
   if(adminBajaHistoryCache.length === 0){ showToast('No hay datos para exportar'); return; }
-  const headers = ['codigo','tipo','item','cantidad','unidad','fecha','motivo','estado','registrado_por','anulado_por','motivo_rechazo','registrado_en'];
-  const lines = [headers.join(',')];
-  adminBajaHistoryCache.forEach(b=>{
-    const row = [
-      b.codigo||'', b.tipo, b.item_name, b.cantidad, b.unidad, b.fecha,
-      (b.motivo||'').replace(/,/g,';').replace(/\n/g,' '), b.status,
-      b.creado_por_nombre||'', b.resuelto_por||'',
-      (b.rechazo_motivo||'').replace(/,/g,';').replace(/\n/g,' '), b.created_at
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`);
-    lines.push(row.join(','));
-  });
-  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `bajas_${currentLocation.name.replace(/\s+/g,'_')}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const formato = await elegirFormato('Descargar bajas', EXP_OPC_CSV); if(!formato) return;
+  const filas = adminBajaHistoryCache.map(b => [b.fecha, b.codigo || '', b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada', b.item_name, Number(b.cantidad), b.unidad,
+    b.motivo || '', BAJA_ESTADO_LABEL[b.status] || b.status, b.creado_por_nombre || '', b.resuelto_por || '', b.rechazo_motivo || '']);
+  descargarFilas({ formato, horizontal: true, hoja: 'Bajas',
+    nombre: 'bajas_' + currentLocation.name + '_' + toISODate(new Date()),
+    titulo: 'Bajas · ' + currentLocation.name + (currentArea ? ' · ' + currentArea.name : ''), subtitulo: filas.length + ' bajas',
+    cab: ['Fecha', 'Código', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Motivo', 'Estado', 'Registró', 'Resolvió', 'Motivo del rechazo'], filas,
+    resaltar: k => adminBajaHistoryCache[k].status === 'rechazado' });
 });
 
 /* ---------- INVENTARIO ---------- */
@@ -12383,7 +12396,7 @@ async function renderInvDayPanel(){
       <div class="inv-sub">${isLocked ? '<span class="badge ok">Cerrado</span>' : '<span class="badge warn">Abierto para corregir</span>'}<span>${escapeHtml(existingSession.creado_por_nombre||'')}${isLocked ? ' · ' + conValor + ' de ' + items.length + ' contados' : ''}</span></div>
     </div>
     <div class="header-actions">
-      ${isLocked ? `<button class="btn btn-secondary btn-small" id="invDownloadBtn">Descargar CSV</button>` : ''}
+      ${isLocked ? `<button class="btn btn-secondary btn-small" id="invDownloadBtn">Descargar</button>` : ''}
       ${isLocked && isAdminRole() ? `<button class="btn btn-secondary btn-small" id="invUnlockBtn">Desbloquear</button>` : ''}
     </div>
   </div><div class="inv-rows">`;
@@ -12449,21 +12462,16 @@ function seguirProgresoInventario(box){
   pintar();
 }
 
-function downloadInventarioCsv(session, items){
-  const headers = ['Ingrediente','Código','Cantidad','Medida','Bodega'];
-  const lines = [headers.join(',')];
-  items.forEach(it=>{
-    const row = [
-      it.item_name, it.item_code, it.cantidad !== null ? it.cantidad : '', it.unidad, it.bodega
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`);
-    lines.push(row.join(','));
-  });
-  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `inventario_${currentLocation.name.replace(/\s+/g,'_')}_${currentArea.name.replace(/\s+/g,'_')}_${session.fecha}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+async function downloadInventarioCsv(session, items){
+  const formato = await elegirFormato('Descargar inventario', EXP_OPC_CSV); if(!formato) return;
+  const filas = items.map(it => [it.bodega || '', it.item_name, it.item_code, it.cantidad !== null && it.cantidad !== '' ? Number(it.cantidad) : '', it.unidad]);
+  const contados = filas.filter(r => r[3] !== '').length;
+  descargarFilas({ formato, hoja: 'Inventario',
+    nombre: 'inventario_' + currentLocation.name + '_' + currentArea.name + '_' + session.fecha,
+    titulo: 'Inventario · ' + currentArea.name + ' · ' + currentLocation.name,
+    subtitulo: 'Conteo del ' + fmtDia(session.fecha) + ' · ' + contados + ' de ' + filas.length + ' insumos contados',
+    cab: ['Bodega', 'Insumo', 'Código', 'Cantidad', 'Medida'], filas,
+    resaltar: k => filas[k][3] === '' });
 }
 
 document.getElementById('invPrevMonth').addEventListener('click', ()=>{
