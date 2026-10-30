@@ -1758,6 +1758,7 @@ nav.tabs button{position:relative;}
 
       <div class="field" style="max-width:560px;">
         <label class="field-label">Nueva factura</label>
+        <div id="facContextoFijo" class="empty-note" style="display:none; margin-bottom:8px;"></div>
         <select id="facPunto"><option value="">Elegí el punto...</option></select>
         <select id="facArea" style="margin-top:8px;" disabled><option value="">Elegí primero el punto...</option></select>
         <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
@@ -2110,6 +2111,7 @@ nav.tabs button{position:relative;}
               <label class="choice"><input type="checkbox" class="area-module-cb" value="bajas" checked> Bajas</label>
               <label class="choice"><input type="checkbox" class="area-module-cb" value="inventario" checked> Inventario</label>
               <label class="choice"><input type="checkbox" class="area-module-cb" value="costeo"> Costeo</label>
+              <label class="choice"><input type="checkbox" class="area-module-cb" value="facturas" checked> Facturas</label>
               <label class="choice"><input type="checkbox" class="area-module-cb" value="horarios"> Horarios</label>
             </div>
           </div>
@@ -3002,8 +3004,27 @@ async function rrhhAbrirDetalle(id){
 /* ---------- Facturas ---------- */
 let FAC_AREAS_PUNTO = {}, FAC_PROVEEDORES_PUNTO = {}, FAC_FOTO = null, FAC_PEDIDO_ELEGIDO = null, FACTURAS_LISTA = [];
 
+function facturasModoGlobal(){ return esFacturas(); }
+
 function facturasAlEntrar(){
-  facturasCargarPuntos();
+  const global = facturasModoGlobal();
+  document.getElementById('facPunto').style.display = global ? '' : 'none';
+  document.getElementById('facArea').style.display = global ? '' : 'none';
+  document.getElementById('facFiltroPunto').style.display = global ? '' : 'none';
+  const fijo = document.getElementById('facContextoFijo');
+  const buscar = document.getElementById('facPedidoBuscar');
+  if(global){
+    fijo.style.display = 'none';
+    buscar.placeholder = 'Elegí primero punto y área, luego buscá por código o proveedor...';
+    facturasCargarPuntos();
+  } else {
+    fijo.style.display = 'block';
+    fijo.textContent = `Punto: ${currentLocation.name} · Área: ${currentArea.name}`;
+    buscar.placeholder = 'Buscá por código o proveedor...';
+    facturasProveedoresDe(currentLocation.id).then(proveedores => {
+      document.getElementById('facProveedoresLst').innerHTML = proveedores.map(p => `<option value="${escapeHtml(p.nombre)}">`).join('');
+    });
+  }
   facturasCargarLista();
 }
 
@@ -3077,7 +3098,7 @@ document.getElementById('facFoto').addEventListener('change', e => {
 document.getElementById('facPedidoBuscar').addEventListener('input', async e => {
   const q = e.target.value.trim();
   const results = document.getElementById('facPedidoResultados');
-  const areaId = document.getElementById('facArea').value;
+  const areaId = facturasModoGlobal() ? document.getElementById('facArea').value : currentArea.id;
   if(!areaId){ results.innerHTML = '<div class="empty-note">Elegí primero punto y área.</div>'; return; }
   if(!q){ results.innerHTML = ''; return; }
   const { data } = await supa.from('orders').select('id, codigo, proveedor, fecha').eq('area_id', areaId)
@@ -3102,8 +3123,9 @@ document.getElementById('facPedidoBuscar').addEventListener('input', async e => 
 });
 
 document.getElementById('facGuardar').addEventListener('click', async () => {
-  const locId = document.getElementById('facPunto').value;
-  const areaId = document.getElementById('facArea').value;
+  const global = facturasModoGlobal();
+  const locId = global ? document.getElementById('facPunto').value : currentLocation.id;
+  const areaId = global ? document.getElementById('facArea').value : currentArea.id;
   const proveedor = document.getElementById('facProveedor').value.trim();
   const numero = document.getElementById('facNumero').value.trim();
   const montoRaw = document.getElementById('facMonto').value;
@@ -3150,10 +3172,14 @@ document.getElementById('facFiltroPunto').addEventListener('change', facturasCar
 async function facturasCargarLista(){
   const wrap = document.getElementById('facLista');
   wrap.innerHTML = '<div class="empty-note">Cargando...</div>';
-  const locId = document.getElementById('facFiltroPunto').value;
   let q = supa.from('facturas').select('*, locations(name), areas(name), orders(codigo)')
     .order('fecha_factura', { ascending: false }).order('created_at', { ascending: false }).limit(300);
-  if(locId) q = q.eq('location_id', locId);
+  if(facturasModoGlobal()){
+    const locId = document.getElementById('facFiltroPunto').value;
+    if(locId) q = q.eq('location_id', locId);
+  } else {
+    q = q.eq('area_id', currentArea.id);
+  }
   const { data, error } = await q;
   if(error){ wrap.innerHTML = '<div class="empty-note">No se pudo cargar la lista de facturas.</div>'; return; }
   FACTURAS_LISTA = data || [];
@@ -3239,7 +3265,7 @@ async function pickAreaForLocation(loc){
   });
 }
 
-const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','horarios'];
+const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios'];
 
 function applyAreaModuleVisibility(modules){
   const mb = document.getElementById('marcacionBtn');
@@ -3276,7 +3302,6 @@ function enterArea(loc, area){
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
-  document.getElementById('tab-facturas').style.display = (esFacturas() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   if(esRrhh()){
@@ -3287,9 +3312,10 @@ function enterArea(loc, area){
     return;
   }
   if(esFacturas()){
-    // Facturas: solo el módulo de facturas, en cualquier punto (no depende de área).
+    // Facturas (rol global, sin accesos por punto): el módulo de facturas con selector de punto y área.
     ['tab-chat', 'tab-admin', 'tab-calculadora', 'tab-rrhh'].forEach(id => { document.getElementById(id).style.display = 'none'; });
     applyAreaModuleVisibility([]);
+    document.getElementById('tab-facturas').style.display = '';
     switchTab('facturas');
     return;
   }
@@ -4090,7 +4116,7 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','horarios','calculadora','chat','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
   cocina: ['recetario','produccion','pedidos','chat'],
@@ -13044,7 +13070,7 @@ async function loadAreasAdmin(){
 }
 
 function renderAreasAdminList(){
-  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario', costeo:'Costeo', horarios:'Horarios'};
+  const MODULE_LABELS = {recetario:'Recetario', produccion:'Producción', cronograma:'Cronograma', pedidos:'Pedidos', bajas:'Bajas', inventario:'Inventario', costeo:'Costeo', facturas:'Facturas', horarios:'Horarios'};
   const box = document.getElementById('areasAdminList');
   if(AREAS_THIS_LOCATION.length === 0){ box.innerHTML = '<div class="empty-list">Aún no hay áreas creadas en este punto.</div>'; return; }
   box.innerHTML = AREAS_THIS_LOCATION.map(a => `
@@ -13078,7 +13104,7 @@ function renderAreasAdminList(){
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
   if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
-  if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); switchTab('facturas'); return; }
+  if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-facturas').style.display = ''; switchTab('facturas'); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
   currentArea = area;
   document.getElementById('whoArea').textContent = area.name;

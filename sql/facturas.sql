@@ -38,22 +38,24 @@ create index if not exists facturas_fecha_idx on public.facturas(fecha_factura);
 
 alter table public.facturas enable row level security;
 
+-- Cualquiera con acceso al área (no solo admin) puede subir/ver/editar/borrar las facturas de esa
+-- área — así quien esté en Cocina Dos Santos puede subir la foto ahí mismo, sin ser admin.
 drop policy if exists facturas_select on public.facturas;
 create policy facturas_select on public.facturas for select to authenticated
-  using (public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(area_id)));
+  using (public.es_facturas() or public.has_area_access(area_id));
 
 drop policy if exists facturas_insert on public.facturas;
 create policy facturas_insert on public.facturas for insert to authenticated
-  with check (public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(area_id)));
+  with check (public.es_facturas() or public.has_area_access(area_id));
 
 drop policy if exists facturas_update on public.facturas;
 create policy facturas_update on public.facturas for update to authenticated
-  using (public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(area_id)))
-  with check (public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(area_id)));
+  using (public.es_facturas() or public.has_area_access(area_id))
+  with check (public.es_facturas() or public.has_area_access(area_id));
 
 drop policy if exists facturas_delete on public.facturas;
 create policy facturas_delete on public.facturas for delete to authenticated
-  using (public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(area_id)));
+  using (public.es_facturas() or public.has_area_access(area_id));
 
 -- 3) Quien es solo "Facturas" (sin accesos por punto/área) necesita ver el nombre de todos los
 --    puntos y áreas, para el selector punto → área al crear una factura.
@@ -73,7 +75,7 @@ returns boolean language plpgsql stable security definer set search_path = publi
 declare v_area uuid;
 begin
   begin v_area := split_part(p_nombre, '/', 1)::uuid; exception when others then return false; end;
-  return public.es_facturas() or ((public.is_admin() or public.is_super_admin()) and public.has_area_access(v_area));
+  return public.es_facturas() or public.has_area_access(v_area);
 end;
 $$;
 revoke execute on function public.facturas_puede_ver_archivo(text) from public, anon;
@@ -88,6 +90,13 @@ create policy "facturas: subir" on storage.objects
 drop policy if exists "facturas: borrar" on storage.objects;
 create policy "facturas: borrar" on storage.objects
   for delete to authenticated using (bucket_id = 'facturas' and public.facturas_puede_ver_archivo(name));
+
+-- 5) Habilita el módulo "Facturas" en todas las áreas que ya tienen Pedidos activo (igual lógica
+--    que se usó para habilitar Costeo sobre Recetario en enable_costeo_modulo.sql).
+update public.areas
+set modules = modules || '["facturas"]'::jsonb
+where modules @> '["pedidos"]'::jsonb
+  and not modules @> '["facturas"]'::jsonb;
 
 notify pgrst, 'reload schema';
 
