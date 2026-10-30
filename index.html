@@ -3008,7 +3008,7 @@ async function rrhhAbrirDetalle(id){
 }
 
 /* ---------- Facturas ---------- */
-let FAC_AREAS_PUNTO = {}, FAC_PROVEEDORES_PUNTO = {}, FAC_FOTO = null, FAC_PEDIDO_ELEGIDO = null, FACTURAS_LISTA = [];
+let FAC_AREAS_PUNTO = {}, FAC_PROVEEDORES_PUNTO = {}, FAC_FOTO = null, FAC_FOTO_SEQ = 0, FAC_PEDIDO_ELEGIDO = null, FACTURAS_LISTA = [];
 
 function facturasModoGlobal(){ return esFacturas(); }
 
@@ -3098,6 +3098,7 @@ document.getElementById('facFoto').addEventListener('change', e => {
   e.target.value = '';
   if(!f) return;
   FAC_FOTO = f;
+  FAC_FOTO_SEQ++;
   const prev = document.getElementById('facFotoPrevia'), img = prev.querySelector('img');
   prev.style.display = 'block';
   if(/^image\//.test(f.type)){ img.hidden = false; img.src = URL.createObjectURL(f); }
@@ -3105,7 +3106,7 @@ document.getElementById('facFoto').addEventListener('change', e => {
   let nameTag = prev.querySelector('.fac-foto-nombre');
   if(!nameTag){ nameTag = document.createElement('div'); nameTag.className = 'fac-foto-nombre empty-note'; prev.appendChild(nameTag); }
   nameTag.textContent = f.name;
-  if(/^image\//.test(f.type)) facturasLeerConIA(f);
+  if(/^image\//.test(f.type)) facturasProcesarFoto(f, FAC_FOTO_SEQ);
 });
 
 function blobToBase64(blob){
@@ -3117,16 +3118,89 @@ function blobToBase64(blob){
   });
 }
 
-async function facturasLeerConIA(file){
-  const miFoto = file, aviso = document.getElementById('facFotoIA');
+/* ---------- Recorte automático (escáner tipo CamScanner, opencv.js + jscanify, bajo demanda) ---------- */
+let FAC_SCANNER_PROMISE = null;
+function cargarEscanerFacturas(){
+  if(FAC_SCANNER_PROMISE) return FAC_SCANNER_PROMISE;
+  FAC_SCANNER_PROMISE = (async () => {
+    if(!window.cv || !window.cv.Mat){
+      await cargarScript('https://docs.opencv.org/4.7.0/opencv.js');
+      await new Promise(resolve => {
+        if(window.cv && window.cv.Mat) return resolve();
+        window.cv['onRuntimeInitialized'] = resolve;
+      });
+    }
+    if(!window.jscanify) await cargarScript('https://cdn.jsdelivr.net/npm/jscanify@1.4.0/src/jscanify.js');
+    return new window.jscanify();
+  })();
+  return FAC_SCANNER_PROMISE;
+}
+
+function facturasArchivoAImagen(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => resolve(img);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo abrir la imagen')); };
+    img.src = url;
+  });
+}
+
+async function facturasEscanearFoto(file){
+  const scanner = await cargarEscanerFacturas();
+  const img = await facturasArchivoAImagen(file);
+  const src = window.cv.imread(img);
+  URL.revokeObjectURL(img.src);
+  let contour = null;
+  try {
+    contour = scanner.findPaperContour(src);
+    if(!contour) return null;
+    const c = scanner.getCornerPoints(contour);
+    if(!c.topLeftCorner || !c.topRightCorner || !c.bottomLeftCorner || !c.bottomRightCorner) return null;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const maxWidth = Math.round(Math.max(dist(c.bottomRightCorner, c.bottomLeftCorner), dist(c.topRightCorner, c.topLeftCorner)));
+    const maxHeight = Math.round(Math.max(dist(c.topRightCorner, c.bottomRightCorner), dist(c.topLeftCorner, c.bottomLeftCorner)));
+    if(maxWidth < 80 || maxHeight < 80) return null; // recorte irrisorio: no sirve
+    return scanner.extractPaper(img, maxWidth, maxHeight, c);
+  } finally {
+    src.delete();
+    if(contour) contour.delete();
+  }
+}
+
+async function facturasProcesarFoto(file, miSeq){
+  const aviso = document.getElementById('facFotoIA');
+  aviso.style.display = 'block';
+  aviso.textContent = 'Escaneando el documento...';
+  let archivo = file;
+  try {
+    const canvas = await facturasEscanearFoto(file);
+    if(miSeq !== FAC_FOTO_SEQ) return;
+    if(canvas){
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9));
+      if(blob){
+        archivo = new File([blob], 'factura-escaneada.jpg', { type: 'image/jpeg' });
+        FAC_FOTO = archivo;
+        document.getElementById('facFotoPrevia').querySelector('img').src = URL.createObjectURL(blob);
+      }
+    }
+  } catch(e){
+    // Si falla el escaneo (no carga la librería, no detecta el papel, etc.) seguimos con la foto tal cual.
+  }
+  if(miSeq !== FAC_FOTO_SEQ) return;
+  await facturasLeerConIA(archivo, miSeq);
+}
+
+async function facturasLeerConIA(file, miSeq){
+  const aviso = document.getElementById('facFotoIA');
   aviso.style.display = 'block';
   aviso.textContent = 'Leyendo factura con IA...';
   try {
-    const blob = await chatComprimirFoto(miFoto);
-    if(FAC_FOTO !== miFoto) return; // eligieron otra foto mientras tanto
+    const blob = await chatComprimirFoto(file);
+    if(miSeq !== FAC_FOTO_SEQ) return;
     const base64 = await blobToBase64(blob);
     const { data, error } = await supa.functions.invoke('facturas-leer-ia', { body: { image_base64: base64, media_type: 'image/jpeg' } });
-    if(FAC_FOTO !== miFoto) return;
+    if(miSeq !== FAC_FOTO_SEQ) return;
     if(error || !data || data.error || !data.data){ aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.'; return; }
     const d = data.data;
     let completo = [];
@@ -3145,7 +3219,7 @@ async function facturasLeerConIA(file){
       aviso.textContent = 'La IA no encontró datos claros en la foto, completá a mano si hace falta.';
     }
   } catch(e){
-    if(FAC_FOTO === miFoto) aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.';
+    if(miSeq === FAC_FOTO_SEQ) aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.';
   }
 }
 
@@ -3212,6 +3286,7 @@ document.getElementById('facGuardar').addEventListener('click', async () => {
     document.getElementById('facMonto').value = '';
     document.getElementById('facNotas').value = '';
     FAC_FOTO = null;
+    FAC_FOTO_SEQ++;
     document.getElementById('facFotoPrevia').style.display = 'none';
     document.getElementById('facFotoIA').style.display = 'none';
     document.getElementById('facDetalles').open = false;
