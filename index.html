@@ -3124,7 +3124,7 @@ function cargarEscanerFacturas(){
   if(FAC_SCANNER_PROMISE) return FAC_SCANNER_PROMISE;
   FAC_SCANNER_PROMISE = (async () => {
     if(!window.cv || !window.cv.Mat){
-      await cargarScript('https://docs.opencv.org/4.7.0/opencv.js');
+      await cargarScript('https://cdn.jsdelivr.net/npm/@techstark/opencv-js@5.0.0-release.1/dist/opencv.js');
       await new Promise(resolve => {
         if(window.cv && window.cv.Mat) return resolve();
         window.cv['onRuntimeInitialized'] = resolve;
