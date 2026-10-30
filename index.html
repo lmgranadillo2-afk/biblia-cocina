@@ -1489,6 +1489,7 @@ nav.tabs button{position:relative;}
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-rrhh" style="display:none" title="Recursos humanos" aria-label="Recursos humanos"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg><span class="tab-label">RRHH</span></button>
+      <button id="tab-facturas" style="display:none" title="Facturas" aria-label="Facturas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h1"/><path d="M9 17h1"/><path d="M13 13h2"/><path d="M13 17h2"/></svg><span class="tab-label">Facturas</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
       <button id="navMore" type="button" class="nav-more" title="Más" aria-label="Más"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg><span class="tab-label">Más</span></button>
     </nav>
@@ -1749,6 +1750,46 @@ nav.tabs button{position:relative;}
       <div id="rrhhLista"></div>
 
       <div id="rrhhDetalle" style="display:none; margin-top:20px; max-width:640px;"></div>
+    </div>
+
+    <div id="view-facturas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header"><h2>Facturas</h2></div>
+      <div class="empty-note" style="margin-bottom:14px;">Subí la foto de cada factura que llega, con el área a la que corresponde, proveedor, monto y fecha.</div>
+
+      <div class="field" style="max-width:560px;">
+        <label class="field-label">Nueva factura</label>
+        <select id="facPunto"><option value="">Elegí el punto...</option></select>
+        <select id="facArea" style="margin-top:8px;" disabled><option value="">Elegí primero el punto...</option></select>
+        <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
+        <datalist id="facProveedoresLst"></datalist>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input type="text" id="facNumero" placeholder="N.º de factura" style="flex:1;">
+          <input type="number" id="facMonto" placeholder="Monto" step="1" min="0" style="flex:1;">
+        </div>
+        <input type="date" id="facFecha" style="margin-top:8px;">
+
+        <div style="margin-top:12px;">
+          <label class="field-label">Asociar a un pedido (opcional)</label>
+          <input type="text" id="facPedidoBuscar" placeholder="Elegí primero punto y área, luego buscá por código o proveedor...">
+          <div id="facPedidoResultados"></div>
+          <div id="facPedidoElegido" style="display:none; margin-top:6px;" class="empty-note"></div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label class="field-label">Foto de la factura</label>
+          <input type="file" id="facFoto" accept="image/*,application/pdf" capture="environment">
+          <div id="facFotoPrevia" style="display:none; margin-top:8px;"><img alt="" style="max-width:160px; border-radius:8px; display:block;"></div>
+        </div>
+
+        <textarea id="facNotas" placeholder="Notas (opcional)" style="margin-top:10px; width:100%; min-height:60px;"></textarea>
+        <button class="btn btn-accent" id="facGuardar" style="margin-top:12px;">Guardar factura</button>
+      </div>
+
+      <div class="admin-header" style="margin-top:28px;">
+        <h3>Facturas registradas</h3>
+        <select id="facFiltroPunto"><option value="">Todos los puntos</option></select>
+      </div>
+      <div id="facLista"></div>
     </div>
 
     <div id="view-horarios" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
@@ -2737,8 +2778,8 @@ async function onLoggedIn(sess){
   }
 
   let locations;
-  if(esRrhh()){
-    // Recursos humanos: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
+  if(esRrhh() || esFacturas()){
+    // Recursos humanos / Facturas: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
     const { data: todas, error: tErr } = await supa.from('locations').select('*').order('name');
     if(tErr){ showToast('No se pudieron cargar los puntos.'); return; }
     locations = (todas || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug));
@@ -2840,6 +2881,7 @@ async function superAdminEnterLocation(locId){
 }
 
 function esRrhh(){ return !!(profile && profile.es_rrhh && !profile.is_super_admin); }
+function esFacturas(){ return !!(profile && profile.es_facturas && !profile.is_super_admin); }
 
 /* ---------- RRHH: documentación de vinculación ---------- */
 async function rrhhCargarPuntos(){
@@ -2956,13 +2998,213 @@ async function rrhhAbrirDetalle(id){
     rrhhCargarLista(); rrhhAbrirDetalle(id);
   });
 }
+
+/* ---------- Facturas ---------- */
+let FAC_AREAS_PUNTO = {}, FAC_PROVEEDORES_PUNTO = {}, FAC_FOTO = null, FAC_PEDIDO_ELEGIDO = null, FACTURAS_LISTA = [];
+
+function facturasAlEntrar(){
+  facturasCargarPuntos();
+  facturasCargarLista();
+}
+
+function facturasCargarPuntos(){
+  const selCrear = document.getElementById('facPunto'), selFiltro = document.getElementById('facFiltroPunto');
+  if(selCrear.dataset.cargado) return;
+  const opciones = (USER_LOCATIONS || []).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+  selCrear.innerHTML = '<option value="">Elegí el punto...</option>' + opciones;
+  selFiltro.innerHTML = '<option value="">Todos los puntos</option>' + opciones;
+  selCrear.dataset.cargado = '1';
+}
+
+async function facturasAreasDe(locId){
+  if(FAC_AREAS_PUNTO[locId]) return FAC_AREAS_PUNTO[locId];
+  const { data } = await supa.from('areas').select('*').eq('location_id', locId).order('created_at', { ascending: true });
+  FAC_AREAS_PUNTO[locId] = data || [];
+  return FAC_AREAS_PUNTO[locId];
+}
+
+async function facturasProveedoresDe(locId){
+  if(FAC_PROVEEDORES_PUNTO[locId]) return FAC_PROVEEDORES_PUNTO[locId];
+  const { data } = await supa.from('proveedores').select('nombre').eq('location_id', locId).order('nombre');
+  FAC_PROVEEDORES_PUNTO[locId] = data || [];
+  return FAC_PROVEEDORES_PUNTO[locId];
+}
+
+function facturasLimpiarPedido(){
+  FAC_PEDIDO_ELEGIDO = null;
+  const box = document.getElementById('facPedidoElegido');
+  box.style.display = 'none';
+  box.innerHTML = '';
+}
+
+document.getElementById('facPunto').addEventListener('change', async e => {
+  const locId = e.target.value;
+  const selArea = document.getElementById('facArea');
+  facturasLimpiarPedido();
+  document.getElementById('facPedidoBuscar').value = '';
+  document.getElementById('facPedidoResultados').innerHTML = '';
+  if(!locId){
+    selArea.innerHTML = '<option value="">Elegí primero el punto...</option>'; selArea.disabled = true;
+    document.getElementById('facProveedoresLst').innerHTML = '';
+    return;
+  }
+  const [areas, proveedores] = await Promise.all([facturasAreasDe(locId), facturasProveedoresDe(locId)]);
+  selArea.innerHTML = '<option value="">Elegí el área...</option>' + areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  selArea.disabled = false;
+  document.getElementById('facProveedoresLst').innerHTML = proveedores.map(p => `<option value="${escapeHtml(p.nombre)}">`).join('');
+});
+
+document.getElementById('facArea').addEventListener('change', () => {
+  facturasLimpiarPedido();
+  document.getElementById('facPedidoBuscar').value = '';
+  document.getElementById('facPedidoResultados').innerHTML = '';
+});
+
+document.getElementById('facFoto').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!f) return;
+  FAC_FOTO = f;
+  const prev = document.getElementById('facFotoPrevia'), img = prev.querySelector('img');
+  prev.style.display = 'block';
+  if(/^image\//.test(f.type)){ img.hidden = false; img.src = URL.createObjectURL(f); }
+  else { img.hidden = true; }
+  let nameTag = prev.querySelector('.fac-foto-nombre');
+  if(!nameTag){ nameTag = document.createElement('div'); nameTag.className = 'fac-foto-nombre empty-note'; prev.appendChild(nameTag); }
+  nameTag.textContent = f.name;
+});
+
+document.getElementById('facPedidoBuscar').addEventListener('input', async e => {
+  const q = e.target.value.trim();
+  const results = document.getElementById('facPedidoResultados');
+  const areaId = document.getElementById('facArea').value;
+  if(!areaId){ results.innerHTML = '<div class="empty-note">Elegí primero punto y área.</div>'; return; }
+  if(!q){ results.innerHTML = ''; return; }
+  const { data } = await supa.from('orders').select('id, codigo, proveedor, fecha').eq('area_id', areaId)
+    .or(`codigo.ilike.%${q}%,proveedor.ilike.%${q}%`).order('created_at', { ascending: false }).limit(10);
+  const candidatos = data || [];
+  if(candidatos.length === 0){ results.innerHTML = '<div class="empty-note">Sin resultados.</div>'; return; }
+  results.innerHTML = `<div class="ingredient-ticket">` + candidatos.map(o =>
+    `<div class="ing-row fac-pedido-pick" data-id="${o.id}"><div class="ing-name"><span class="ing-code">${escapeHtml(o.codigo)}</span>${escapeHtml(o.proveedor || '')}</div><div class="ing-qty">${o.fecha ? new Date(o.fecha + 'T00:00:00').toLocaleDateString('es-CO') : ''}</div></div>`
+  ).join('') + `</div>`;
+  results.querySelectorAll('.fac-pedido-pick').forEach(el => {
+    el.addEventListener('click', () => {
+      const o = candidatos.find(x => x.id === el.dataset.id);
+      FAC_PEDIDO_ELEGIDO = o;
+      const box = document.getElementById('facPedidoElegido');
+      box.style.display = 'block';
+      box.innerHTML = `Asociada al pedido ${escapeHtml(o.codigo)}${o.proveedor ? ' — ' + escapeHtml(o.proveedor) : ''} <button type="button" class="btn btn-ghost btn-small" id="facPedidoQuitar">Quitar</button>`;
+      document.getElementById('facPedidoQuitar').addEventListener('click', facturasLimpiarPedido);
+      results.innerHTML = '';
+      document.getElementById('facPedidoBuscar').value = '';
+    });
+  });
+});
+
+document.getElementById('facGuardar').addEventListener('click', async () => {
+  const locId = document.getElementById('facPunto').value;
+  const areaId = document.getElementById('facArea').value;
+  const proveedor = document.getElementById('facProveedor').value.trim();
+  const numero = document.getElementById('facNumero').value.trim();
+  const montoRaw = document.getElementById('facMonto').value;
+  const fecha = document.getElementById('facFecha').value;
+  const notas = document.getElementById('facNotas').value.trim();
+  if(!locId || !areaId){ showToast('Elegí el punto y el área', 'warn'); return; }
+  if(!proveedor){ showToast('Escribe el proveedor', 'warn'); return; }
+  if(!fecha){ showToast('Elegí la fecha de la factura', 'warn'); return; }
+  if(!FAC_FOTO){ showToast('Subí la foto (o el PDF) de la factura', 'warn'); return; }
+
+  const btn = document.getElementById('facGuardar'); btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    let blob = FAC_FOTO, tipo = FAC_FOTO.type, ext = (FAC_FOTO.name.split('.').pop() || 'jpg').toLowerCase();
+    if(/^image\//.test(FAC_FOTO.type)){ blob = await chatComprimirFoto(FAC_FOTO); tipo = 'image/jpeg'; ext = 'jpg'; }
+    const mes = fecha.slice(0, 7);
+    const path = `${areaId}/${mes}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supa.storage.from('facturas').upload(path, blob, { contentType: tipo });
+    if(upErr) throw upErr;
+    const { error } = await supa.from('facturas').insert({
+      area_id: areaId, location_id: locId, proveedor, numero_factura: numero || null,
+      monto: montoRaw ? parseFloat(montoRaw) : null, fecha_factura: fecha, foto_path: path,
+      order_id: FAC_PEDIDO_ELEGIDO ? FAC_PEDIDO_ELEGIDO.id : null, notas: notas || null,
+      created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
+    });
+    if(error) throw error;
+    showToast('Factura guardada', 'ok');
+    document.getElementById('facProveedor').value = '';
+    document.getElementById('facNumero').value = '';
+    document.getElementById('facMonto').value = '';
+    document.getElementById('facNotas').value = '';
+    FAC_FOTO = null;
+    document.getElementById('facFotoPrevia').style.display = 'none';
+    facturasLimpiarPedido();
+    facturasCargarLista();
+  } catch(e){
+    showToast('Error al guardar la factura: ' + (e.message || e), 'danger');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar factura';
+  }
+});
+
+document.getElementById('facFiltroPunto').addEventListener('change', facturasCargarLista);
+
+async function facturasCargarLista(){
+  const wrap = document.getElementById('facLista');
+  wrap.innerHTML = '<div class="empty-note">Cargando...</div>';
+  const locId = document.getElementById('facFiltroPunto').value;
+  let q = supa.from('facturas').select('*, locations(name), areas(name), orders(codigo)')
+    .order('fecha_factura', { ascending: false }).order('created_at', { ascending: false }).limit(300);
+  if(locId) q = q.eq('location_id', locId);
+  const { data, error } = await q;
+  if(error){ wrap.innerHTML = '<div class="empty-note">No se pudo cargar la lista de facturas.</div>'; return; }
+  FACTURAS_LISTA = data || [];
+  facturasPintarLista();
+}
+
+function facturasPintarLista(){
+  const wrap = document.getElementById('facLista');
+  if(FACTURAS_LISTA.length === 0){ wrap.innerHTML = '<div class="empty-list">Todavía no hay facturas registradas.</div>'; return; }
+  wrap.innerHTML = FACTURAS_LISTA.map(f => `
+    <div class="kanban-card" style="margin-bottom:8px;">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(f.proveedor)}</span><span class="badge info">${fmtMoney(f.monto) || 'sin monto'}</span></div>
+      <div class="kc-meta">${f.locations ? escapeHtml(f.locations.name) + ' · ' : ''}${f.areas ? escapeHtml(f.areas.name) + ' · ' : ''}${new Date(f.fecha_factura + 'T00:00:00').toLocaleDateString('es-CO')}${f.numero_factura ? ' · N.º ' + escapeHtml(f.numero_factura) : ''}${f.orders ? ' · Pedido ' + escapeHtml(f.orders.codigo) : ''}</div>
+      ${f.notas ? `<div class="kc-meta">${escapeHtml(f.notas)}</div>` : ''}
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-ghost btn-small" data-fac-ver="${f.id}">Ver</button>
+        <button class="btn btn-ghost btn-small" data-fac-borrar="${f.id}">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-fac-ver]').forEach(b => b.addEventListener('click', async () => {
+    const f = FACTURAS_LISTA.find(x => x.id === b.dataset.facVer);
+    if(!f) return;
+    const { data } = await supa.storage.from('facturas').createSignedUrl(f.foto_path, 300);
+    if(data) window.open(data.signedUrl, '_blank');
+  }));
+  wrap.querySelectorAll('[data-fac-borrar]').forEach(b => b.addEventListener('click', async () => {
+    const f = FACTURAS_LISTA.find(x => x.id === b.dataset.facBorrar);
+    if(!f) return;
+    if(!confirm(`¿Eliminar la factura de ${f.proveedor}? No se puede deshacer.`)) return;
+    const { error } = await supa.from('facturas').delete().eq('id', f.id);
+    if(error){ showToast('Error al eliminar: ' + error.message, 'danger'); return; }
+    await supa.storage.from('facturas').remove([f.foto_path]);
+    showToast('Factura eliminada');
+    facturasCargarLista();
+  }));
+}
+
 async function areasDeRrhh(locId){
   const { data } = await supa.from('areas').select('*').eq('location_id', locId).order('created_at', { ascending: true });
   return (data || []).filter(a => (a.modules || []).includes('horarios'));
 }
+async function areaCualquieraDe(locId){
+  // Facturas no depende de un área: cualquiera sirve para entrar directo, sin mostrar el selector.
+  const { data } = await supa.from('areas').select('*').eq('location_id', locId).order('created_at', { ascending: true }).limit(1);
+  return data || [];
+}
 async function pickAreaForLocation(loc){
   let areas;
   if(esRrhh()) areas = await areasDeRrhh(loc.id);
+  else if(esFacturas()) areas = await areaCualquieraDe(loc.id);
   else {
     const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
     if(error){
@@ -3029,11 +3271,12 @@ function enterArea(loc, area){
   document.getElementById('ctxLoc').textContent = loc.name;
   document.getElementById('userInitial').textContent = (profile.name || session.user.email || '?').trim().charAt(0).toUpperCase();
   const roleBadge = document.getElementById('whoRole');
-  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : profile.role === 'admin' ? 'Admin' : 'Cocina';
+  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
+  document.getElementById('tab-facturas').style.display = (esFacturas() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   if(esRrhh()){
@@ -3041,6 +3284,13 @@ function enterArea(loc, area){
     ['tab-chat', 'tab-admin', 'tab-calculadora'].forEach(id => { document.getElementById(id).style.display = 'none'; });
     HOR.subPedida = 'prenomina';
     applyAreaModuleVisibility(['horarios']);
+    return;
+  }
+  if(esFacturas()){
+    // Facturas: solo el módulo de facturas, en cualquier punto (no depende de área).
+    ['tab-chat', 'tab-admin', 'tab-calculadora', 'tab-rrhh'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    applyAreaModuleVisibility([]);
+    switchTab('facturas');
     return;
   }
   applyAreaModuleVisibility(area.modules || MODULE_TABS);
@@ -3804,8 +4054,9 @@ document.getElementById('tab-calculadora').addEventListener('click', ()=>switchT
 document.getElementById('tab-chat').addEventListener('click', ()=>switchTab('chat'));
 document.getElementById('tab-horarios').addEventListener('click', ()=>switchTab('horarios'));
 document.getElementById('tab-rrhh').addEventListener('click', ()=>switchTab('rrhh'));
+document.getElementById('tab-facturas').addEventListener('click', ()=>switchTab('facturas'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -3820,6 +4071,7 @@ function switchTab(name){
   if(name==='chat') chatAlEntrar();
   if(name==='horarios') horAlEntrar();
   if(name==='rrhh'){ rrhhCargarPuntos(); rrhhCargarLista(); }
+  if(name==='facturas') facturasAlEntrar();
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
     // Qué pestañas ve cada punto:
     //  - Restaurante: Platos, Eventos (los suyos), Carta (la suya), Cargos (para Platos), Food cost (admin).
@@ -10697,6 +10949,10 @@ async function loadUsers(){
           <input type="checkbox" data-rrhh-for="${u.id}" ${u.es_rrhh?'checked':''}>
           Recursos humanos
         </label>
+        <label class="chip-check" title="Ve y sube facturas de todos los puntos y áreas">
+          <input type="checkbox" data-facturas-for="${u.id}" ${u.es_facturas?'checked':''}>
+          Facturas
+        </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
         <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
@@ -10724,6 +10980,7 @@ async function loadUsers(){
       const newRole = select.value;
       const newSuper = superCb.checked;
       const newRrhh = wrap.querySelector(`[data-rrhh-for="${id}"]`).checked;
+      const newFacturas = wrap.querySelector(`[data-facturas-for="${id}"]`).checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
@@ -10734,7 +10991,7 @@ async function loadUsers(){
         superCb.checked = true;
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh }).eq('id', id);
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
       showToast('Usuario actualizado');
     });
@@ -12821,6 +13078,7 @@ function renderAreasAdminList(){
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
   if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
+  if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); switchTab('facturas'); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
   currentArea = area;
   document.getElementById('whoArea').textContent = area.name;
