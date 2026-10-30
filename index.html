@@ -2689,6 +2689,23 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   document.getElementById('loginScreen').style.display='flex';
 });
 
+function elegirNombreCompartido(nombres){
+  return new Promise(resolve => {
+    const div = document.createElement('div');
+    div.id = 'whoPicker';
+    div.style.cssText = 'position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+    div.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px 32px; max-width:360px; width:100%; text-align:center;">
+      <div style="font-family:'Playfair Display',serif; font-size:22px; margin-bottom:6px;">¿Quién sos?</div>
+      <div style="color:var(--text-muted); font-size:13px; margin-bottom:18px;">Para que quede registrado con tu nombre</div>
+      ${nombres.map(n => `<button class="btn btn-accent btn-block" style="margin-bottom:10px;" data-nombre="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('')}
+    </div>`;
+    document.body.appendChild(div);
+    div.querySelectorAll('[data-nombre]').forEach(b => {
+      b.addEventListener('click', () => { div.remove(); resolve(b.dataset.nombre); });
+    });
+  });
+}
+
 async function onLoggedIn(sess){
   session = sess;
   const { data: prof, error } = await supa.from('profiles').select('*').eq('id', sess.user.id).single();
@@ -2697,6 +2714,9 @@ async function onLoggedIn(sess){
     return;
   }
   profile = prof;
+  if(Array.isArray(prof.nombres_compartidos) && prof.nombres_compartidos.length > 1){
+    profile.name = await elegirNombreCompartido(prof.nombres_compartidos);
+  }
 
   // Enlace de marcación (?marcacion=<área>): entra directo a la pantalla de marcación de esa área, sin cargar la app.
   const marcPunto = new URLSearchParams(location.search).get('marcacion_punto');
