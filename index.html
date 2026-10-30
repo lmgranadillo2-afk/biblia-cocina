@@ -2759,25 +2759,36 @@ async function onLoggedIn(sess){
     return;
   }
 
-  if(locations.length === 1){
+  const panelAdmin = locations.find(loc => loc.slug === 'admin');
+  const puntosReales = locations.filter(loc => loc.slug !== 'admin');
+
+  if(locations.length === 1 && !panelAdmin){
     enterLocation(locations[0]);
+    return;
+  }
+  if(puntosReales.length === 0 && panelAdmin){
+    enterLocation(panelAdmin);
     return;
   }
 
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('locationScreen').style.display='flex';
-  document.getElementById('locationList').innerHTML = locations.map(loc => `
+  document.getElementById('locationList').innerHTML = puntosReales.map(loc => `
     <div class="location-card" data-loc-id="${loc.id}">
       ${loc.logo_data_url ? `<img src="${escapeHtml(loc.logo_data_url)}" alt="">` : ''}
       <div class="lc-name">${escapeHtml(loc.name)}</div>
     </div>
-  `).join('');
+  `).join('') + (panelAdmin ? `
+    <button type="button" id="btnPanelAdmin" style="width:100%; margin-top:16px; padding-top:16px; border:none; border-top:1px dashed var(--border); background:none; color:var(--text-muted); font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer; text-align:center;">⚙ Panel administrativo</button>
+  ` : '');
   document.getElementById('locationList').querySelectorAll('.location-card').forEach(card=>{
     card.addEventListener('click', ()=>{
-      const loc = locations.find(l => l.id === card.dataset.locId);
+      const loc = puntosReales.find(l => l.id === card.dataset.locId);
       enterLocation(loc);
     });
   });
+  const btnAdmin = document.getElementById('btnPanelAdmin');
+  if(btnAdmin) btnAdmin.addEventListener('click', () => enterLocation(panelAdmin));
 }
 
 function enterLocation(loc){
