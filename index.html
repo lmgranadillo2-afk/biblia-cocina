@@ -1768,9 +1768,10 @@ nav.tabs button{position:relative;}
           <label class="field-label">Foto de la factura</label>
           <input type="file" id="facFoto" accept="image/*,application/pdf" capture="environment">
           <div id="facFotoPrevia" style="display:none; margin-top:8px;"><img alt="" style="max-width:160px; border-radius:8px; display:block;"></div>
+          <div id="facFotoIA" class="empty-note" style="display:none; margin-top:6px;"></div>
         </div>
 
-        <details class="pren-sec" style="margin-top:12px;">
+        <details class="pren-sec" id="facDetalles" style="margin-top:12px;">
           <summary>Más detalles (opcional)</summary>
           <div class="pren-cuerpo">
             <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
@@ -3104,7 +3105,49 @@ document.getElementById('facFoto').addEventListener('change', e => {
   let nameTag = prev.querySelector('.fac-foto-nombre');
   if(!nameTag){ nameTag = document.createElement('div'); nameTag.className = 'fac-foto-nombre empty-note'; prev.appendChild(nameTag); }
   nameTag.textContent = f.name;
+  if(/^image\//.test(f.type)) facturasLeerConIA(f);
 });
+
+function blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function facturasLeerConIA(file){
+  const miFoto = file, aviso = document.getElementById('facFotoIA');
+  aviso.style.display = 'block';
+  aviso.textContent = 'Leyendo factura con IA...';
+  try {
+    const blob = await chatComprimirFoto(miFoto);
+    if(FAC_FOTO !== miFoto) return; // eligieron otra foto mientras tanto
+    const base64 = await blobToBase64(blob);
+    const { data, error } = await supa.functions.invoke('facturas-leer-ia', { body: { image_base64: base64, media_type: 'image/jpeg' } });
+    if(FAC_FOTO !== miFoto) return;
+    if(error || !data || data.error || !data.data){ aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.'; return; }
+    const d = data.data;
+    let completo = [];
+    const proveedorEl = document.getElementById('facProveedor');
+    if(d.proveedor && !proveedorEl.value.trim()){ proveedorEl.value = d.proveedor; completo.push('proveedor'); }
+    const numeroEl = document.getElementById('facNumero');
+    if(d.numero_factura && !numeroEl.value.trim()){ numeroEl.value = d.numero_factura; completo.push('número'); }
+    const montoEl = document.getElementById('facMonto');
+    if(d.monto != null && !montoEl.value.trim()){ montoEl.value = d.monto; completo.push('monto'); }
+    if(d.fecha_factura) document.getElementById('facFecha').value = d.fecha_factura;
+    if(completo.length){
+      const det = document.getElementById('facDetalles');
+      if(det) det.open = true;
+      aviso.textContent = 'Completado con IA: ' + completo.join(', ') + '. Revisá que esté bien.';
+    } else {
+      aviso.textContent = 'La IA no encontró datos claros en la foto, completá a mano si hace falta.';
+    }
+  } catch(e){
+    if(FAC_FOTO === miFoto) aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.';
+  }
+}
 
 document.getElementById('facPedidoBuscar').addEventListener('input', async e => {
   const q = e.target.value.trim();
@@ -3170,6 +3213,8 @@ document.getElementById('facGuardar').addEventListener('click', async () => {
     document.getElementById('facNotas').value = '';
     FAC_FOTO = null;
     document.getElementById('facFotoPrevia').style.display = 'none';
+    document.getElementById('facFotoIA').style.display = 'none';
+    document.getElementById('facDetalles').open = false;
     facturasLimpiarPedido();
     facturasCargarLista();
   } catch(e){
