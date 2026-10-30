@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentación de vinculación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F7F2E8; --surface:#FFFDF8; --surface-2:#F0E9DB; --border:#DDD0B6;
+    --text:#1F1810; --text-muted:#62564A; --text-dim:#8A7D68;
+    --accent:#C8935A; --accent-strong:#A07648; --accent-text:#1F1810;
+    --ok:#2F7A45; --ok-bg:#E2EFE3; --warn:#A4660A; --warn-bg:#F7EAD0; --danger:#B0382A; --danger-bg:#F6DDD8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; padding:20px 14px 60px;}
+  .wrap{max-width:640px; margin:0 auto;}
+  h1{font-family:'Playfair Display',serif; font-size:24px; margin:0 0 4px;}
+  h2{font-family:'Playfair Display',serif; font-size:17px; margin:26px 0 4px;}
+  .sub{color:var(--text-muted); font-size:13.5px; margin:0 0 18px;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:14px;}
+  .err{color:var(--danger); font-family:'Inter',sans-serif; font-size:15px;}
+  label{display:block; font-size:13px; color:var(--text-muted); margin-bottom:6px;}
+  select, input[type=text], input[type=tel]{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface);
+    color:var(--text); font-family:'Inter',sans-serif; font-size:14.5px; outline:none;
+  }
+  select:focus, input:focus{border-color:var(--accent);}
+  .row{display:flex; align-items:center; gap:8px; margin:6px 0;}
+  .doc-row{border-top:1px dashed var(--border); padding:12px 0;}
+  .doc-row:first-child{border-top:none; padding-top:0;}
+  .doc-label{font-size:14.5px; font-weight:600;}
+  .file-chip{display:inline-flex; align-items:center; gap:6px; background:var(--ok-bg); color:var(--ok); border-radius:7px; padding:5px 10px; font-size:12.5px; margin:5px 6px 0 0;}
+  .file-chip button{background:none; border:none; color:var(--ok); cursor:pointer; font-size:13px; line-height:1;}
+  .btn{display:inline-block; padding:9px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; cursor:pointer;}
+  .btn-accent{background:var(--accent); border-color:var(--accent-strong); color:var(--accent-text);}
+  .btn-block{width:100%; text-align:center; padding:13px; font-size:15px;}
+  .progreso{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--text-muted);}
+  .ref-item{font-size:13.5px; margin:4px 0; display:flex; justify-content:space-between; align-items:center;}
+  .ref-item button{background:none; border:none; color:var(--danger); cursor:pointer; font-size:12px;}
+  .done{text-align:center; padding:40px 10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Documentación de vinculación</h1>
+    <div class="sub">Subí foto o PDF de cada documento. Podés completar esto en varias veces — no se pierde lo que ya subiste.</div>
+  </div>
+  <div id="app"><div class="card">Cargando...</div></div>
+</div>
+
+<script>
+const FN_URL = "https://rwsmscggszaogalmwsrj.supabase.co/functions/v1/rrhh-upload";
+const ANON_KEY = "sb_publishable_ZHjOiAmgamvaTcLfluTxxA_tkhOX-Ve";
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function apiGet(){
+  const res = await fetch(`${FN_URL}?token=${encodeURIComponent(TOKEN)}`, { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } });
+  return { ok: res.ok, data: await res.json().catch(()=>({})) };
+}
+async function apiPost(body){
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return { ok: res.ok, data: await res.json().catch(()=>({})) };
+}
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const DOC_CATALOG = [
+  { tipo:'hoja_vida', label:'Hoja de vida actualizada' },
+  { tipo:'cedula', label:'Cédula (copia ampliada al 150%)' },
+  { tipo:'cert_eps', label:'Certificado de aportes y permanencia — EPS' },
+  { tipo:'cert_pension', label:'Certificado de aportes y permanencia — Fondo de Pensión' },
+  { tipo:'cert_estudios', label:'Certificado de estudios (bachiller)' },
+  { tipo:'cert_manipulacion', label:'Certificado de manipulación de alimentos' },
+  { tipo:'cert_judicial', label:'Certificado judicial (antecedentes)' },
+  { tipo:'cert_bancario', label:'Certificado bancario (preferible Bancolombia)' },
+  { tipo:'cert_laboral', label:'Certificaciones laborales (mínimo 2, subí una por una)' },
+  { tipo:'registro_civil_matrimonio', label:'Registro civil de matrimonio', cond: s => s.estado_civil === 'casado' },
+  { tipo:'declaracion_extrajuicio', label:'Declaración extrajuicio (unión libre)', cond: s => s.estado_civil === 'union_libre' },
+  { tipo:'doc_identidad_conyuge', label:'Documento de identidad de tu pareja', cond: s => s.estado_civil === 'casado' || s.estado_civil === 'union_libre' },
+  { tipo:'cert_laboral_conyuge', label:'Certificado laboral de tu pareja', cond: s => (s.estado_civil === 'casado' || s.estado_civil === 'union_libre') && s.conyuge_trabaja },
+  { tipo:'registro_civil_hijo', label:'Registro civil de nacimiento de cada hijo', cond: s => s.tiene_hijos },
+  { tipo:'tarjeta_identidad_hijo', label:'Tarjeta de identidad — hijos mayores de 7 años', cond: s => s.tiene_hijos },
+  { tipo:'cert_escolaridad_hijo', label:'Certificado de escolaridad — hijos mayores de 11 años', cond: s => s.tiene_hijos },
+  { tipo:'registro_civil_trabajador', label:'Tu registro civil (para acreditar a tus padres)', cond: s => s.tiene_padres_dependientes },
+  { tipo:'cedula_padre', label:'Cédula de cada padre/madre a cargo', cond: s => s.tiene_padres_dependientes },
+  { tipo:'cert_supervivencia', label:'Certificado de supervivencia (no mayor a 30 días)', cond: s => s.tiene_padres_dependientes },
+];
+
+let STATE = null;
+
+async function init(){
+  if(!TOKEN){ mostrarError('Este enlace no es válido. Pedile a Recursos Humanos que te lo vuelva a mandar.'); return; }
+  const r = await apiGet();
+  if(!r.ok){ mostrarError(r.data.error || 'No se pudo cargar tu solicitud.'); return; }
+  STATE = r.data;
+  render();
+}
+
+function mostrarError(msg){
+  document.getElementById('app').innerHTML = `<div class="card"><div class="err">${escapeHtml(msg)}</div></div>`;
+}
+
+function docsDe(tipo){ return (STATE.documentos || []).filter(d => d.tipo === tipo); }
+
+function render(){
+  if(STATE.bloqueado){
+    document.getElementById('app').innerHTML = `<div class="card done"><h1>¡Gracias, ${escapeHtml(STATE.nombre_candidato)}!</h1><p class="sub">Recursos Humanos ya revisó tu documentación. Si falta algo, te van a escribir.</p></div>`;
+    return;
+  }
+
+  const visibles = DOC_CATALOG.filter(d => !d.cond || d.cond(STATE));
+  const completos = visibles.filter(d => docsDe(d.tipo).length > 0).length;
+
+  const docsHtml = visibles.map(d => {
+    const subidos = docsDe(d.tipo);
+    const chips = subidos.map(f => `<span class="file-chip">${escapeHtml(f.nombre_archivo || 'archivo')}<button data-quitar="${f.id}" aria-label="Quitar">✕</button></span>`).join('');
+    return `<div class="doc-row">
+      <div class="doc-label">${subidos.length ? '✅ ' : ''}${escapeHtml(d.label)}</div>
+      <div>${chips}</div>
+      <label class="btn" style="margin-top:8px; display:inline-block;">+ Subir archivo
+        <input type="file" accept="image/*,.pdf" data-tipo="${d.tipo}" style="display:none;">
+      </label>
+    </div>`;
+  }).join('');
+
+  const refs = STATE.referencias || [];
+  const refsHtml = refs.map(r => `<div class="ref-item"><span>${escapeHtml(r.nombre)} · ${escapeHtml(r.telefono)}${r.relacion ? ' · ' + escapeHtml(r.relacion) : ''}</span><button data-quitar-ref="${r.id}">Quitar</button></div>`).join('');
+  const refsForm = refs.length >= 2 ? '' : `
+    <div style="margin-top:8px;">
+      <input type="text" id="refNombre" placeholder="Nombre completo" style="margin-bottom:6px;">
+      <input type="tel" id="refTelefono" placeholder="Teléfono" style="margin-bottom:6px;">
+      <input type="text" id="refRelacion" placeholder="Relación (ej: excompañero de trabajo)" style="margin-bottom:8px;">
+      <button class="btn" id="btnAgregarRef">Agregar referencia</button>
+    </div>`;
+
+  document.getElementById('app').innerHTML = `
+    <div class="card">
+      <div class="progreso">${completos} de ${visibles.length} documentos cargados</div>
+    </div>
+
+    <div class="card">
+      <label>Estado civil</label>
+      <select id="estadoCivil">
+        <option value="">Selecciona...</option>
+        <option value="soltero" ${STATE.estado_civil==='soltero'?'selected':''}>Soltero(a)</option>
+        <option value="casado" ${STATE.estado_civil==='casado'?'selected':''}>Casado(a)</option>
+        <option value="union_libre" ${STATE.estado_civil==='union_libre'?'selected':''}>Unión libre</option>
+      </select>
+      <div class="row" style="margin-top:12px;"><input type="checkbox" id="tieneHijos" ${STATE.tiene_hijos?'checked':''}><label style="margin:0;" for="tieneHijos">Tengo hijos</label></div>
+      ${(STATE.estado_civil==='casado'||STATE.estado_civil==='union_libre') ? `<div class="row"><input type="checkbox" id="conyugeTrabaja" ${STATE.conyuge_trabaja?'checked':''}><label style="margin:0;" for="conyugeTrabaja">Mi pareja trabaja</label></div>` : ''}
+      <div class="row"><input type="checkbox" id="padresDependientes" ${STATE.tiene_padres_dependientes?'checked':''}><label style="margin:0;" for="padresDependientes">Tengo padres mayores de 60 años a mi cargo</label></div>
+    </div>
+
+    <h2>Documentos</h2>
+    <div class="card">${docsHtml}</div>
+
+    <h2>Referencias personales (2, que no sean familiares)</h2>
+    <div class="card">${refsHtml || '<div class="sub" style="margin:0;">Todavía no agregaste ninguna.</div>'}${refsForm}</div>
+
+    <button class="btn btn-accent btn-block" id="btnCompletar" style="margin-top:10px;">Ya terminé de subir todo</button>
+  `;
+
+  document.getElementById('estadoCivil').addEventListener('change', e => { STATE.estado_civil = e.target.value || null; guardarPerfil(); });
+  document.getElementById('tieneHijos').addEventListener('change', e => { STATE.tiene_hijos = e.target.checked; guardarPerfil(); });
+  const cy = document.getElementById('conyugeTrabaja'); if(cy) cy.addEventListener('change', e => { STATE.conyuge_trabaja = e.target.checked; guardarPerfil(); });
+  document.getElementById('padresDependientes').addEventListener('change', e => { STATE.tiene_padres_dependientes = e.target.checked; guardarPerfil(); });
+
+  document.querySelectorAll('input[type=file]').forEach(inp => {
+    inp.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      await subirArchivo(e.target.dataset.tipo, file);
+    });
+  });
+  document.querySelectorAll('[data-quitar]').forEach(btn => {
+    btn.addEventListener('click', () => quitarArchivo(btn.dataset.quitar));
+  });
+  document.querySelectorAll('[data-quitar-ref]').forEach(btn => {
+    btn.addEventListener('click', () => quitarReferencia(btn.dataset.quitarRef));
+  });
+  const btnRef = document.getElementById('btnAgregarRef');
+  if(btnRef) btnRef.addEventListener('click', agregarReferencia);
+  document.getElementById('btnCompletar').addEventListener('click', completar);
+}
+
+async function guardarPerfil(){
+  render();
+  const r = await apiPost({ token: TOKEN, accion: 'perfil', estado_civil: STATE.estado_civil, tiene_hijos: STATE.tiene_hijos, conyuge_trabaja: STATE.conyuge_trabaja, tiene_padres_dependientes: STATE.tiene_padres_dependientes });
+  if(!r.ok) alert(r.data.error || 'No se pudo guardar');
+}
+
+async function subirArchivo(tipo, file){
+  if(file.size > 8 * 1024 * 1024){ alert('El archivo pesa más de 8MB. Comprimilo o sacá la foto de nuevo.'); return; }
+  const base64 = await fileToBase64(file);
+  const r = await apiPost({ token: TOKEN, accion: 'documento', tipo, nombre_archivo: file.name, content_type: file.type, contenido_base64: base64 });
+  if(!r.ok){ alert(r.data.error || 'No se pudo subir el archivo'); return; }
+  await init();
+}
+
+async function quitarArchivo(id){
+  const r = await apiPost({ token: TOKEN, accion: 'eliminar_documento', documento_id: id });
+  if(!r.ok){ alert(r.data.error || 'No se pudo quitar'); return; }
+  await init();
+}
+
+async function agregarReferencia(){
+  const nombre = document.getElementById('refNombre').value.trim();
+  const telefono = document.getElementById('refTelefono').value.trim();
+  const relacion = document.getElementById('refRelacion').value.trim();
+  if(!nombre || !telefono){ alert('Completa el nombre y el teléfono'); return; }
+  const r = await apiPost({ token: TOKEN, accion: 'referencia', nombre, telefono, relacion });
+  if(!r.ok){ alert(r.data.error || 'No se pudo guardar'); return; }
+  await init();
+}
+
+async function quitarReferencia(id){
+  const r = await apiPost({ token: TOKEN, accion: 'eliminar_referencia', referencia_id: id });
+  if(!r.ok){ alert(r.data.error || 'No se pudo quitar'); return; }
+  await init();
+}
+
+async function completar(){
+  const r = await apiPost({ token: TOKEN, accion: 'completar' });
+  if(!r.ok){ alert(r.data.error || 'No se pudo completar'); return; }
+  alert('¡Listo! Recursos Humanos va a revisar tu documentación.');
+  await init();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1488,6 +1488,7 @@ nav.tabs button{position:relative;}
       <button id="tab-horarios" title="Horarios" aria-label="Horarios"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg><span class="tab-label">Horarios</span></button>
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
+      <button id="tab-rrhh" style="display:none" title="Recursos humanos" aria-label="Recursos humanos"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg><span class="tab-label">RRHH</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
       <button id="navMore" type="button" class="nav-more" title="Más" aria-label="Más"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg><span class="tab-label">Más</span></button>
     </nav>
@@ -1729,6 +1730,25 @@ nav.tabs button{position:relative;}
       <div class="cal-legend"><span><i style="background:var(--ok);"></i>Conteo cerrado</span><span><i style="background:var(--warn);"></i>Abierto para corregir</span></div>
 
       <div id="invDayPanel" style="margin-top:18px;"></div>
+    </div>
+
+    <div id="view-rrhh" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
+      <div class="admin-header"><h2>Recursos humanos — Documentación de vinculación</h2></div>
+      <div class="empty-note" style="margin-bottom:14px;">Generá un enlace para el candidato — no necesita usuario de la app para subir sus documentos.</div>
+
+      <div class="field" style="max-width:560px;">
+        <label class="field-label">Nueva solicitud</label>
+        <input type="text" id="rrhhNombre" placeholder="Nombre del candidato">
+        <input type="text" id="rrhhCedula" placeholder="Cédula (opcional)" style="margin-top:8px;">
+        <select id="rrhhPunto" style="margin-top:8px;"><option value="">(sin punto específico)</option></select>
+        <button class="btn btn-accent" id="rrhhCrear" style="margin-top:10px;">Generar enlace</button>
+      </div>
+      <div id="rrhhNuevoLink" style="display:none; margin:14px 0; max-width:560px;"></div>
+
+      <div class="admin-header" style="margin-top:24px;"><h3>Solicitudes</h3></div>
+      <div id="rrhhLista"></div>
+
+      <div id="rrhhDetalle" style="display:none; margin-top:20px; max-width:640px;"></div>
     </div>
 
     <div id="view-horarios" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
@@ -2789,6 +2809,122 @@ async function superAdminEnterLocation(locId){
 }
 
 function esRrhh(){ return !!(profile && profile.es_rrhh && !profile.is_super_admin); }
+
+/* ---------- RRHH: documentación de vinculación ---------- */
+async function rrhhCargarPuntos(){
+  const sel = document.getElementById('rrhhPunto');
+  if(sel.dataset.cargado) return;
+  const { data } = await supa.from('locations').select('id, name').order('name');
+  sel.innerHTML = '<option value="">(sin punto específico)</option>' +
+    (data || []).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+  sel.dataset.cargado = '1';
+}
+
+function rrhhToken(){
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+document.getElementById('rrhhCrear').addEventListener('click', async () => {
+  const nombre = document.getElementById('rrhhNombre').value.trim();
+  if(!nombre){ showToast('Escribe el nombre del candidato'); return; }
+  const cedula = document.getElementById('rrhhCedula').value.trim();
+  const locationId = document.getElementById('rrhhPunto').value || null;
+  const token = rrhhToken();
+  const { error } = await supa.from('rrhh_solicitudes').insert({
+    token, nombre_candidato: nombre, cedula_candidato: cedula || null, location_id: locationId, creado_por: session.user.id
+  });
+  if(error){ showToast('Error al crear la solicitud: ' + error.message); return; }
+  const link = location.origin + '/vinculacion.html?token=' + token;
+  const box = document.getElementById('rrhhNuevoLink');
+  box.style.display = 'block';
+  box.innerHTML = `<div class="empty-note">Enlace para ${escapeHtml(nombre)} (mandáselo por WhatsApp o correo):</div>
+    <div style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+      <input type="text" readonly value="${escapeHtml(link)}" style="flex:1; min-width:220px;" id="rrhhLinkInput">
+      <button class="btn btn-ghost btn-small" id="rrhhCopiar">Copiar</button>
+      <a class="btn btn-ghost btn-small" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Hola ' + nombre + ', por favor sube tus documentos de vinculación acá: ' + link)}">WhatsApp</a>
+    </div>`;
+  document.getElementById('rrhhCopiar').addEventListener('click', () => {
+    navigator.clipboard.writeText(link); showToast('Enlace copiado');
+  });
+  document.getElementById('rrhhNombre').value = '';
+  document.getElementById('rrhhCedula').value = '';
+  rrhhCargarLista();
+});
+
+let RRHH_SOLICITUDES = [];
+async function rrhhCargarLista(){
+  const { data, error } = await supa.from('rrhh_solicitudes').select('*, locations(name)').order('created_at', { ascending: false });
+  RRHH_SOLICITUDES = error ? [] : (data || []);
+  rrhhPintarLista();
+}
+const RRHH_ESTADO_LABEL = { pendiente: 'Pendiente', completo: 'Completo, por revisar', revisado: 'Revisado' };
+const RRHH_ESTADO_CLASE = { pendiente: 'warn', completo: 'info', revisado: 'ok' };
+function rrhhPintarLista(){
+  const box = document.getElementById('rrhhLista');
+  if(RRHH_SOLICITUDES.length === 0){ box.innerHTML = '<div class="empty-list">Todavía no hay solicitudes.</div>'; return; }
+  box.innerHTML = RRHH_SOLICITUDES.map(s => `
+    <div class="kanban-card" data-rrhh-id="${s.id}" style="cursor:pointer; margin-bottom:8px;" role="button" tabindex="0">
+      <div class="kc-head"><span class="kc-code">${escapeHtml(s.nombre_candidato)}</span><span class="badge ${RRHH_ESTADO_CLASE[s.estado] || ''}">${RRHH_ESTADO_LABEL[s.estado] || s.estado}</span></div>
+      <div class="kc-meta">${s.locations ? escapeHtml(s.locations.name) + ' · ' : ''}${new Date(s.created_at).toLocaleDateString('es-CO')}${s.cedula_candidato ? ' · CC ' + escapeHtml(s.cedula_candidato) : ''}</div>
+    </div>`).join('');
+  box.querySelectorAll('[data-rrhh-id]').forEach(el => el.addEventListener('click', () => rrhhAbrirDetalle(el.dataset.rrhhId)));
+}
+
+const RRHH_TIPO_LABEL = {
+  hoja_vida: 'Hoja de vida', cedula: 'Cédula (copia ampliada 150%)', cert_eps: 'Certificado EPS',
+  cert_pension: 'Certificado Fondo de Pensión', cert_estudios: 'Certificado de estudios (bachiller)',
+  cert_manipulacion: 'Certificado manipulación de alimentos', cert_judicial: 'Certificado judicial',
+  cert_bancario: 'Certificado bancario', cert_laboral: 'Certificación laboral',
+  registro_civil_matrimonio: 'Registro civil de matrimonio', doc_identidad_conyuge: 'Identidad del cónyuge',
+  declaracion_extrajuicio: 'Declaración extrajuicio', registro_civil_hijo: 'Registro civil de hijo',
+  tarjeta_identidad_hijo: 'Tarjeta de identidad de hijo', cert_escolaridad_hijo: 'Certificado de escolaridad de hijo',
+  cert_laboral_conyuge: 'Certificado laboral del cónyuge', registro_civil_trabajador: 'Registro civil propio',
+  cedula_padre: 'Cédula de padre/madre', cert_supervivencia: 'Certificado de supervivencia'
+};
+
+async function rrhhAbrirDetalle(id){
+  const s = RRHH_SOLICITUDES.find(x => x.id === id);
+  if(!s) return;
+  const [{ data: docs }, { data: refs }] = await Promise.all([
+    supa.from('rrhh_documentos').select('*').eq('solicitud_id', id).order('subido_at'),
+    supa.from('rrhh_referencias').select('*').eq('solicitud_id', id).order('created_at'),
+  ]);
+  const box = document.getElementById('rrhhDetalle');
+  box.style.display = 'block';
+  const docsHtml = (docs || []).length === 0 ? '<div class="empty-note">Sin documentos todavía.</div>' :
+    `<div class="ingredient-ticket">` + (docs || []).map(d =>
+      `<div class="ing-row"><div class="ing-name">${escapeHtml(RRHH_TIPO_LABEL[d.tipo] || d.tipo)} — ${escapeHtml(d.nombre_archivo || '')}</div><div class="ing-qty"><button class="btn btn-ghost btn-small" data-ver-doc="${escapeHtml(d.storage_path)}">Ver</button></div></div>`
+    ).join('') + `</div>`;
+  const refsHtml = (refs || []).length === 0 ? '<div class="empty-note">Sin referencias cargadas.</div>' :
+    (refs || []).map(r => `<div class="kc-meta">${escapeHtml(r.nombre)} · ${escapeHtml(r.telefono)}${r.relacion ? ' · ' + escapeHtml(r.relacion) : ''}</div>`).join('');
+  box.innerHTML = `
+    <div class="section-label">Documentos de ${escapeHtml(s.nombre_candidato)}</div>
+    <div class="empty-note">Estado civil: ${escapeHtml(s.estado_civil || 'sin indicar')} · ${s.tiene_hijos ? 'Con hijos' : 'Sin hijos'}${s.conyuge_trabaja ? ' · Cónyuge trabaja' : ''}${s.tiene_padres_dependientes ? ' · Padres dependientes' : ''}</div>
+    ${docsHtml}
+    <div class="section-label">Referencias personales</div>
+    ${refsHtml}
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      ${s.estado !== 'revisado' ? `<button class="btn btn-accent" id="rrhhMarcarRevisado">Marcar como revisado</button>` : '<div class="empty-note">Ya fue revisado.</div>'}
+    </div>
+  `;
+  box.querySelectorAll('[data-ver-doc]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const { data } = await supa.storage.from('rrhh-documentos').createSignedUrl(el.dataset.verDoc, 300);
+      if(data) window.open(data.signedUrl, '_blank');
+    });
+  });
+  const btnRev = document.getElementById('rrhhMarcarRevisado');
+  if(btnRev) btnRev.addEventListener('click', async () => {
+    const { error } = await supa.from('rrhh_solicitudes').update({
+      estado: 'revisado', revisado_por: profile.name || session.user.email, revisado_at: new Date().toISOString()
+    }).eq('id', id);
+    if(error){ showToast('Error: ' + error.message); return; }
+    showToast('Marcado como revisado');
+    rrhhCargarLista(); rrhhAbrirDetalle(id);
+  });
+}
 async function areasDeRrhh(locId){
   const { data } = await supa.from('areas').select('*').eq('location_id', locId).order('created_at', { ascending: true });
   return (data || []).filter(a => (a.modules || []).includes('horarios'));
@@ -2866,6 +3002,7 @@ function enterArea(loc, area){
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
+  document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   if(esRrhh()){
@@ -3635,8 +3772,9 @@ document.getElementById('tab-admin').addEventListener('click', ()=>switchTab('ad
 document.getElementById('tab-calculadora').addEventListener('click', ()=>switchTab('calculadora'));
 document.getElementById('tab-chat').addEventListener('click', ()=>switchTab('chat'));
 document.getElementById('tab-horarios').addEventListener('click', ()=>switchTab('horarios'));
+document.getElementById('tab-rrhh').addEventListener('click', ()=>switchTab('rrhh'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -3650,6 +3788,7 @@ function switchTab(name){
   if(name==='inventario') loadInventarioMonth();
   if(name==='chat') chatAlEntrar();
   if(name==='horarios') horAlEntrar();
+  if(name==='rrhh'){ rrhhCargarPuntos(); rrhhCargarLista(); }
   if(name==='costeo'){ document.getElementById('costeoItems').innerHTML = '<div class="empty-note">Cargando...</div>'; loadCosteoTodo().then(()=>{
     // Qué pestañas ve cada punto:
     //  - Restaurante: Platos, Eventos (los suyos), Carta (la suya), Cargos (para Platos), Food cost (admin).
