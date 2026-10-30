@@ -1763,18 +1763,7 @@ nav.tabs button{position:relative;}
         <select id="facArea" style="margin-top:8px;" disabled><option value="">Elegí primero el punto...</option></select>
         <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
         <datalist id="facProveedoresLst"></datalist>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <input type="text" id="facNumero" placeholder="N.º de factura" style="flex:1;">
-          <input type="number" id="facMonto" placeholder="Monto" step="1" min="0" style="flex:1;">
-        </div>
         <input type="date" id="facFecha" style="margin-top:8px;">
-
-        <div style="margin-top:12px;">
-          <label class="field-label">Asociar a un pedido (opcional)</label>
-          <input type="text" id="facPedidoBuscar" placeholder="Elegí primero punto y área, luego buscá por código o proveedor...">
-          <div id="facPedidoResultados"></div>
-          <div id="facPedidoElegido" style="display:none; margin-top:6px;" class="empty-note"></div>
-        </div>
 
         <div style="margin-top:12px;">
           <label class="field-label">Foto de la factura</label>
@@ -1782,7 +1771,23 @@ nav.tabs button{position:relative;}
           <div id="facFotoPrevia" style="display:none; margin-top:8px;"><img alt="" style="max-width:160px; border-radius:8px; display:block;"></div>
         </div>
 
-        <textarea id="facNotas" placeholder="Notas (opcional)" style="margin-top:10px; width:100%; min-height:60px;"></textarea>
+        <details class="pren-sec" style="margin-top:12px;">
+          <summary>Más detalles (opcional)</summary>
+          <div class="pren-cuerpo">
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <input type="text" id="facNumero" placeholder="N.º de factura" style="flex:1;">
+              <input type="number" id="facMonto" placeholder="Monto" step="1" min="0" style="flex:1;">
+            </div>
+            <div style="margin-top:12px;">
+              <label class="field-label">Asociar a un pedido</label>
+              <input type="text" id="facPedidoBuscar" placeholder="Elegí primero punto y área, luego buscá por código o proveedor...">
+              <div id="facPedidoResultados"></div>
+              <div id="facPedidoElegido" style="display:none; margin-top:6px;" class="empty-note"></div>
+            </div>
+            <textarea id="facNotas" placeholder="Notas" style="margin-top:12px; width:100%; min-height:60px;"></textarea>
+          </div>
+        </details>
+
         <button class="btn btn-accent" id="facGuardar" style="margin-top:12px;">Guardar factura</button>
       </div>
 
@@ -3006,7 +3011,13 @@ let FAC_AREAS_PUNTO = {}, FAC_PROVEEDORES_PUNTO = {}, FAC_FOTO = null, FAC_PEDID
 
 function facturasModoGlobal(){ return esFacturas(); }
 
+function facturasFechaHoy(){
+  const campo = document.getElementById('facFecha');
+  if(!campo.value) campo.value = new Date().toISOString().slice(0, 10);
+}
+
 function facturasAlEntrar(){
+  facturasFechaHoy();
   const global = facturasModoGlobal();
   document.getElementById('facPunto').style.display = global ? '' : 'none';
   document.getElementById('facArea').style.display = global ? '' : 'none';
@@ -3112,6 +3123,8 @@ document.getElementById('facPedidoBuscar').addEventListener('input', async e => 
     el.addEventListener('click', () => {
       const o = candidatos.find(x => x.id === el.dataset.id);
       FAC_PEDIDO_ELEGIDO = o;
+      const proveedorField = document.getElementById('facProveedor');
+      if(!proveedorField.value.trim() && o.proveedor) proveedorField.value = o.proveedor;
       const box = document.getElementById('facPedidoElegido');
       box.style.display = 'block';
       box.innerHTML = `Asociada al pedido ${escapeHtml(o.codigo)}${o.proveedor ? ' — ' + escapeHtml(o.proveedor) : ''} <button type="button" class="btn btn-ghost btn-small" id="facPedidoQuitar">Quitar</button>`;
