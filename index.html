@@ -3118,74 +3118,47 @@ function blobToBase64(blob){
   });
 }
 
-/* ---------- Recorte automático (escáner tipo CamScanner, opencv.js + jscanify, bajo demanda) ---------- */
-let FAC_SCANNER_PROMISE = null;
-function cargarEscanerFacturas(){
-  if(FAC_SCANNER_PROMISE) return FAC_SCANNER_PROMISE;
-  FAC_SCANNER_PROMISE = (async () => {
-    if(!window.cv || !window.cv.Mat){
-      await cargarScript('https://cdn.jsdelivr.net/npm/@techstark/opencv-js@5.0.0-release.1/dist/opencv.js');
-      await new Promise(resolve => {
-        if(window.cv && window.cv.Mat) return resolve();
-        window.cv['onRuntimeInitialized'] = resolve;
-      });
-    }
-    if(!window.jscanify) await cargarScript('https://cdn.jsdelivr.net/npm/jscanify@1.4.0/src/jscanify.js');
-    return new window.jscanify();
-  })();
-  return FAC_SCANNER_PROMISE;
-}
-
-function facturasArchivoAImagen(file){
+/* ---------- Mejorar la foto (contraste/brillo, sin recortar; todo local, sin librerías externas) ---------- */
+function facturasMejorarFoto(file){
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => resolve(img);
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo abrir la imagen')); };
+    img.onload = () => {
+      const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      try {
+        const id = ctx.getImageData(0, 0, cv.width, cv.height), d = id.data;
+        const contraste = 1.25, brillo = 12;
+        for(let i = 0; i < d.length; i += 4){
+          d[i]   = Math.min(255, Math.max(0, (d[i]   - 128) * contraste + 128 + brillo));
+          d[i+1] = Math.min(255, Math.max(0, (d[i+1] - 128) * contraste + 128 + brillo));
+          d[i+2] = Math.min(255, Math.max(0, (d[i+2] - 128) * contraste + 128 + brillo));
+        }
+        ctx.putImageData(id, 0, 0);
+      } catch(e){ /* si falla el realce, seguimos con la foto redimensionada tal cual */ }
+      cv.toBlob(b => b ? resolve(new File([b], 'factura.jpg', { type: 'image/jpeg' })) : reject(new Error('No se pudo procesar la foto')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Esa imagen no se pudo abrir')); };
     img.src = url;
   });
-}
-
-async function facturasEscanearFoto(file){
-  const scanner = await cargarEscanerFacturas();
-  const img = await facturasArchivoAImagen(file);
-  const src = window.cv.imread(img);
-  URL.revokeObjectURL(img.src);
-  let contour = null;
-  try {
-    contour = scanner.findPaperContour(src);
-    if(!contour) return null;
-    const c = scanner.getCornerPoints(contour);
-    if(!c.topLeftCorner || !c.topRightCorner || !c.bottomLeftCorner || !c.bottomRightCorner) return null;
-    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-    const maxWidth = Math.round(Math.max(dist(c.bottomRightCorner, c.bottomLeftCorner), dist(c.topRightCorner, c.topLeftCorner)));
-    const maxHeight = Math.round(Math.max(dist(c.topRightCorner, c.bottomRightCorner), dist(c.topLeftCorner, c.bottomLeftCorner)));
-    if(maxWidth < 80 || maxHeight < 80) return null; // recorte irrisorio: no sirve
-    return scanner.extractPaper(img, maxWidth, maxHeight, c);
-  } finally {
-    src.delete();
-    if(contour) contour.delete();
-  }
 }
 
 async function facturasProcesarFoto(file, miSeq){
   const aviso = document.getElementById('facFotoIA');
   aviso.style.display = 'block';
-  aviso.textContent = 'Escaneando el documento...';
+  aviso.textContent = 'Mejorando la foto...';
   let archivo = file;
   try {
-    const canvas = await facturasEscanearFoto(file);
+    archivo = await facturasMejorarFoto(file);
     if(miSeq !== FAC_FOTO_SEQ) return;
-    if(canvas){
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9));
-      if(blob){
-        archivo = new File([blob], 'factura-escaneada.jpg', { type: 'image/jpeg' });
-        FAC_FOTO = archivo;
-        document.getElementById('facFotoPrevia').querySelector('img').src = URL.createObjectURL(blob);
-      }
-    }
+    FAC_FOTO = archivo;
+    document.getElementById('facFotoPrevia').querySelector('img').src = URL.createObjectURL(archivo);
   } catch(e){
-    // Si falla el escaneo (no carga la librería, no detecta el papel, etc.) seguimos con la foto tal cual.
+    // Si falla el realce, seguimos con la foto original tal cual.
   }
   if(miSeq !== FAC_FOTO_SEQ) return;
   await facturasLeerConIA(archivo, miSeq);
@@ -3196,9 +3169,7 @@ async function facturasLeerConIA(file, miSeq){
   aviso.style.display = 'block';
   aviso.textContent = 'Leyendo factura con IA...';
   try {
-    const blob = await chatComprimirFoto(file);
-    if(miSeq !== FAC_FOTO_SEQ) return;
-    const base64 = await blobToBase64(blob);
+    const base64 = await blobToBase64(file);
     const { data, error } = await supa.functions.invoke('facturas-leer-ia', { body: { image_base64: base64, media_type: 'image/jpeg' } });
     if(miSeq !== FAC_FOTO_SEQ) return;
     if(error || !data || data.error || !data.data){ aviso.textContent = 'No se pudo leer sola, completá a mano si hace falta.'; return; }
