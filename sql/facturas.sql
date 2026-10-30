@@ -20,7 +20,7 @@ create table if not exists public.facturas (
   id uuid primary key default gen_random_uuid(),
   area_id uuid not null references public.areas(id),
   location_id uuid not null references public.locations(id),
-  proveedor text not null,
+  proveedor text, -- opcional: con la foto alcanza, se puede completar después
   numero_factura text,
   monto numeric,
   fecha_factura date not null,

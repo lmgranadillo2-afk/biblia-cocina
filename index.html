@@ -1754,14 +1754,13 @@ nav.tabs button{position:relative;}
 
     <div id="view-facturas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header"><h2>Facturas</h2></div>
-      <div class="empty-note" style="margin-bottom:14px;">Subí la foto de cada factura que llega, con el área a la que corresponde, proveedor, monto y fecha.</div>
+      <div class="empty-note" style="margin-bottom:14px;">Con tomar la foto alcanza. Si querés, agregá proveedor, monto o número en "Más detalles".</div>
 
       <div class="field" style="max-width:560px;">
         <label class="field-label">Nueva factura</label>
         <div id="facContextoFijo" class="empty-note" style="display:none; margin-bottom:8px;"></div>
         <select id="facPunto"><option value="">Elegí el punto...</option></select>
         <select id="facArea" style="margin-top:8px;" disabled><option value="">Elegí primero el punto...</option></select>
-        <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
         <datalist id="facProveedoresLst"></datalist>
         <input type="date" id="facFecha" style="margin-top:8px;">
 
@@ -1774,6 +1773,7 @@ nav.tabs button{position:relative;}
         <details class="pren-sec" style="margin-top:12px;">
           <summary>Más detalles (opcional)</summary>
           <div class="pren-cuerpo">
+            <input type="text" id="facProveedor" list="facProveedoresLst" placeholder="Proveedor" style="margin-top:8px;">
             <div style="display:flex; gap:8px; margin-top:8px;">
               <input type="text" id="facNumero" placeholder="N.º de factura" style="flex:1;">
               <input type="number" id="facMonto" placeholder="Monto" step="1" min="0" style="flex:1;">
@@ -3145,7 +3145,6 @@ document.getElementById('facGuardar').addEventListener('click', async () => {
   const fecha = document.getElementById('facFecha').value;
   const notas = document.getElementById('facNotas').value.trim();
   if(!locId || !areaId){ showToast('Elegí el punto y el área', 'warn'); return; }
-  if(!proveedor){ showToast('Escribe el proveedor', 'warn'); return; }
   if(!fecha){ showToast('Elegí la fecha de la factura', 'warn'); return; }
   if(!FAC_FOTO){ showToast('Subí la foto (o el PDF) de la factura', 'warn'); return; }
 
@@ -3158,7 +3157,7 @@ document.getElementById('facGuardar').addEventListener('click', async () => {
     const { error: upErr } = await supa.storage.from('facturas').upload(path, blob, { contentType: tipo });
     if(upErr) throw upErr;
     const { error } = await supa.from('facturas').insert({
-      area_id: areaId, location_id: locId, proveedor, numero_factura: numero || null,
+      area_id: areaId, location_id: locId, proveedor: proveedor || null, numero_factura: numero || null,
       monto: montoRaw ? parseFloat(montoRaw) : null, fecha_factura: fecha, foto_path: path,
       order_id: FAC_PEDIDO_ELEGIDO ? FAC_PEDIDO_ELEGIDO.id : null, notas: notas || null,
       created_by: session.user.id, creado_por_nombre: profile.name || session.user.email
@@ -3204,7 +3203,7 @@ function facturasPintarLista(){
   if(FACTURAS_LISTA.length === 0){ wrap.innerHTML = '<div class="empty-list">Todavía no hay facturas registradas.</div>'; return; }
   wrap.innerHTML = FACTURAS_LISTA.map(f => `
     <div class="kanban-card" style="margin-bottom:8px;">
-      <div class="kc-head"><span class="kc-code">${escapeHtml(f.proveedor)}</span><span class="badge info">${fmtMoney(f.monto) || 'sin monto'}</span></div>
+      <div class="kc-head"><span class="kc-code">${f.proveedor ? escapeHtml(f.proveedor) : 'Sin proveedor'}</span><span class="badge info">${fmtMoney(f.monto) || 'sin monto'}</span></div>
       <div class="kc-meta">${f.locations ? escapeHtml(f.locations.name) + ' · ' : ''}${f.areas ? escapeHtml(f.areas.name) + ' · ' : ''}${new Date(f.fecha_factura + 'T00:00:00').toLocaleDateString('es-CO')}${f.numero_factura ? ' · N.º ' + escapeHtml(f.numero_factura) : ''}${f.orders ? ' · Pedido ' + escapeHtml(f.orders.codigo) : ''}</div>
       ${f.notas ? `<div class="kc-meta">${escapeHtml(f.notas)}</div>` : ''}
       <div style="display:flex; gap:8px; margin-top:8px;">
