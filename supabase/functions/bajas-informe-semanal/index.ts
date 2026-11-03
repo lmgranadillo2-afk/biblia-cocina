@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     if (e2) throw e2;
 
     const { error: e3 } = await admin.from("bajas_informes_semanales")
-      .upsert({ semana_inicio, semana_fin, archivo_path: path, cantidad_bajas: filas.length }, { onConflict: "semana_inicio" });
+      .upsert({ semana_inicio, semana_fin, archivo_path: path, cantidad_bajas: filas.length, datos: filas }, { onConflict: "semana_inicio" });
     if (e3) throw e3;
 
     return json({ ok: true, semana_inicio, semana_fin, cantidad_bajas: filas.length });

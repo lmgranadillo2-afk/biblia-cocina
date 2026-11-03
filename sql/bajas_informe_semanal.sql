@@ -13,6 +13,7 @@ create table if not exists public.bajas_informes_semanales (
   generado_at timestamptz not null default now()
 );
 create unique index if not exists bajas_informes_semana_idx on public.bajas_informes_semanales(semana_inicio);
+alter table public.bajas_informes_semanales add column if not exists datos jsonb;
 
 alter table public.bajas_informes_semanales enable row level security;
 
