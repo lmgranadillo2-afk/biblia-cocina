@@ -2005,6 +2005,12 @@ nav.tabs button{position:relative;}
           <span class="list-count" id="bhCount"></span>
           <div id="bhList" style="margin-top:10px;"></div>
         </div>
+
+        <div id="bajaInformesSemanales" style="display:none; margin-top:28px; border-top:1px solid var(--border); padding-top:16px;">
+          <div class="admin-header"><h2>Informes semanales (todos los puntos)</h2></div>
+          <div class="empty-note" style="margin-bottom:14px;">Se genera solo, cada lunes a las 11 a.m., con las bajas de la semana que acaba de terminar (lunes a domingo) de todos los puntos. Solo lo ves vos.</div>
+          <div id="bajaInformesLista"></div>
+        </div>
       </div>
 
       <div id="adminpanel-insumos" class="adminpanel">
@@ -12743,6 +12749,30 @@ async function loadAdminBajas(){
     .order('created_at', {ascending:false});
   const list = error ? [] : (data || []);
   renderBajaKanban(list, document.getElementById('adminBajaKanban'), 'admin');
+  const bloqueInformes = document.getElementById('bajaInformesSemanales');
+  bloqueInformes.style.display = (profile && profile.is_super_admin) ? 'block' : 'none';
+  if(profile && profile.is_super_admin) cargarBajaInformesSemanales();
+}
+
+async function cargarBajaInformesSemanales(){
+  const box = document.getElementById('bajaInformesLista');
+  box.innerHTML = '<div class="empty-note">Cargando...</div>';
+  const { data, error } = await supa.from('bajas_informes_semanales').select('*').order('semana_inicio', { ascending: false }).limit(26);
+  if(error){ box.innerHTML = '<div class="empty-note">No se pudo cargar.</div>'; return; }
+  if(!data || data.length === 0){ box.innerHTML = '<div class="empty-note">Todavía no se generó ningún informe (el primero sale el próximo lunes a las 11 a.m.).</div>'; return; }
+  box.innerHTML = data.map(r => `
+    <div class="kanban-card" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <b>Semana del ${fmtDia(r.semana_inicio)} al ${fmtDia(r.semana_fin)}</b>
+        <div class="kc-meta">${r.cantidad_bajas} baja${r.cantidad_bajas === 1 ? '' : 's'}</div>
+      </div>
+      <button class="btn btn-secondary btn-small" data-desc-informe="${escapeHtml(r.archivo_path)}">Descargar</button>
+    </div>
+  `).join('');
+  box.querySelectorAll('[data-desc-informe]').forEach(b => b.addEventListener('click', async () => {
+    const { data: signed } = await supa.storage.from('informes-bajas').createSignedUrl(b.dataset.descInforme, 300);
+    if(signed) window.open(signed.signedUrl, '_blank');
+  }));
 }
 
 function openBajaReview(bajaId, list){
