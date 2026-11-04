@@ -549,7 +549,9 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 @media (max-width:760px){ .vivo-quien{top:auto; bottom:84px; right:12px;} .vivo-txt{display:none;} .vivo-barra{bottom:84px;} }
 .loc-empresa{flex-basis:100%; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,2fr) auto; gap:8px; align-items:end; margin-top:10px;}
 .loc-empresa label{display:flex; flex-direction:column; gap:4px; min-width:0;}
-@media (max-width:760px){ .loc-empresa{grid-template-columns:1fr;} }
+.loc-geo{flex-basis:100%; display:grid; grid-template-columns:minmax(0,3fr) minmax(0,1fr) auto auto; gap:8px; align-items:end; margin-top:10px;}
+.loc-geo label{display:flex; flex-direction:column; gap:4px; min-width:0;}
+@media (max-width:760px){ .loc-empresa, .loc-geo{grid-template-columns:1fr;} }
 .admin-grupos{display:flex; gap:4px; padding:4px; margin-bottom:var(--space-3); background:var(--surface-2); border-radius:var(--radius-md); overflow-x:auto; max-width:100%;}
 .admin-grupos button{display:inline-flex; align-items:center; gap:8px; border:none; background:transparent; color:var(--text-muted); font:600 14.5px 'Inter',sans-serif; border-radius:8px; min-height:44px; padding:0 16px; cursor:pointer; white-space:nowrap;}
 .admin-grupos button:hover{color:var(--text);}
@@ -6352,13 +6354,31 @@ async function kioscoAbrir(){
     KIO.stream = await faceCamara(document.getElementById('kioVideo'));
   } catch(e){ kioscoPintar('error', e.message); return; }
   try { KIO.wake = await navigator.wakeLock?.request('screen'); } catch(_){}
+  kioscoGeoIniciar();
   if(!KIO.separado && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
   kioscoPintar('espera');
   kioscoBucle();
   clearInterval(KIO.recarga); KIO.recarga = setInterval(() => { if(KIO.estado === 'espera') kioscoCargarDatos().catch(() => {}); }, 5 * 60 * 1000);
   kioscoLimpiarFotos();
 }
+// Ubicación del equipo mientras la marcación está abierta. La base la compara con el punto (horario_marcacion_geo) y no guarda las coordenadas.
+function kioscoGeoIniciar(){
+  if(!navigator.geolocation || KIO.geoWatch != null) return;
+  KIO.geoWatch = navigator.geolocation.watchPosition(
+    pos => { KIO.geo = { lat: pos.coords.latitude, lng: pos.coords.longitude, prec: pos.coords.accuracy, t: Date.now() }; },
+    () => {}, { enableHighAccuracy: true, maximumAge: 60000, timeout: 20000 });
+}
+function kioscoGeoApagar(){ if(KIO.geoWatch != null) navigator.geolocation.clearWatch(KIO.geoWatch); KIO.geoWatch = null; KIO.geo = null; }
+// Última ubicación de menos de 2 minutos; si no hay, espera hasta 5 segundos. Sin ubicación devuelve null y la marcación sigue.
+function kioscoGeoActual(){
+  if(KIO.geo && Date.now() - KIO.geo.t < 120000) return Promise.resolve(KIO.geo);
+  if(!navigator.geolocation) return Promise.resolve(null);
+  return new Promise(res => navigator.geolocation.getCurrentPosition(
+    pos => res({ lat: pos.coords.latitude, lng: pos.coords.longitude, prec: pos.coords.accuracy }),
+    () => res(null), { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }));
+}
 function kioscoCerrar(){
+  kioscoGeoApagar();
   clearTimeout(KIO.timer); clearInterval(KIO.recarga); faceApagar(KIO.stream); KIO.stream = null; KIO.estado = 'apagado';
   try { KIO.wake && KIO.wake.release(); } catch(_){}
   if(document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -6464,7 +6484,7 @@ function kioscoPintar(estado, extra){
   else if(estado === 'hecho'){
     marco.classList.add('ok'); est.textContent = extra.foto ? 'Foto de evidencia guardada' : '';
     panel.innerHTML = `<div class="kio-check${extra.tarde ? ' tarde' : ''}" aria-hidden="true">✓</div><h2>${extra.tipo === 'entrada' ? 'Entrada' : 'Salida'} marcada</h2>
-      <div class="kio-info"><span>${escapeHtml(extra.nombre)} · <b>${escapeHtml(extra.hora)}</b></span><span>${extra.tipo === 'entrada' ? (extra.tarde ? `<span class="kio-tarde">${extra.tarde} min tarde: queda anotado en el registro del día</span>` : 'A tiempo') : 'Que descanses'}</span></div>
+      <div class="kio-info"><span>${escapeHtml(extra.nombre)} · <b>${escapeHtml(extra.hora)}</b></span><span>${extra.tipo === 'entrada' ? (extra.tarde ? `<span class="kio-tarde">${extra.tarde} min tarde: queda anotado en el registro del día</span>` : 'A tiempo') : 'Que descanses'}</span>${extra.geo === 'fuera' ? '<span class="kio-tarde">Lejos del restaurante: el líder revisará esta marcación</span>' : extra.geo === 'sin_ubicacion' ? '<span class="kio-tarde">Sin ubicación: el líder revisará esta marcación</span>' : ''}</div>
       <div class="kio-cuenta"><i></i></div>`;
     KIO.volver = setTimeout(kioscoReiniciar, 5000);
   }
@@ -6502,13 +6522,15 @@ async function kioscoMarcar(pid, tipo, opciones){
       const up = await supa.storage.from('horario-marcaciones').upload(path, blob, { contentType: 'image/jpeg' });
       if(!up.error) foto_path = path;
     } catch(_){}
-    const fila = { area_id: kioscoAreaDe(pid), personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual };
+    const geo = opciones.manual ? null : await kioscoGeoActual();
+    const fila = { area_id: kioscoAreaDe(pid), personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual,
+      geo_lat: geo ? geo.lat : null, geo_lng: geo ? geo.lng : null, geo_precision_m: geo ? geo.prec : null };
     const { data, error } = await supa.from('horario_marcaciones').insert(fila).select().single();
     if(error){ showToast('No se pudo marcar: ' + error.message, 'danger'); kioscoReiniciar(); return; }
     KIO.datos.marc.push({ personal_id: pid, tipo, at: data.at, fecha_turno: data.fecha_turno });
     KIO.reciente = { pid, hasta: Date.now() + 60 * 1000 };
     const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(kioscoCfg(pid).tolerancia_min ?? 5);
-    kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path });
+    kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path, geo: data.geo_estado });
   } finally { KIO.ocupado = false; }
 }
 // Borra las fotos de evidencia de más de 60 días (carpetas por fecha).
@@ -6679,11 +6701,11 @@ function entPintar(){
       <div class="pren-tot ent warn"><span class="field-label">En pausa</span><b>${n('pausa')}</b></div>
       <div class="pren-tot ent"><span class="field-label">Salieron</span><b>${n('salio')}</b></div>
     </div>`;
-  if(dudosas.length) h += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">${dudosas.length} por revisar</span> Reconocimiento dudoso</h3>
-    <ul class="ent-dudosas">${dudosas.map(m => { const p = HOR.personal.find(x => x.id === m.personal_id); return `<li><span>${escapeHtml(p ? p.nombre : '?')} · ${m.tipo} ${escapeHtml(new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))}</span>
+  if(dudosas.length) h += `<div class="hor-checks"><div class="hor-check warn"><h3><span class="badge warn">${dudosas.length} por revisar</span> Marcaciones dudosas</h3>
+    <ul class="ent-dudosas">${dudosas.map(m => { const p = HOR.personal.find(x => x.id === m.personal_id); return `<li><span>${escapeHtml(p ? p.nombre : '?')} · ${m.tipo} ${escapeHtml(new Date(m.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }))} · ${m.geo_estado === 'fuera' ? `a ${m.geo_metros >= 1000 ? horNum(Math.round(m.geo_metros / 100) / 10) + ' km' : m.geo_metros + ' m'} del restaurante` : m.geo_estado === 'sin_ubicacion' ? 'sin ubicación' : 'reconocimiento dudoso'}</span>
       ${m.foto_path ? `<button type="button" class="btn btn-ghost btn-small" data-ent-foto="${escapeHtml(m.foto_path)}">Ver foto</button>` : ''}
       <button type="button" class="btn btn-ok btn-small" data-ent-revisar="${m.id}|1">Sí es</button><button type="button" class="btn btn-danger-outline btn-small" data-ent-revisar="${m.id}|0">No es</button></li>`; }).join('')}</ul>
-    <span class="field-help">Si no es la persona, la marcación se anula y no cuenta en el registro.</span></div></div>`;
+    <span class="field-help">Si no es la persona o no estaba en el restaurante, elige "No es": la marcación se anula y no cuenta en el registro.</span></div></div>`;
   horGrupos().forEach(({ e, gente }) => {
     const filas = personas.filter(x => gente.some(g => g.id === x.p.id)).sort((a, b) => a.e.o - b.e.o);
     if(!filas.length) return;
@@ -10906,6 +10928,12 @@ async function loadLocationsAdmin(){
           <label><span class="field-label">Dirección</span><input type="text" data-emp="direccion_fiscal" maxlength="120" value="${escapeHtml(loc.direccion_fiscal || '')}"></label>
           <button type="button" class="btn btn-secondary btn-small" data-guardar-empresa="${loc.id}">Guardar datos</button>
         </div>
+        <div class="loc-geo" data-geo-loc="${loc.id}">
+          <label><span class="field-label">Ubicación para la marcación (latitud, longitud)</span><input type="text" data-geo="coords" inputmode="decimal" value="${loc.geo_lat != null && loc.geo_lng != null ? escapeHtml(loc.geo_lat + ', ' + loc.geo_lng) : ''}" placeholder="Vacío = no se revisa"></label>
+          <label><span class="field-label">Radio (m)</span><input type="number" data-geo="radio" min="30" max="2000" step="10" value="${Number(loc.geo_radio_m) || 150}"></label>
+          <button type="button" class="btn btn-secondary btn-small" data-geo-aqui>Usar mi ubicación</button>
+          <button type="button" class="btn btn-secondary btn-small" data-geo-guardar>Guardar ubicación</button>
+        </div>
       </div>`;
     }).join('');
     listBox.querySelectorAll('[data-del-loc]').forEach(btn=>{
@@ -10917,6 +10945,27 @@ async function loadLocationsAdmin(){
         box.querySelectorAll('[data-emp]').forEach(i => { datos[i.dataset.emp] = i.value.trim() || null; });
         const { error } = await supa.from('locations').update(datos).eq('id', btn.dataset.guardarEmpresa);
         showToast(error ? 'Error: ' + error.message : 'Datos de la empresa guardados', error ? undefined : 'ok');
+      });
+    });
+    listBox.querySelectorAll('[data-geo-aqui]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!navigator.geolocation){ showToast('Este equipo no da ubicación', 'warn'); return; }
+        btn.disabled = true;
+        navigator.geolocation.getCurrentPosition(pos => {
+          btn.disabled = false;
+          btn.closest('[data-geo-loc]').querySelector('[data-geo="coords"]').value = pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6);
+          showToast(`Ubicación tomada con precisión de ${Math.round(pos.coords.accuracy)} m. Revísala y guárdala.`, pos.coords.accuracy > 100 ? 'warn' : 'ok');
+        }, () => { btn.disabled = false; showToast('No se pudo leer la ubicación: revisa el permiso del navegador', 'warn'); }, { enableHighAccuracy: true, timeout: 15000 });
+      });
+    });
+    listBox.querySelectorAll('[data-geo-guardar]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const box = btn.closest('[data-geo-loc]'), texto = box.querySelector('[data-geo="coords"]').value.trim(), radio = Number(box.querySelector('[data-geo="radio"]').value);
+        const m = /^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(texto);
+        if(texto && (!m || Math.abs(Number(m[1])) > 90 || Math.abs(Number(m[2])) > 180)){ showToast('Escribe latitud y longitud así: 6.2442, -75.5812', 'warn'); return; }
+        if(!(radio >= 30 && radio <= 2000)){ showToast('El radio va de 30 a 2.000 metros', 'warn'); return; }
+        const { error } = await supa.from('locations').update({ geo_lat: m ? Number(m[1]) : null, geo_lng: m ? Number(m[2]) : null, geo_radio_m: radio }).eq('id', box.dataset.geoLoc);
+        showToast(error ? 'Error: ' + error.message : (m ? 'Ubicación guardada' : 'Ubicación quitada: no se revisa en este punto'), error ? undefined : 'ok');
       });
     });
     listBox.querySelectorAll('[data-enter-loc]').forEach(btn=>{
