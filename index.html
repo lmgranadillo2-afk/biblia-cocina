@@ -1276,6 +1276,9 @@ nav.tabs button{position:relative;}
 .hor-img img{display:block; width:100%; max-width:640px; height:auto; border-radius:6px;}
 .hor-envio pre{margin:0; white-space:pre-wrap; font:400 13px/1.5 'IBM Plex Mono',monospace; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; max-height:340px; overflow-y:auto;}
 .hor-acciones{display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center;}
+.hor-est-filtro{display:flex; flex-wrap:wrap; gap:var(--space-2); margin:0 0 var(--space-3);}
+.hor-est-chip{min-height:44px; padding:0 var(--space-4); display:inline-flex; align-items:center; gap:var(--space-2); background:var(--surface); color:var(--text); border:1px solid var(--border-strong); border-radius:var(--radius-pill); font:500 13px Inter,sans-serif; cursor:pointer;}
+.hor-est-chip[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); font-weight:700;}
 .hor-vacio{border:1.5px dashed var(--border-strong); border-radius:var(--radius-md); padding:32px 16px; text-align:center; color:var(--text-muted); display:flex; flex-direction:column; align-items:center; gap:10px;}
 .hor-vacio b{color:var(--text); font-size:16px;}
 .hor-opts{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-bottom:var(--space-3);}
@@ -4384,13 +4387,14 @@ function horRangoBloqueadoPersona(pid, desde, hasta){
   for(let f = desde; f <= hasta; f = prenSumarDias(f, 1)) if(HOR.quincenas.some(q => f >= q.desde && f <= q.hasta) && !HOR.habilitados[pid + '|' + f]) return true;
   return false;
 }
-const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', calamidad:'Calamidad', vacante:'Vacante', retardo:'Retardo' };
-const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', calamidad:'CALAM.', vacante:'VACANTE', retardo:'RETARDO' };
+const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', calamidad:'Calamidad', compensatorio:'Compensatorio', vacante:'Vacante', retardo:'Retardo' };
+const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', calamidad:'CALAM.', compensatorio:'COMPENS.', vacante:'VACANTE', retardo:'RETARDO' };
 const HOR_AYUDA_NOV = {
   incapacidad: 'No viene por enfermedad. Pide el soporte.',
   vacaciones: 'No viene esos días.',
   permiso: 'No viene, o viene solo parte del día (anótalo en la nota).',
   calamidad: 'No viene por una calamidad doméstica (ej. enfermedad grave o muerte de un familiar). Pide el soporte si lo hay.',
+  compensatorio: 'No viene porque compensa un día u horas ya trabajadas.',
   vacante: 'El puesto no tiene a nadie (ej. el cocinero nuevo aún no empieza).',
   retardo: 'Llegó tarde. Se crea solo al cerrar el día; también se puede anotar aquí.',
 };
@@ -4594,6 +4598,30 @@ function horEditable(){ return HOR.editor && HOR.semana && HOR.semana.estado ===
 function horTrabaja(pid, dia){ const a = HOR.asig[pid + '|' + dia]; return !!a && a.tipo !== 'descanso' && !horNovedad(pid, dia); }
 function horHoras(pid){ let h = 0; for(let d = 1; d <= 7; d++){ if(horTrabaja(pid, d)) h += Number(HOR.asig[pid + '|' + d].horas) || 0; } return h; }
 // En la grilla: activos + los inactivos que tengan algo esta semana.
+// Estación elegida en Semana (null = todas). Cambia lo que se ve y lo que se manda; las validaciones siempre miran a todos.
+function horEstVista(){
+  if(!HOR.verEst) return null;
+  const g = horGrupos().find(x => x.gente.length && String(x.e.id) === HOR.verEst);
+  return g ? g.e : null;
+}
+function horGruposVista(){
+  const e = horEstVista(), g = horGrupos().filter(x => x.gente.length);
+  return e ? g.filter(x => String(x.e.id) === String(e.id)) : g;
+}
+function horTareaEnVista(t){
+  if(!horEstVista()) return true;
+  const ids = new Set(horGruposVista().flatMap(g => g.gente.map(p => p.id)));
+  return [1,2,3,4,5,6,7].some(d => ids.has(HOR.tareaAsig[t.id + '|' + d]));
+}
+function horChipsEst(){
+  const g = horGrupos().filter(x => x.gente.length);
+  if(g.length < 2) return '';
+  const e = horEstVista(), total = g.reduce((n, x) => n + x.gente.length, 0);
+  return `<div class="hor-est-filtro" role="group" aria-label="Ver por estación">
+    <button type="button" class="hor-est-chip" data-hor-act="verest" data-est="" aria-pressed="${e ? 'false' : 'true'}">Todas · ${total}</button>
+    ${g.map(x => `<button type="button" class="hor-est-chip" data-hor-act="verest" data-est="${escapeHtml(String(x.e.id))}" aria-pressed="${e && String(e.id) === String(x.e.id) ? 'true' : 'false'}"><i class="hor-dot" style="background:${horColor(x.e.color)}"></i>${escapeHtml(x.e.nombre)} · ${x.gente.length}</button>`).join('')}
+  </div>`;
+}
 function horPersonasSemana(){
   return HOR.personal.filter(p => p.activo || [1,2,3,4,5,6,7].some(d => HOR.asig[p.id + '|' + d]));
 }
@@ -4708,7 +4736,7 @@ function horValidar(){
       }
     }
     if(sinNadie.length) warn.push({ k: 'tar|' + t.id + '|' + sinNadie[0], t: `${t.nombre} sin asignar: ${sinNadie.map(dia).join(', ')}.` });
-    Object.entries(veces).filter(([, v]) => v > 2).forEach(([pid, v]) => {
+    Object.entries(veces).filter(([, v]) => v > 2 && !t.fija).forEach(([pid, v]) => {
       const p = HOR.personal.find(x => x.id === pid);
       warn.push({ k: 'tar|' + t.id + '|' + ([1,2,3,4,5,6,7].find(d => HOR.tareaAsig[t.id + '|' + d] === pid)), t: `${p ? p.nombre : '?'} hace ${t.nombre} ${v} veces en la semana.` });
     });
@@ -4750,6 +4778,7 @@ function horPintarSemana(){
       : `<div class="hor-vacio"><b>El horario de esta semana todavía no está publicado</b><span>Cuando el líder lo publique, lo verás aquí.</span></div>`;
     box.innerHTML = html; return;
   }
+  html += horChipsEst();
   const v = horValidar();
   const bloq = [1,2,3,4,5,6,7].filter(horBloqueado);
   if(bloq.length && HOR.editor) html += `<div class="pren-aviso info">${bloq.length === 7 ? 'Toda esta semana está' : 'Del ' + horFecha(bloq[0]).getDate() + ' al ' + horFecha(bloq[bloq.length - 1]).getDate() + ' la semana está'} en una quincena cerrada: esos días no se pueden cambiar. ${horEsAdmin() ? 'Si hay que corregir un turno, habilítalo en Registro del día y el líder hace la corrección.' : 'Si hay que corregir un turno, pídele a un admin que lo habilite.'}${Object.keys(HOR.habilitados).length ? ' <b>Habilitado para corrección: ' + Object.values(HOR.habilitados).map(x => { const p = HOR.personal.find(y => y.id === x.personal_id); return (p ? horCorto(p) : '?') + ' ' + HOR_DC[(new Date(x.fecha + "T12:00:00").getDay() + 6) % 7].toLowerCase() + ' ' + Number(x.fecha.slice(8)); }).join(', ') + '.</b>' : ''}</div>`;
@@ -4787,7 +4816,7 @@ function horPintarSemana(){
         <button type="button" class="btn btn-ghost btn-small" data-hor-act="texto">${HOR.verTexto ? 'Ocultar texto' : 'Ver texto'}</button>
       </div>
       ${HOR.verTexto ? `<pre id="horTexto">${escapeHtml(horMensaje())}</pre><div><button type="button" class="btn btn-secondary btn-small" data-hor-act="copiartexto">${HOR_ICO.copiar}Copiar texto</button></div>` : ''}
-      <span class="field-help">En el celular, "Enviar como imagen" abre el menú de compartir para elegir WhatsApp; en el computador descarga la imagen. La imagen y el texto no muestran horas.</span>
+      <span class="field-help">En el celular, "Enviar como imagen" abre el menú de compartir para elegir WhatsApp; en el computador descarga la imagen. La imagen y el texto no muestran horas.${horGrupos().filter(x => x.gente.length).length > 1 ? ' Elige una estación arriba para mandar solo esa.' : ''}</span>
     </div>`;
   }
   box.innerHTML = html;
@@ -4867,7 +4896,7 @@ function horGrillaHtml(v){
   for(let d = 1; d <= 7; d++) h += `<th class="${horBloqueado(d) ? 'bloq' : horDiasSinDescanso().includes(d) ? 'finde' : ''}">${HOR_DC[d - 1]}<small>${horFecha(d).getDate()}</small>${horBloqueado(d) ? '<span class="hor-bloq">CERRADO</span>' : ''}</th>`;
   if(HOR.puente) h += `<th class="puente" title="${escapeHtml(HOR.puente.nombre)} · cuenta en la semana siguiente">${HOR_DC[0]}<small>${horFecha(8).getDate()}</small><span class="hor-bloq">FESTIVO</span></th>`;
   h += `<th class="hor-horas">Horas</th></tr></thead><tbody>`;
-  const grupos = horGrupos();
+  const grupos = horGruposVista();
   for(const { e, gente } of grupos){
     if(!gente.length) continue;
     h += `<tr class="hor-est"><td class="hor-first"><i class="hor-dot" style="background:${horColor(e.color)}"></i>${escapeHtml(e.nombre)}</td><td colspan="${horDias() + 1}"></td></tr>`;
@@ -4908,7 +4937,7 @@ function horGrillaHtml(v){
       h += '<td></td></tr>';
     }
   }
-  for(const t of HOR.tareas.filter(t => t.activa || [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]))){
+  for(const t of HOR.tareas.filter(t => (t.activa || [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d])) && horTareaEnVista(t))){
     h += `<tr class="hor-tarea"><td class="hor-first"><span class="hor-pname">${escapeHtml(t.nombre)}</span><span class="hor-pmeta">${escapeHtml(t.detalle || 'tarea del día')}</span></td>`;
     for(let d = 1; d <= 7; d++){
       const pid = HOR.tareaAsig[t.id + '|' + d], lvl = v.tar[t.id + '|' + d] || '';
@@ -4942,7 +4971,9 @@ document.getElementById('horSemana').addEventListener('click', async e => {
   if(ir){
     const k = ir.dataset.horIr;
     const id = k.startsWith('cov|') ? 'horc-cov-' + k.slice(4).replace('|', '-') : k.startsWith('tar|') ? 'horc-tar-' + k.slice(4).replace('|', '-') : 'horc-' + k.replace('|', '-');
-    const el = document.getElementById(id);
+    let el = document.getElementById(id);
+    // Si el aviso es de otra estación, vuelve a mostrar todas para poder llevarlo a la casilla.
+    if(!el && horEstVista()){ HOR.verEst = null; HOR.imgBlob = null; horPintarSemana(); el = document.getElementById(id); }
     if(el){ el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
     return;
   }
@@ -4969,6 +5000,7 @@ document.getElementById('horSemana').addEventListener('click', async e => {
     if(error){ showToast('Error: ' + error.message, 'danger'); btn.disabled = false; return; }
     showToast('La semana volvió a borrador', 'ok'); horCargarSemana();
   }
+  else if(act === 'verest'){ HOR.verEst = btn.dataset.est || null; HOR.imgBlob = null; horPintarSemana(); }
   else if(act === 'img') horCompartirImagen();
   else if(act === 'avisarcambios') window.open('https://wa.me/?text=' + encodeURIComponent(horMensajeCambios()), '_blank');
   else if(act === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(horMensaje()), '_blank');
@@ -5171,6 +5203,17 @@ function horCalcularPropuesta(hist, histTareas){
   const tareas = [];
   for(const t of HOR.tareas.filter(t => t.activa)){
     const cuenta = {}, vacios = [];
+    if(t.fija){
+      // Encargado fijo: se repite el de la semana pasada si trabaja ese día.
+      for(let d = 1; d <= 7; d++){
+        const pid = histTareas[t.id + '|' + d];
+        if(pid && trabajaProp(pid, d)) tareas.push({ tarea_id: t.id, dia: d, personal_id: pid });
+        else if(!todos.includes(d)) vacios.push(d);
+      }
+      notas.push(`${t.nombre}: el mismo encargado de la semana pasada.`);
+      if(vacios.length) riesgos.push(`${t.nombre} sin asignar: ${vacios.map(d => HOR_DIAS[d - 1].toLowerCase()).join(', ')}.`);
+      continue;
+    }
     for(let d = 1; d <= 7; d++){
       const cand = activos.filter(p => trabajaProp(p.id, d));
       const sinProd = cand.filter(p => !p.es_produccion);
@@ -5279,8 +5322,9 @@ document.getElementById('horCeldaModal').addEventListener('input', e => {
 
 /* --- Mensaje e imagen para el grupo (sin horas) --- */
 function horMensaje(){
-  let m = `*Horario ${currentArea.name} · ${currentLocation.name}*\n_Semana ${horRango(true)}_\n`;
-  const personas = horPersonasSemana();
+  const vista = horEstVista();
+  let m = `*Horario ${currentArea.name}${vista ? ' · ' + vista.nombre : ''} · ${currentLocation.name}*\n_Semana ${horRango(true)}_\n`;
+  const personas = vista ? horGruposVista().flatMap(g => g.gente) : horPersonasSemana();
   for(let d = 1; d <= horDias(); d++){
     m += `\n*${horDiaNombre(d)} ${horFecha(d).getDate()}${d === 8 ? ' (festivo)' : ''}*\n`;
     const porCodigo = new Map();
@@ -5291,7 +5335,7 @@ function horMensaje(){
     if(desc.length) m += `Descansan: ${desc.join(', ')}\n`;
     const noVienen = personas.filter(p => horNovedad(p.id, d)).map(horCorto);
     if(noVienen.length) m += `No viene: ${noVienen.join(', ')}\n`;
-    HOR.tareas.forEach(t => { const p = HOR.personal.find(x => x.id === HOR.tareaAsig[t.id + '|' + d]); if(p) m += `🧹 ${t.nombre}: ${horCorto(p)}\n`; });
+    HOR.tareas.filter(horTareaEnVista).forEach(t => { const p = HOR.personal.find(x => x.id === HOR.tareaAsig[t.id + '|' + d]); if(p) m += `🧹 ${t.nombre}: ${horCorto(p)}\n`; });
   }
   return m.trim();
 }
@@ -5300,8 +5344,8 @@ async function horDibujarImagen(){
   try{ await document.fonts.ready; }catch(_){}
   const img = document.getElementById('horImg'); if(!img || !HOR.semana) return;
   const css = getComputedStyle(document.documentElement), c = n => css.getPropertyValue(n).trim();
-  const grupos = horGrupos().filter(g => g.gente.length);
-  const tareas = HOR.tareas.filter(t => [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]));
+  const grupos = horGruposVista(), vistaEst = horEstVista();
+  const tareas = HOR.tareas.filter(t => [1,2,3,4,5,6,7].some(d => HOR.tareaAsig[t.id + '|' + d]) && horTareaEnVista(t));
   const W = 1080, M = 36, NAME = 200, COL = (W - 2 * M - NAME) / horDias(), RH = 54, EH = 36, HEAD = 176;
   let H = HEAD + 46;
   grupos.forEach(g => { H += EH + g.gente.length * RH; });
@@ -5321,7 +5365,7 @@ async function horDibujarImagen(){
   const MONO = "'IBM Plex Mono', monospace", SANS = "Inter, system-ui, sans-serif";
   x.fillStyle = c('--bg'); x.fillRect(0, 0, W, H);
   x.fillStyle = c('--accent'); x.fillRect(0, 0, W, 8);
-  txt('Horario · ' + currentArea.name, M, 62, "700 40px 'Playfair Display', Georgia, serif", c('--text'), 'left', W - 2 * M);
+  txt('Horario · ' + currentArea.name + (vistaEst ? ' · ' + vistaEst.nombre : ''), M, 62, "700 40px 'Playfair Display', Georgia, serif", c('--text'), 'left', W - 2 * M);
   txt(currentLocation.name, M, 104, '500 20px ' + SANS, c('--text-muted'));
   txt(('Semana ' + horRango(true) + ' ' + HOR.lunes.getFullYear()).toUpperCase(), M, 140, '600 15px ' + MONO, c('--accent-strong'));
   let y = HEAD;
@@ -5374,10 +5418,11 @@ async function horDibujarImagen(){
 
 async function horCompartirImagen(){
   if(!HOR.imgBlob){ showToast('La imagen todavía se está armando', 'warn'); return; }
-  const nombre = `horario-${(currentArea.name || 'area').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}-${horIso(HOR.lunes)}.png`;
+  const vistaEst = horEstVista();
+  const nombre = `horario-${(currentArea.name + (vistaEst ? ' ' + vistaEst.nombre : '') || 'area').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}-${horIso(HOR.lunes)}.png`;
   const file = new File([HOR.imgBlob], nombre, { type: 'image/png' });
   if(navigator.canShare && navigator.canShare({ files: [file] })){
-    try{ await navigator.share({ files: [file], title: 'Horario ' + currentArea.name }); return; }
+    try{ await navigator.share({ files: [file], title: 'Horario ' + currentArea.name + (vistaEst ? ' ' + vistaEst.nombre : '') }); return; }
     catch(e){ if(e.name === 'AbortError') return; }
   }
   const url = URL.createObjectURL(HOR.imgBlob), a = document.createElement('a');
@@ -5831,7 +5876,7 @@ function prenCalcular(d, per){
   const personas = HOR.personal.filter(p => p.activo || Object.keys(d.regPor).some(k => k.startsWith(p.id + '|')) || Object.keys(d.asigPor).some(k => k.split('|')[1] === p.id));
   return personas.map(p => {
     const r = { p, dias: 0, min: { h: 0, ord: 0, rn: 0, hed: 0, hen: 0, dfd: 0, dfn: 0, hedf: 0, henf: 0 }, valor: 0, det: [],
-      incap: 0, vac: 0, permR: 0, permN: 0, calam: 0, vacante: 0, falta: 0, tarde: 0, tardeMin: 0, prog: 0, sal: d.salarios[p.id] };
+      incap: 0, vac: 0, permR: 0, permN: 0, calam: 0, comp: 0, vacante: 0, falta: 0, tarde: 0, tardeMin: 0, prog: 0, sal: d.salarios[p.id] };
     // Salario fijo (líderes de dirección y confianza): sin horas extra ni recargos; las horas se muestran igual.
     const vhMin = r.sal && !p.salario_fijo ? r.sal / horasMes / 60 : 0;
     for(const lunes of semanas){
@@ -5861,7 +5906,7 @@ function prenCalcular(d, per){
         if(!enPeriodo) continue;
         if(x.tipo === 'nov'){
           const t = x.nov.tipo;
-          if(t === 'incapacidad') r.incap++; else if(t === 'vacaciones') r.vac++; else if(t === 'vacante') r.vacante++; else if(t === 'calamidad') r.calam++;
+          if(t === 'incapacidad') r.incap++; else if(t === 'vacaciones') r.vac++; else if(t === 'vacante') r.vacante++; else if(t === 'calamidad') r.calam++; else if(t === 'compensatorio') r.comp++;
           else if(t === 'permiso'){ if(x.nov.remunerado === false) r.permN++; else r.permR++; }
         }
         if(x.tipo === 'falta') r.falta++;
@@ -5869,7 +5914,7 @@ function prenCalcular(d, per){
       }
     }
     return r;
-  }).filter(r => r.min.h || r.incap || r.vac || r.permR || r.permN || r.calam || r.falta || r.p.activo);
+  }).filter(r => r.min.h || r.incap || r.vac || r.permR || r.permN || r.calam || r.comp || r.falta || r.p.activo);
 }
 
 function prenRender(){
@@ -5910,7 +5955,7 @@ function prenRender(){
   html += `<div class="hor-grid-wrap"><table class="pren-tabla"><thead><tr><th>Persona</th><th>Días</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Novedades</th>${PREN.pesos ? '<th>Valor<br>recargos</th>' : ''}</tr></thead><tbody>`;
   res.forEach(r => {
     const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`,
-      r.permR && `<span class="badge warn">${r.permR} d permiso</span>`, r.permN && `<span class="badge warn">${r.permN} d permiso no rem.</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`,
+      r.permR && `<span class="badge warn">${r.permR} d permiso</span>`, r.permN && `<span class="badge warn">${r.permN} d permiso no rem.</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`, r.comp && `<span class="badge warn">${r.comp} d compensatorio</span>`,
       r.vacante && `<span class="badge info">${r.vacante} d vacante</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`,
       r.tarde && `<span class="badge neutral">${r.tarde} tarde · ${r.tardeMin} min</span>`].filter(Boolean).join('');
     const abierta = PREN.abierta === r.p.id;
@@ -6020,7 +6065,7 @@ async function prenCsvTodos(btn){
         const n = m => Math.round(m / 60 * 100) / 100;
         const hm = prenPct('horas_mes', 210) || 210;
         res.forEach(r => filas.push([loc.name, a.name, r.p.nombre, (HOR.estaciones.find(e => e.id === r.p.estacion_id) || {}).nombre || '', r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias,
-          ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.falta, r.tarde, r.tardeMin, r.prog,
+          ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.comp, r.falta, r.tarde, r.tardeMin, r.prog,
           datos.cerrada ? 'Cerrada' : 'Sin cerrar', r.sal || '', r.sal ? Math.round(r.sal / hm) : '', r.sal && !r.p.salario_fijo ? Math.round(r.valor) : '']));
       }
     }
@@ -6030,7 +6075,7 @@ async function prenCsvTodos(btn){
   }
   if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
   if(!(await prenConfirmarSinCerrar(grupos))) return;
-  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
+  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Días compensatorio', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
   await descargarFilas({ formato, cab, filas, horizontal: true, hoja: 'Pre-nómina',
     nombre: 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta),
     titulo: 'Pre-nómina · todos los puntos', subtitulo: 'Quincena ' + horIso(per.desde) + ' a ' + horIso(per.hasta) + ' · ' + filas.length + ' personas',
@@ -6044,9 +6089,9 @@ async function prenCsv(detalle){
   const est = id => { const e = HOR.estaciones.find(x => x.id === id); return e ? e.nombre : ''; };
   let filas;
   if(!detalle){
-    filas = [['Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar']
+    filas = [['Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Días compensatorio', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar']
       .concat(PREN.pesos ? ['Salario', 'Valor hora', 'Valor recargos y extras'] : [])];
-    res.forEach(r => filas.push([r.p.nombre, est(r.p.estacion_id), r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias, ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.falta, r.tarde, r.tardeMin, r.prog]
+    res.forEach(r => filas.push([r.p.nombre, est(r.p.estacion_id), r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias, ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.comp, r.falta, r.tarde, r.tardeMin, r.prog]
       .concat(PREN.pesos ? [r.sal || '', r.sal ? Math.round(r.sal / (prenPct('horas_mes', 210) || 210)) : '', r.sal ? Math.round(r.valor) : ''] : [])));
   } else {
     filas = [['Persona', 'Fecha', 'Día', 'Festivo', 'Tipo', 'Turno', 'Entra - sale', 'Horas', 'Nocturnas', 'Extra', 'Estado', 'Nota']];
@@ -6175,7 +6220,7 @@ async function horPintarQuincena(){
   // Resumen de horas (sin pesos)
   html += `<div class="hor-grid-wrap"><table class="pren-tabla" style="min-width:760px"><thead><tr><th>Persona</th><th>Días</th><th>Horas</th><th>Extra</th><th>Nocturnas</th><th>Dom/fest</th><th>Novedades</th></tr></thead><tbody>
     ${res.map(r => { const m = r.min, ext = m.hed + m.hen + m.hedf + m.henf, noc = m.rn + m.dfn + m.hen + m.henf, df = m.dfd + m.dfn + m.hedf + m.henf;
-      const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
+      const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`, r.comp && `<span class="badge warn">${r.comp} d compensatorio</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
       return `<tr><td>${escapeHtml(r.p.nombre)}</td><td>${r.dias}</td><td>${h2(m.h)}</td><td>${ext ? h2(ext) : '<span class="pren-cero">·</span>'}</td><td>${noc ? h2(noc) : '<span class="pren-cero">·</span>'}</td><td>${df ? h2(df) : '<span class="pren-cero">·</span>'}</td><td><div class="pren-chips">${chips || '<span class="pren-cero">·</span>'}</div></td></tr>`; }).join('')}
   </tbody></table></div>`;
   if(!q && HOR.editor) html += `<div class="hor-publicar" style="margin-top:12px">
@@ -6853,6 +6898,7 @@ function horPintarConfig(){
       ${HOR.tareas.map(t => `<div class="hor-cfg-row${t.activa ? '' : ' inactivo'}">
         ${inp('horario_tareas', t.id, 'nombre', t.nombre, 'Nombre')}
         ${inp('horario_tareas', t.id, 'detalle', t.detalle, 'Detalle')}
+        ${cb('horario_tareas', t.id, 'fija', t.fija, 'Encargado fijo')}
         ${cb('horario_tareas', t.id, 'activa', t.activa, 'Activa')}
       </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay tareas.</p>'}
       <p class="hor-cfg-nota">Cada día se asigna a una persona que trabaje ese día. No suma horas.</p>
