@@ -6369,13 +6369,13 @@ function kioscoGeoIniciar(){
     () => {}, { enableHighAccuracy: true, maximumAge: 60000, timeout: 20000 });
 }
 function kioscoGeoApagar(){ if(KIO.geoWatch != null) navigator.geolocation.clearWatch(KIO.geoWatch); KIO.geoWatch = null; KIO.geo = null; }
-// Última ubicación de menos de 2 minutos; si no hay, espera hasta 5 segundos. Sin ubicación devuelve null y la marcación sigue.
+// Última ubicación de menos de 2 minutos; si no hay, espera hasta 10 segundos. Sin ubicación devuelve null.
 function kioscoGeoActual(){
   if(KIO.geo && Date.now() - KIO.geo.t < 120000) return Promise.resolve(KIO.geo);
   if(!navigator.geolocation) return Promise.resolve(null);
   return new Promise(res => navigator.geolocation.getCurrentPosition(
     pos => res({ lat: pos.coords.latitude, lng: pos.coords.longitude, prec: pos.coords.accuracy }),
-    () => res(null), { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }));
+    () => res(null), { enableHighAccuracy: true, maximumAge: 60000, timeout: 10000 }));
 }
 function kioscoCerrar(){
   kioscoGeoApagar();
@@ -6484,9 +6484,17 @@ function kioscoPintar(estado, extra){
   else if(estado === 'hecho'){
     marco.classList.add('ok'); est.textContent = extra.foto ? 'Foto de evidencia guardada' : '';
     panel.innerHTML = `<div class="kio-check${extra.tarde ? ' tarde' : ''}" aria-hidden="true">✓</div><h2>${extra.tipo === 'entrada' ? 'Entrada' : 'Salida'} marcada</h2>
-      <div class="kio-info"><span>${escapeHtml(extra.nombre)} · <b>${escapeHtml(extra.hora)}</b></span><span>${extra.tipo === 'entrada' ? (extra.tarde ? `<span class="kio-tarde">${extra.tarde} min tarde: queda anotado en el registro del día</span>` : 'A tiempo') : 'Que descanses'}</span>${extra.geo === 'fuera' ? '<span class="kio-tarde">Lejos del restaurante: el líder revisará esta marcación</span>' : extra.geo === 'sin_ubicacion' ? '<span class="kio-tarde">Sin ubicación: el líder revisará esta marcación</span>' : ''}</div>
+      <div class="kio-info"><span>${escapeHtml(extra.nombre)} · <b>${escapeHtml(extra.hora)}</b></span><span>${extra.tipo === 'entrada' ? (extra.tarde ? `<span class="kio-tarde">${extra.tarde} min tarde: queda anotado en el registro del día</span>` : 'A tiempo') : 'Que descanses'}</span></div>
       <div class="kio-cuenta"><i></i></div>`;
     KIO.volver = setTimeout(kioscoReiniciar, 5000);
+  }
+  else if(estado === 'fuerarango'){
+    marco.classList.add('no'); est.textContent = 'No se marcó';
+    panel.innerHTML = cab + (extra.estado === 'fuera'
+      ? `<h2>Estás fuera del restaurante</h2><p>Este equipo está a ${extra.metros >= 1000 ? horNum(Math.round(extra.metros / 100) / 10) + ' km' : extra.metros + ' m'} del restaurante. Solo se puede marcar dentro del rango. Si estás allá, espera un momento y vuelve a intentar, o llama al líder.</p>`
+      : '<h2>No hay ubicación</h2><p>Sin la ubicación del equipo no se puede marcar. Activa el GPS y permite la ubicación en el navegador; si sigue igual, llama al líder.</p>')
+      + '<button type="button" class="kio-sec" data-kio="volver">Volver a intentar</button>' + kioscoPie();
+    KIO.volver = setTimeout(() => { if(KIO.estado === 'fuerarango') kioscoReiniciar(); }, 20000);
   }
   else if(estado === 'clave'){
     est.textContent = '';
@@ -6513,6 +6521,13 @@ async function kioscoVerificarClave(){
 async function kioscoMarcar(pid, tipo, opciones){
   if(KIO.ocupado) return; KIO.ocupado = true;
   try {
+    // Se revisa el rango antes de subir la foto. Si la consulta falla, decide el disparador al guardar.
+    const geo = opciones.manual ? null : await kioscoGeoActual();
+    if(!opciones.manual){
+      const { data: rango } = await supa.rpc('horario_geo_evaluar', { p_area: kioscoAreaDe(pid), p_lat: geo ? geo.lat : null, p_lng: geo ? geo.lng : null, p_precision: geo ? geo.prec : null });
+      const res = rango && rango[0];
+      if(res && (res.estado === 'fuera' || res.estado === 'sin_ubicacion')){ kioscoPintar('fuerarango', res); return; }
+    }
     const v = document.getElementById('kioVideo'), hoy = horHoy();
     let foto_path = null;
     try {
@@ -6522,7 +6537,6 @@ async function kioscoMarcar(pid, tipo, opciones){
       const up = await supa.storage.from('horario-marcaciones').upload(path, blob, { contentType: 'image/jpeg' });
       if(!up.error) foto_path = path;
     } catch(_){}
-    const geo = opciones.manual ? null : await kioscoGeoActual();
     const fila = { area_id: kioscoAreaDe(pid), personal_id: pid, tipo, foto_path, distancia: opciones.distancia ?? null, dudosa: !!opciones.dudosa, manual: !!opciones.manual,
       geo_lat: geo ? geo.lat : null, geo_lng: geo ? geo.lng : null, geo_precision_m: geo ? geo.prec : null };
     const { data, error } = await supa.from('horario_marcaciones').insert(fila).select().single();
@@ -6530,7 +6544,7 @@ async function kioscoMarcar(pid, tipo, opciones){
     KIO.datos.marc.push({ personal_id: pid, tipo, at: data.at, fecha_turno: data.fecha_turno });
     KIO.reciente = { pid, hasta: Date.now() + 60 * 1000 };
     const p = KIO.datos.personal.find(x => x.id === pid), atraso = tipo === 'entrada' ? kioscoAtraso(pid) : null, tol = Number(kioscoCfg(pid).tolerancia_min ?? 5);
-    kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path, geo: data.geo_estado });
+    kioscoPintar('hecho', { tipo, nombre: p ? p.nombre : '', hora: new Date(data.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }), tarde: atraso !== null && atraso > tol ? atraso : 0, foto: !!foto_path });
   } finally { KIO.ocupado = false; }
 }
 // Borra las fotos de evidencia de más de 60 días (carpetas por fecha).
