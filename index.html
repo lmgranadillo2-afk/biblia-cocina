@@ -3378,9 +3378,12 @@ async function pickAreaForLocation(loc){
 
 const MODULE_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios'];
 
-function applyAreaModuleVisibility(modules){
+// Límite de pestañas por persona (profiles.modulos_permitidos; null = sin límite).
+function usuarioPuedeModulo(m){ const p = profile && profile.modulos_permitidos; return !Array.isArray(p) || p.includes(m); }
+function applyAreaModuleVisibility(modulesArea){
+  const modules = modulesArea.filter(usuarioPuedeModulo);
   const mb = document.getElementById('marcacionBtn');
-  if(mb) mb.hidden = !modules.includes('horarios') || esRrhh();
+  if(mb) mb.hidden = !modulesArea.includes('horarios') || !usuarioPuedeModulo('marcacion') || esRrhh();
   MODULE_TABS.forEach(m=>{
     const tabBtn = document.getElementById('tab-'+m);
     if(tabBtn) tabBtn.style.display = modules.includes(m) ? '' : 'none';
@@ -11933,7 +11936,7 @@ async function cargarPedidosArea(){
 const AVISO_ATRASADOS_MOSTRADO = new Set();
 async function avisarPedidosAtrasados(){
   if(!currentArea || AVISO_ATRASADOS_MOSTRADO.has(currentArea.id)) return;
-  if(!(currentArea.modules || MODULE_TABS).includes('pedidos')) return;
+  if(!(currentArea.modules || MODULE_TABS).includes('pedidos') || !usuarioPuedeModulo('pedidos')) return;
   AVISO_ATRASADOS_MOSTRADO.add(currentArea.id);
   const { data, error } = await supa.from('orders').select('id, codigo, proveedor, enviado_at, entrega_esperada, status, enviado, recibido')
     .eq('area_id', currentArea.id).eq('status', 'aprobado').eq('enviado', true).eq('recibido', false);

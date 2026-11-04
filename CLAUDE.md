@@ -27,6 +27,7 @@ Grupo Junín
 - **Aislamiento por PUNTO únicamente** (compartido entre áreas del mismo punto) en: el catálogo de insumos de Pedidos (`group_ingredients` + `location_ingredient_activation`), `catalog_items`.
 - **Compartido a nivel de TODO EL GRUPO**: `group_ingredients` (catálogo maestro de insumos), `proveedores` (catálogo de proveedores), activables por punto o por área según la tabla.
 - **Cuentas**: solo las crea el super admin, desde **Admin → Usuarios → Crear usuario** (Edge Function `usuarios-admin`, `supabase/functions/usuarios-admin`, con llave de servicio; también "Cambiar contraseña"); registro público apagado. Se entra con **correo o cédula**: la cédula se convierte en el correo interno `<cédula>@biblia-cocina.vercel.app` (`correoDeAcceso`, `accesoTexto`; sin recuperación por correo, el super admin pone una contraseña nueva). El trigger `handle_new_user` crea el perfil; la función completa nombre, rol, punto y áreas. Solo el super admin edita `profiles`.
+- **Límite de pestañas por persona** (`sql/usuarios_modulos_permitidos.sql`): `profiles.modulos_permitidos` (null = sin límite; incluye `marcacion` para el botón; el Chat no se limita; `usuarioPuedeModulo`). Solo oculta en la app, no cambia la RLS. Por ahora se carga por SQL.
 - **Usuarios**: acceso explícito por punto (`user_locations`) y por área (`user_areas`) — el admin no ve todo automáticamente, salvo `is_super_admin` que tiene bypass total vía la función `has_location_access()` / `has_area_access()`.
 
 ### Todas las tablas (public schema)
