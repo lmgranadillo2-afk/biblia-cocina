@@ -2009,8 +2009,8 @@ nav.tabs button{position:relative;}
         </div>
 
         <div id="bajaInformesSemanales" style="display:none; margin-top:28px; border-top:1px solid var(--border); padding-top:16px;">
-          <div class="admin-header"><h2>Informes semanales (todos los puntos)</h2></div>
-          <div class="empty-note" style="margin-bottom:14px;">Se genera solo, cada lunes a las 11 a.m., con las bajas de la semana que acaba de terminar (lunes a domingo) de todos los puntos. Solo lo ves vos.</div>
+          <div class="admin-header"><h2>Informes semanales</h2></div>
+          <div class="empty-note" style="margin-bottom:14px;">Se genera solo, cada lunes a las 11 a.m., con las bajas de la semana que acaba de terminar (lunes a domingo). Puedes descargar el del punto en el que estás o el de todos los puntos. Solo lo ves vos.</div>
           <div id="bajaInformesLista"></div>
         </div>
       </div>
@@ -4384,12 +4384,13 @@ function horRangoBloqueadoPersona(pid, desde, hasta){
   for(let f = desde; f <= hasta; f = prenSumarDias(f, 1)) if(HOR.quincenas.some(q => f >= q.desde && f <= q.hasta) && !HOR.habilitados[pid + '|' + f]) return true;
   return false;
 }
-const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', vacante:'Vacante', retardo:'Retardo' };
-const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', vacante:'VACANTE', retardo:'RETARDO' };
+const HOR_TIPOS = { incapacidad:'Incapacidad', vacaciones:'Vacaciones', permiso:'Permiso', calamidad:'Calamidad', vacante:'Vacante', retardo:'Retardo' };
+const HOR_TIPOS_CORTO = { incapacidad:'INCAP.', vacaciones:'VACAC.', permiso:'PERMISO', calamidad:'CALAM.', vacante:'VACANTE', retardo:'RETARDO' };
 const HOR_AYUDA_NOV = {
   incapacidad: 'No viene por enfermedad. Pide el soporte.',
   vacaciones: 'No viene esos días.',
   permiso: 'No viene, o viene solo parte del día (anótalo en la nota).',
+  calamidad: 'No viene por una calamidad doméstica (ej. enfermedad grave o muerte de un familiar). Pide el soporte si lo hay.',
   vacante: 'El puesto no tiene a nadie (ej. el cocinero nuevo aún no empieza).',
   retardo: 'Llegó tarde. Se crea solo al cerrar el día; también se puede anotar aquí.',
 };
@@ -5830,7 +5831,7 @@ function prenCalcular(d, per){
   const personas = HOR.personal.filter(p => p.activo || Object.keys(d.regPor).some(k => k.startsWith(p.id + '|')) || Object.keys(d.asigPor).some(k => k.split('|')[1] === p.id));
   return personas.map(p => {
     const r = { p, dias: 0, min: { h: 0, ord: 0, rn: 0, hed: 0, hen: 0, dfd: 0, dfn: 0, hedf: 0, henf: 0 }, valor: 0, det: [],
-      incap: 0, vac: 0, permR: 0, permN: 0, vacante: 0, falta: 0, tarde: 0, tardeMin: 0, prog: 0, sal: d.salarios[p.id] };
+      incap: 0, vac: 0, permR: 0, permN: 0, calam: 0, vacante: 0, falta: 0, tarde: 0, tardeMin: 0, prog: 0, sal: d.salarios[p.id] };
     // Salario fijo (líderes de dirección y confianza): sin horas extra ni recargos; las horas se muestran igual.
     const vhMin = r.sal && !p.salario_fijo ? r.sal / horasMes / 60 : 0;
     for(const lunes of semanas){
@@ -5860,7 +5861,7 @@ function prenCalcular(d, per){
         if(!enPeriodo) continue;
         if(x.tipo === 'nov'){
           const t = x.nov.tipo;
-          if(t === 'incapacidad') r.incap++; else if(t === 'vacaciones') r.vac++; else if(t === 'vacante') r.vacante++;
+          if(t === 'incapacidad') r.incap++; else if(t === 'vacaciones') r.vac++; else if(t === 'vacante') r.vacante++; else if(t === 'calamidad') r.calam++;
           else if(t === 'permiso'){ if(x.nov.remunerado === false) r.permN++; else r.permR++; }
         }
         if(x.tipo === 'falta') r.falta++;
@@ -5868,7 +5869,7 @@ function prenCalcular(d, per){
       }
     }
     return r;
-  }).filter(r => r.min.h || r.incap || r.vac || r.permR || r.permN || r.falta || r.p.activo);
+  }).filter(r => r.min.h || r.incap || r.vac || r.permR || r.permN || r.calam || r.falta || r.p.activo);
 }
 
 function prenRender(){
@@ -5909,7 +5910,7 @@ function prenRender(){
   html += `<div class="hor-grid-wrap"><table class="pren-tabla"><thead><tr><th>Persona</th><th>Días</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Novedades</th>${PREN.pesos ? '<th>Valor<br>recargos</th>' : ''}</tr></thead><tbody>`;
   res.forEach(r => {
     const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`,
-      r.permR && `<span class="badge warn">${r.permR} d permiso</span>`, r.permN && `<span class="badge warn">${r.permN} d permiso no rem.</span>`,
+      r.permR && `<span class="badge warn">${r.permR} d permiso</span>`, r.permN && `<span class="badge warn">${r.permN} d permiso no rem.</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`,
       r.vacante && `<span class="badge info">${r.vacante} d vacante</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`,
       r.tarde && `<span class="badge neutral">${r.tarde} tarde · ${r.tardeMin} min</span>`].filter(Boolean).join('');
     const abierta = PREN.abierta === r.p.id;
@@ -6019,7 +6020,7 @@ async function prenCsvTodos(btn){
         const n = m => Math.round(m / 60 * 100) / 100;
         const hm = prenPct('horas_mes', 210) || 210;
         res.forEach(r => filas.push([loc.name, a.name, r.p.nombre, (HOR.estaciones.find(e => e.id === r.p.estacion_id) || {}).nombre || '', r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias,
-          ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.falta, r.tarde, r.tardeMin, r.prog,
+          ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.falta, r.tarde, r.tardeMin, r.prog,
           datos.cerrada ? 'Cerrada' : 'Sin cerrar', r.sal || '', r.sal ? Math.round(r.sal / hm) : '', r.sal && !r.p.salario_fijo ? Math.round(r.valor) : '']));
       }
     }
@@ -6029,7 +6030,7 @@ async function prenCsvTodos(btn){
   }
   if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
   if(!(await prenConfirmarSinCerrar(grupos))) return;
-  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
+  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
   await descargarFilas({ formato, cab, filas, horizontal: true, hoja: 'Pre-nómina',
     nombre: 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta),
     titulo: 'Pre-nómina · todos los puntos', subtitulo: 'Quincena ' + horIso(per.desde) + ' a ' + horIso(per.hasta) + ' · ' + filas.length + ' personas',
@@ -6043,9 +6044,9 @@ async function prenCsv(detalle){
   const est = id => { const e = HOR.estaciones.find(x => x.id === id); return e ? e.nombre : ''; };
   let filas;
   if(!detalle){
-    filas = [['Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar']
+    filas = [['Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar']
       .concat(PREN.pesos ? ['Salario', 'Valor hora', 'Valor recargos y extras'] : [])];
-    res.forEach(r => filas.push([r.p.nombre, est(r.p.estacion_id), r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias, ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.falta, r.tarde, r.tardeMin, r.prog]
+    res.forEach(r => filas.push([r.p.nombre, est(r.p.estacion_id), r.p.cargo || '', r.p.salario_fijo ? 'Sí' : 'No', r.dias, ...PREN_CATS.map(c => n(r.min[c[0]])), r.incap, r.vac, r.permR, r.permN, r.calam, r.falta, r.tarde, r.tardeMin, r.prog]
       .concat(PREN.pesos ? [r.sal || '', r.sal ? Math.round(r.sal / (prenPct('horas_mes', 210) || 210)) : '', r.sal ? Math.round(r.valor) : ''] : [])));
   } else {
     filas = [['Persona', 'Fecha', 'Día', 'Festivo', 'Tipo', 'Turno', 'Entra - sale', 'Horas', 'Nocturnas', 'Extra', 'Estado', 'Nota']];
@@ -6174,7 +6175,7 @@ async function horPintarQuincena(){
   // Resumen de horas (sin pesos)
   html += `<div class="hor-grid-wrap"><table class="pren-tabla" style="min-width:760px"><thead><tr><th>Persona</th><th>Días</th><th>Horas</th><th>Extra</th><th>Nocturnas</th><th>Dom/fest</th><th>Novedades</th></tr></thead><tbody>
     ${res.map(r => { const m = r.min, ext = m.hed + m.hen + m.hedf + m.henf, noc = m.rn + m.dfn + m.hen + m.henf, df = m.dfd + m.dfn + m.hedf + m.henf;
-      const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
+      const chips = [r.incap && `<span class="badge danger">${r.incap} d incap.</span>`, r.vac && `<span class="badge info">${r.vac} d vacac.</span>`, (r.permR + r.permN) && `<span class="badge warn">${r.permR + r.permN} d permiso</span>`, r.calam && `<span class="badge warn">${r.calam} d calamidad</span>`, r.falta && `<span class="badge danger">${r.falta} falta${r.falta > 1 ? 's' : ''}</span>`, r.tarde && `<span class="badge neutral">${r.tarde} tarde</span>`].filter(Boolean).join('');
       return `<tr><td>${escapeHtml(r.p.nombre)}</td><td>${r.dias}</td><td>${h2(m.h)}</td><td>${ext ? h2(ext) : '<span class="pren-cero">·</span>'}</td><td>${noc ? h2(noc) : '<span class="pren-cero">·</span>'}</td><td>${df ? h2(df) : '<span class="pren-cero">·</span>'}</td><td><div class="pren-chips">${chips || '<span class="pren-cero">·</span>'}</div></td></tr>`; }).join('')}
   </tbody></table></div>`;
   if(!q && HOR.editor) html += `<div class="hor-publicar" style="margin-top:12px">
@@ -12870,25 +12871,34 @@ async function cargarBajaInformesSemanales(){
   const { data, error } = await supa.from('bajas_informes_semanales').select('*').order('semana_inicio', { ascending: false }).limit(26);
   if(error){ box.innerHTML = '<div class="empty-note">No se pudo cargar.</div>'; return; }
   if(!data || data.length === 0){ box.innerHTML = '<div class="empty-note">Todavía no se generó ningún informe (el primero sale el próximo lunes a las 11 a.m.).</div>'; return; }
-  box.innerHTML = data.map((r, i) => `
-    <div class="kanban-card" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+  // La primera columna de cada fila es el nombre del punto.
+  const delPunto = r => (r.datos || []).filter(f => f[0] === currentLocation.name);
+  box.innerHTML = data.map((r, i) => {
+    const n = delPunto(r).length;
+    return `
+    <div class="kanban-card" style="margin-bottom:8px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px;">
       <div>
         <b>Semana del ${fmtDia(r.semana_inicio)} al ${fmtDia(r.semana_fin)}</b>
-        <div class="kc-meta">${r.cantidad_bajas} baja${r.cantidad_bajas === 1 ? '' : 's'}</div>
+        <div class="kc-meta">${n} baja${n === 1 ? '' : 's'} en ${escapeHtml(currentLocation.name)} · ${r.cantidad_bajas} en todos los puntos</div>
       </div>
-      <button class="btn btn-secondary btn-small" data-desc-informe="${i}">Descargar</button>
-    </div>
-  `).join('');
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-secondary btn-small" data-desc-informe="${i}" data-informe-punto="1"${n ? '' : ' disabled'}>Descargar este punto</button>
+        <button class="btn btn-ghost btn-small" data-desc-informe="${i}">Todos los puntos</button>
+      </div>
+    </div>`;
+  }).join('');
   box.querySelectorAll('[data-desc-informe]').forEach(b => b.addEventListener('click', async () => {
-    const r = data[Number(b.dataset.descInforme)];
-    const formato = await elegirFormato('Informe de bajas · semana del ' + fmtDia(r.semana_inicio) + ' al ' + fmtDia(r.semana_fin), EXP_OPC_CSV);
+    const r = data[Number(b.dataset.descInforme)], soloPunto = !!b.dataset.informePunto;
+    const filas = soloPunto ? delPunto(r) : (r.datos || []);
+    const lugar = soloPunto ? currentLocation.name : 'todos los puntos';
+    const formato = await elegirFormato('Informe de bajas · ' + lugar + ' · semana del ' + fmtDia(r.semana_inicio) + ' al ' + fmtDia(r.semana_fin), EXP_OPC_CSV);
     if(!formato) return;
     await descargarFilas({
       formato, horizontal: true, hoja: 'Bajas',
-      nombre: 'bajas_semana_' + r.semana_inicio,
-      titulo: 'Bajas · todos los puntos',
-      subtitulo: 'Semana del ' + fmtDia(r.semana_inicio) + ' al ' + fmtDia(r.semana_fin) + ' · ' + r.cantidad_bajas + ' bajas',
-      cab: BAJA_INFORME_CAB, filas: r.datos || [],
+      nombre: 'bajas_' + (soloPunto ? currentLocation.name + '_' : 'semana_') + r.semana_inicio,
+      titulo: 'Bajas · ' + lugar,
+      subtitulo: 'Semana del ' + fmtDia(r.semana_inicio) + ' al ' + fmtDia(r.semana_fin) + ' · ' + filas.length + ' bajas',
+      cab: BAJA_INFORME_CAB, filas,
     });
   }));
 }
