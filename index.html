@@ -4676,6 +4676,19 @@ function horValidar(){
       }
     }
   }
+  // Cierre: cierran quienes salen de últimos ese día. horario_config.cierre_minimo por área (0 = sin regla).
+  const minCierre = Number(HOR.cfg && HOR.cfg.cierre_minimo) || 0;
+  if(minCierre) for(let d = 1; d <= 7; d++){
+    if(todos.includes(d) || !personas.some(p => HOR.asig[p.id + '|' + d])) continue;
+    const salidas = personas.filter(p => horTrabaja(p.id, d)).map(p => ({ p, fin: Math.max(0, ...horTramosMin(horTramosDe(HOR.asig[p.id + '|' + d])).map(x => x[1])) }));
+    const ultima = Math.max(0, ...salidas.map(x => x.fin));
+    const cierran = ultima ? salidas.filter(x => x.fin === ultima) : [];
+    if(cierran.length >= minCierre) continue;
+    cierran.forEach(x => marcar(x.p.id + '|' + d, 'err'));
+    const m = ultima % 1440, hora = horHoraCorta(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'));
+    err.push({ k: (cierran[0] ? cierran[0].p : personas.find(p => HOR.asig[p.id + '|' + d])).id + '|' + d,
+      t: cierran.length ? `Cierre del ${dia(d)}: solo ${cierran.length === 1 ? 'cierra' : 'cierran'} ${cierran.map(x => horCorto(x.p)).join(' y ')} (salida ${hora}) y deben cerrar ${minCierre}.` : `Cierre del ${dia(d)}: nadie cierra y deben cerrar ${minCierre}.` });
+  }
   for(const t of HOR.tareas.filter(t => t.activa)){
     const sinNadie = [], veces = {};
     for(let d = 1; d <= 7; d++){
@@ -6735,6 +6748,7 @@ function horPintarConfig(){
       <div class="hor-cfg-row">
         ${inp('horario_config', HOR.areaId, 'jornada_max', HOR.cfg.jornada_max, 'Jornada máxima (h)', 'number', ' min="1" max="80" step="0.5"')}
         ${inp('horario_config', HOR.areaId, 'tolerancia_min', HOR.cfg.tolerancia_min ?? 5, 'Tolerancia de llegada (min)', 'number', ' min="0" max="60" step="1"')}
+        ${inp('horario_config', HOR.areaId, 'cierre_minimo', HOR.cfg.cierre_minimo ?? 0, 'Personas que deben cerrar', 'number', ' min="0" max="20" step="1"')}
         ${inp('horario_config', HOR.areaId, 'nocturno_desde', ((HOR.cfg && HOR.cfg.nocturno_desde) || '19:00').slice(0, 5), 'Nocturno desde', 'time')}
         ${inp('horario_config', HOR.areaId, 'nocturno_hasta', ((HOR.cfg && HOR.cfg.nocturno_hasta) || '06:00').slice(0, 5), 'Nocturno hasta', 'time')}
         <div><span class="field-label">Días que descansa todo el equipo</span><div class="mins">${HOR_DC.map((d, i) => `<label class="cb"><input type="checkbox" data-hc-todos="${i + 1}"${horDiasTodos().includes(i + 1) ? ' checked' : ''}>${d}</label>`).join('')}</div></div>
@@ -6742,7 +6756,7 @@ function horPintarConfig(){
         <label><span class="field-label">Descanso rotativo hasta</span><input type="date" data-hc-rotativo="descanso_rotativo_hasta" value="${escapeHtml((HOR.cfg && HOR.cfg.descanso_rotativo_hasta) || '')}"></label>
         <div><span class="field-label">Días en que solo descansa producción</span><div class="mins">${HOR_DC.map((d, i) => `<label class="cb"><input type="checkbox" data-hc-sindesc="${i + 1}"${sinDesc.includes(i + 1) ? ' checked' : ''}>${d}</label>`).join('')}</div></div>
       </div>
-      <p class="hor-cfg-nota">La jornada máxima se avisa en amarillo; nunca impide publicar. El horario nocturno (por defecto 7 p. m. a 6 a. m., Ley 2466 de 2025) se usa para separar las horas nocturnas de cada turno. Descansos: si marcas días para todo el equipo, mandan sobre el descanso fijo de cada persona; entre "descanso rotativo desde" y "hasta", esas semanas nadie tiene día fijo y cada persona descansa 1 día a la semana (cualquiera de las dos fechas puede ir vacía). Fuera de esas fechas rige el descanso fijo de cada persona.</p>
+      <p class="hor-cfg-nota">La jornada máxima se avisa en amarillo; nunca impide publicar. Personas que deben cerrar: cuenta a quienes salen a la última hora de cada día y marca error si son menos (0 = sin regla). El horario nocturno (por defecto 7 p. m. a 6 a. m., Ley 2466 de 2025) se usa para separar las horas nocturnas de cada turno. Descansos: si marcas días para todo el equipo, mandan sobre el descanso fijo de cada persona; entre "descanso rotativo desde" y "hasta", esas semanas nadie tiene día fijo y cada persona descansa 1 día a la semana (cualquiera de las dos fechas puede ir vacía). Fuera de esas fechas rige el descanso fijo de cada persona.</p>
     </section>
     <section><h3>Estaciones y mínimos por día <button type="button" class="btn btn-secondary btn-small" data-hc-nuevo="horario_estaciones">+ Estación</button></h3>
       ${HOR.estaciones.map(e => `<div class="hor-cfg-row${e.activa ? '' : ' inactivo'}">
@@ -6850,7 +6864,7 @@ document.getElementById('horConfig').addEventListener('change', async e => {
   if(el.type === 'checkbox') val = el.checked;
   else if(el.type === 'number'){
     val = Number(String(el.value).replace(',', '.'));
-    if(!(val > 0) && !(campo === 'tolerancia_min' && val === 0)){ showToast('Escribe un número mayor que cero', 'warn'); horPintarConfig(); return; }
+    if(!(val > 0) && !((campo === 'tolerancia_min' || campo === 'cierre_minimo') && val === 0)){ showToast('Escribe un número mayor que cero', 'warn'); horPintarConfig(); return; }
   }
   else if(campo === 'estacion_id') val = el.value || null;
   else if(campo === 'descanso_dia' || campo === 'color') val = el.value ? Number(el.value) : null;
