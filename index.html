@@ -12580,7 +12580,18 @@ const BAJA_CAUSAS = {
   almacenamiento: { t: 'Se dañó en almacenamiento', dato: '¿Dónde estaba y qué falló? (ej. nevera 2, se apagó)', tipo: 'text' },
   preparacion: { t: 'Error de preparación', dato: '¿Quién preparó?', tipo: 'text' },
   prueba: { t: 'Prueba o degustación', dato: '¿Para qué fue la prueba?', tipo: 'text' },
+  accidente: { t: 'Accidente', dato: '¿Qué pasó y quién estaba?', tipo: 'text', soloBarra: true },
+  mesero: { t: 'Lo regó el mesero', dato: '¿Qué mesero?', tipo: 'text', soloBarra: true },
 };
+// Las causas de solo Barra se agregan a la lista al abrir el formulario; la prueba dice quién la aprueba según el área.
+function bajaPintarCausas(){
+  const sel = document.getElementById('bajaCausa'), barra = bajaAreaEsBarra();
+  sel.querySelectorAll('option[data-barra]').forEach(o => o.remove());
+  if(barra) Object.entries(BAJA_CAUSAS).filter(([, c]) => c.soloBarra).forEach(([k, c]) => {
+    const o = document.createElement('option'); o.value = k; o.textContent = c.t; o.dataset.barra = '1'; sel.appendChild(o);
+  });
+  sel.querySelector('option[value="prueba"]').textContent = 'Prueba o degustación (la aprueba ' + (barra ? 'un admin de Barra' : 'el super admin') + ')';
+}
 function bajaCausaTexto(b){
   const c = BAJA_CAUSAS[b.causa]; if(!c) return '';
   const dato = b.causa === 'vencido' && b.causa_dato ? 'vence ' + fmtDia(b.causa_dato) : b.causa_dato;
@@ -12618,6 +12629,7 @@ async function bajaPublicarFoto(b, file){
   } catch(_){ return null; }
 }
 document.getElementById('bajaOpenNew').addEventListener('click', ()=>{
+  bajaPintarCausas();
   document.getElementById('bajaCausa').value = '';
   document.getElementById('bajaDatoBox').hidden = true;
   document.getElementById('bajaFoto').value = '';
@@ -12677,7 +12689,7 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
   let avisados = 0;
   if(causa === 'prueba'){ const r = await supa.rpc('baja_avisar_super_admin', { p_baja: nueva.id }); avisados = r.data || 0; }
 
-  showToast('Baja registrada' + (foto ? ' · foto en el grupo' : '') + (causa === 'prueba' ? ' · la aprueba el super admin' + (avisados ? ' (ya le llegó el aviso)' : '') : ''), 'ok');
+  showToast('Baja registrada' + (foto ? ' · foto en el grupo' : '') + (causa === 'prueba' ? (bajaPruebaEnBarra(nueva) ? ' · la aprueba un admin de Barra' : ' · la aprueba el super admin') + (avisados ? ' (ya se avisó)' : '') : ''), 'ok');
   document.getElementById('bajaModal').classList.remove('open');
   loadMyBajas();
 });
@@ -12702,6 +12714,13 @@ const BAJA_COLUMNS = [
 const BAJA_ESTADO_LABEL = { pendiente:'pendiente', aprobado:'ingresada', rechazado:'denegada' };
 // Pueden resolver bajas los admin, desde Admin → Bajas o desde el módulo Bajas.
 function puedeResolverBaja(mode){ return mode === 'admin' || isAdminRole(); }
+// Bajas de prueba en Barra: las resuelve un admin de esa Barra (no quien tenga no_aprueba_prueba_barra). En otras áreas, el super admin. La base lo valida en bajas_reglas_causa.
+function bajaAreaEsBarra(){ return /^barra/i.test(((currentArea && currentArea.name) || '').trim()); }
+function bajaPruebaEnBarra(b){ return !!(b && b.area_id && currentArea && b.area_id === currentArea.id && bajaAreaEsBarra()); }
+function puedeResolverPrueba(b){
+  if(!profile) return false;
+  return bajaPruebaEnBarra(b) ? (isAdminRole() || !!profile.is_super_admin) && !profile.no_aprueba_prueba_barra : !!profile.is_super_admin;
+}
 
 function bajaKanbanCardHtml(b, mode){
   const tipoLabel = b.tipo === 'insumo' ? 'Insumo' : 'Receta preparada';
@@ -12720,7 +12739,7 @@ function bajaKanbanCardHtml(b, mode){
     <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges">${b.area_id ? '' : '<span class="badge warn" title="Baja anterior a la separación por áreas">Sin área</span>'}<span class="badge neutral">${tipoLabel}</span></span></div>
     <div class="kc-title">${escapeHtml(b.item_name)}</div>
     <div class="kc-meta"><span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${fechaCorta}${mode==='admin' ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
-    ${b.causa ? `<div class="kc-items"><span class="kc-label">Causa</span>${escapeHtml(bajaCausaTexto(b))}${b.causa === 'prueba' ? ' <span class="badge info">Super admin</span>' : ''}</div>` : ''}
+    ${b.causa ? `<div class="kc-items"><span class="kc-label">Causa</span>${escapeHtml(bajaCausaTexto(b))}${b.causa === 'prueba' ? ` <span class="badge info">${bajaPruebaEnBarra(b) ? 'Admin de Barra' : 'Super admin'}</span>` : ''}</div>` : ''}
     <div class="kc-items"><span class="kc-label">${b.causa ? 'Detalle' : 'Motivo'}</span>${escapeHtml(b.motivo)}</div>
     ${extra}
   </div>`;
@@ -12808,7 +12827,8 @@ function openBajaReview(bajaId, list){
   document.getElementById('bajaReviewCantidad').textContent = `${fmtQty(baja.cantidad)} ${baja.unidad}`;
   document.getElementById('bajaReviewMotivo').textContent = baja.motivo;
   document.getElementById('bajaReviewCausa').textContent = baja.causa ? bajaCausaTexto(baja) : 'Sin causa (baja anterior)';
-  const soloSA = baja.causa === 'prueba' && !(profile && profile.is_super_admin);
+  const soloSA = baja.causa === 'prueba' && !puedeResolverPrueba(baja);
+  document.getElementById('bajaReviewSoloSA').textContent = bajaPruebaEnBarra(baja) ? 'Esta es una baja de prueba de Barra: la ingresa o deniega otro admin de Barra.' : 'Esta es una baja de prueba: solo el super admin la puede ingresar o denegar.';
   document.getElementById('bajaReviewSoloSA').hidden = !soloSA;
   document.getElementById('bajaReviewApprove').hidden = soloSA; document.getElementById('bajaReviewReject').hidden = soloSA;
   const img = document.getElementById('bajaReviewFoto'); img.hidden = true; img.removeAttribute('src');
