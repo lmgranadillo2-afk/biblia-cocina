@@ -6587,13 +6587,13 @@ setInterval(() => { if(KIO.estado === 'espera'){ const h = document.querySelecto
 
 /* ---------- Registro de rostros (Configuración → Personal) ---------- */
 const ROS = { pid: null, stream: null, descs: [], ocupado: false };
-async function rostroAbrir(pid){
+async function rostroAbrir(pid, agregar){
   const p = HOR.personal.find(x => x.id === pid); if(!p) return;
-  ROS.pid = pid; ROS.descs = [];
+  ROS.pid = pid; ROS.descs = []; ROS.agregar = !!agregar;
   const box = document.getElementById('horRostroBox');
-  box.innerHTML = `<h3 id="horRostroTit">Registrar el rostro de ${escapeHtml(p.nombre)}</h3>
+  box.innerHTML = `<h3 id="horRostroTit">${agregar ? 'Agregar fotos de' : 'Registrar el rostro de'} ${escapeHtml(p.nombre)}</h3>
     <div class="ros-cam"><video id="rosVideo" playsinline muted></video><div class="ros-estado" id="rosEstado">Preparando la cámara…</div></div>
-    <p class="field-help">Se toman 5 fotos: de frente, un poco a la izquierda, a la derecha, arriba y abajo, a la distancia en que va a marcar. Se guarda una huella numérica del rostro, no las fotos.</p>
+    <p class="field-help">Se toman 5 fotos: de frente, un poco a la izquierda, a la derecha, arriba y abajo, a la distancia en que va a marcar. Se guarda una huella numérica del rostro, no las fotos.${agregar ? ' Hazlo en el equipo donde no lo reconoce; se conservan las huellas que ya tiene.' : ''}</p>
     <div class="ros-puntos" id="rosPuntos" aria-live="polite"></div>
     <div class="modal-actions"><button type="button" class="btn btn-ghost" data-ros="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-ros="foto" disabled>Tomar foto 1 de 5</button></div>`;
   document.getElementById('horRostroModal').classList.add('open');
@@ -6637,7 +6637,14 @@ document.getElementById('horRostroModal').addEventListener('click', async e => {
     const parecido = (otros || []).map(r => ({ r, d: Math.min(...ROS.descs.flatMap(a => (r.descriptores || []).map(x => faceDistancia(a, x)))) })).sort((a, b) => a.d - b.d)[0];
     if(parecido && parecido.d < FACE_OK){ const p = HOR.personal.find(x => x.id === parecido.r.personal_id); showToast(`Este rostro se parece mucho al de ${p ? p.nombre : 'otra persona'}. Revisa que sea la persona correcta.`, 'danger'); return; }
     ROS.ocupado = true; b.disabled = true;
-    const { error } = await supa.from('horario_rostros').upsert({ personal_id: ROS.pid, area_id: HOR.areaId, descriptores: ROS.descs, registrado_por: profile.name || session.user.email, updated_at: new Date().toISOString() }, { onConflict: 'personal_id' });
+    // Agregar: conserva las huellas anteriores (ej. las del PC) y suma las de este equipo; máximo 15, las más recientes.
+    let descriptores = ROS.descs;
+    if(ROS.agregar){
+      const { data: actual, error: errActual } = await supa.from('horario_rostros').select('descriptores').eq('personal_id', ROS.pid).maybeSingle();
+      if(errActual){ ROS.ocupado = false; b.disabled = false; showToast('No se pudo guardar: ' + errActual.message, 'danger'); return; }
+      descriptores = [...((actual && actual.descriptores) || []), ...ROS.descs].slice(-15);
+    }
+    const { error } = await supa.from('horario_rostros').upsert({ personal_id: ROS.pid, area_id: HOR.areaId, descriptores, registrado_por: profile.name || session.user.email, updated_at: new Date().toISOString() }, { onConflict: 'personal_id' });
     ROS.ocupado = false;
     if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); b.disabled = false; return; }
     showToast('Rostro guardado', 'ok'); rostroCerrar(); horCargarRostros().then(horPintarConfigQuieto);
@@ -6836,7 +6843,7 @@ function horPintarConfig(){
         ${cb('horario_personal', p.id, 'es_produccion', p.es_produccion, 'Producción')}
         ${cb('horario_personal', p.id, 'salario_fijo', p.salario_fijo, 'Salario fijo (sin extras ni recargos)')}
         ${cb('horario_personal', p.id, 'activo', p.activo, 'Activo')}
-        ${(HOR.rostros || {})[p.id] ? `<span class="badge ok" style="align-self:center">Rostro registrado</span><button type="button" class="btn btn-ghost btn-small" data-hc-rostro="${p.id}">Volver a tomar</button><button type="button" class="btn btn-ghost btn-small" data-hc-rostro-borrar="${p.id}">Borrar rostro</button>`
+        ${(HOR.rostros || {})[p.id] ? `<span class="badge ok" style="align-self:center">Rostro registrado</span><button type="button" class="btn btn-ghost btn-small" data-hc-rostro-agregar="${p.id}">Agregar fotos</button><button type="button" class="btn btn-ghost btn-small" data-hc-rostro="${p.id}">Volver a tomar</button><button type="button" class="btn btn-ghost btn-small" data-hc-rostro-borrar="${p.id}">Borrar rostro</button>`
           : `<button type="button" class="btn btn-secondary btn-small" data-hc-rostro="${p.id}">Registrar rostro</button>`}
       </div>`).join('') || '<p class="hor-cfg-nota">Aún no hay personal.</p>'}
       <p class="hor-cfg-nota">"Producción" puede descansar los días marcados arriba. Quien sale del equipo se desactiva: deja de aparecer en las semanas nuevas y su historial queda.</p>
@@ -7006,6 +7013,8 @@ async function horGuardarTramos(id, tramos){
 document.getElementById('horConfig').addEventListener('click', async e => {
   const ros = e.target.closest('[data-hc-rostro]'), rosB = e.target.closest('[data-hc-rostro-borrar]');
   if(ros){ rostroAbrir(ros.dataset.hcRostro); return; }
+  const rosMas = e.target.closest('[data-hc-rostro-agregar]');
+  if(rosMas){ rostroAbrir(rosMas.dataset.hcRostroAgregar, true); return; }
   if(rosB){
     if(rosB.dataset.armado){ rosB.disabled = true; await rostroBorrar(rosB.dataset.hcRostroBorrar); return; }
     rosB.dataset.armado = '1'; rosB.textContent = 'Toca otra vez para borrar'; rosB.classList.add('btn-danger-outline');
