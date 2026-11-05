@@ -3417,7 +3417,7 @@ function enterArea(loc, area){
   roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
-  document.getElementById('tab-calculadora').style.display = profile.is_super_admin ? '' : 'none';
+  document.getElementById('tab-calculadora').style.display = (profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -10084,7 +10084,7 @@ function renderCosteoEventoForm(){
 /* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
    Precio sin ICO = costo total ÷ (1 − margen); precio de carta = precio sin ICO × (1 + ICO). El margen y el food cost
    se calculan sobre la venta sin ICO (el ICO es del Estado, no del restaurante). Costo total = costo base + otros costos ($ fijos o % del costo base).
-   Se guarda en la tabla calculadora_platos (RLS: solo super admin). */
+   Se guarda en la tabla calculadora_platos (RLS: cada admin los suyos; super admin todos). */
 let CP = { id: null, items: [] }, CP_GUARDADOS = [];
 function cpCalcular(){
   const base = toNum(document.getElementById('cpBase').value) || 0;
@@ -10159,7 +10159,7 @@ async function cpCargarGuardados(){
 }
 let CP_LISTO = false;
 function abrirCalculadoraPrecios(){
-  if(!profile.is_super_admin) return;
+  if(profile.role !== 'admin' && !profile.is_super_admin) return;
   if(!CP_LISTO){
     CP_LISTO = true;
     document.getElementById('cpBase').addEventListener('input', cpPintarResumen);
