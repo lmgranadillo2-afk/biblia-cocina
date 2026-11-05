@@ -906,6 +906,13 @@ nav.tabs button{position:relative;}
 .mer-hoja{max-width:520px;}
 .mer-monto{font:600 22px 'IBM Plex Mono',monospace; text-align:right; min-height:52px;}
 .mer-chips{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.mer-catlist{display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-3);}
+.mer-catrow{display:flex; gap:var(--space-2); align-items:center;}
+.mer-catrow input[type=text]{flex:1;}
+.mer-catrow label.cb{display:flex; align-items:center; gap:6px; min-height:44px; font-size:14px; white-space:nowrap;}
+.mer-catrow.inactiva input[type=text]{color:var(--text-dim);}
+.mer-catnueva{display:flex; gap:var(--space-2);}
+.mer-catnueva input{flex:1;}
 .mer-chips button{min-height:44px; padding:0 14px; border-radius:var(--radius-pill); border:1px solid var(--border-strong); background:var(--surface); font:500 14px Inter,sans-serif; color:var(--text); cursor:pointer;}
 .mer-chips button[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); font-weight:700;}
 .mer-prev{border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); font-size:14px; margin:var(--space-2) 0;}
@@ -13849,12 +13856,15 @@ function renderAreasAdminList(){
    Tarjeta por restaurante con lo que le queda; detalle de categorías y gastos del que se toca; "Definir presupuesto"
    aparte; "+ Anotar gasto" con 3 preguntas. Cada gasto va a un solo restaurante; soporte opcional; se puede pasar
    del presupuesto (solo avisa). Lo usan super admin y profiles.es_mercadeo. */
-const MER_CATS = [['pauta', 'Pauta digital'], ['influencers', 'Influencers y contenido'], ['impresos', 'Impresos y POP'], ['activaciones', 'Activaciones y eventos']];
-const MER = { mes: null, rest: [], sel: null, modo: 'ver', pres: {}, gastos: [], listo: false };
+// Categorías: tabla mercadeo_categorias (sql/mercadeo_categorias.sql), editables desde la app. MER_CATS = las que se muestran
+// en el mes ([clave, nombre]): las activas y las ocultas que tengan presupuesto o gastos ese mes.
+let MER_CATS = [['pauta', 'Pauta digital'], ['influencers', 'Influencers y contenido'], ['impresos', 'Impresos y POP'], ['activaciones', 'Activaciones y eventos']];
+const MER = { mes: null, rest: [], sel: null, modo: 'ver', pres: {}, gastos: [], listo: false, catsTodas: [] };
 function merMesIso(d){ return horIso(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function merFinIso(d){ return horIso(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
 function merMesTexto(d){ const t = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); }
-function merCatNombre(k){ return (MER_CATS.find(c => c[0] === k) || [k, k])[1]; }
+function merCatNombre(k){ const c = MER.catsTodas.find(x => x.clave === k); return c ? c.nombre : ((MER_CATS.find(x => x[0] === k) || [k, k])[1]); }
+function merCatsActivas(){ return MER.catsTodas.length ? MER.catsTodas.filter(c => c.activa).map(c => [c.clave, c.nombre]) : MER_CATS; }
 function merPres(loc, c){ return c ? (MER.pres[loc + '|' + c] || 0) : MER_CATS.reduce((t, [k]) => t + (MER.pres[loc + '|' + k] || 0), 0); }
 function merGas(loc, c){ return MER.gastos.filter(x => x.location_id === loc && (!c || x.categoria === c)).reduce((t, x) => t + Number(x.valor), 0); }
 function merNivel(g, p){
@@ -13882,14 +13892,20 @@ async function merAbrir(){
 }
 async function merCargar(){
   const ini = merMesIso(MER.mes), fin = merFinIso(MER.mes);
-  const [pr, ga] = await Promise.all([
+  const [pr, ga, ca] = await Promise.all([
     supa.from('mercadeo_presupuestos').select('*').eq('mes', ini),
-    supa.from('mercadeo_gastos').select('*').gte('fecha', ini).lte('fecha', fin).order('fecha', { ascending: false }).order('created_at', { ascending: false })
+    supa.from('mercadeo_gastos').select('*').gte('fecha', ini).lte('fecha', fin).order('fecha', { ascending: false }).order('created_at', { ascending: false }),
+    supa.from('mercadeo_categorias').select('*').order('orden').order('nombre')
   ]);
   const err = pr.error || ga.error;
   if(err){ document.getElementById('merBox').innerHTML = '<div class="empty-note">No se pudo cargar: ' + escapeHtml(err.message) + '</div>'; return; }
   MER.pres = {}; (pr.data || []).forEach(x => { MER.pres[x.location_id + '|' + x.categoria] = Number(x.valor) || 0; });
   MER.gastos = ga.data || [];
+  if(!ca.error && (ca.data || []).length){
+    MER.catsTodas = ca.data;
+    const conDatos = k => MER.gastos.some(x => x.categoria === k) || Object.keys(MER.pres).some(key => key.endsWith('|' + k) && MER.pres[key]);
+    MER_CATS = MER.catsTodas.filter(c => c.activa || conDatos(c.clave)).map(c => [c.clave, c.nombre + (c.activa ? '' : ' (oculta)')]);
+  }
   merPintar();
 }
 function merPintar(){
@@ -13922,6 +13938,7 @@ function merPintar(){
     <div class="mer-cards">${cards}</div>
     <div class="mer-detalle">
       <div><h2>${escapeHtml(r.name)}</h2><p class="field-help">${def ? 'Escribe cuánto hay para cada cosa este mes. Total: <b>' + escapeHtml(fmtMoney(merPres(r.id)) || '$ 0') + '</b>' : 'Por categoría'}</p>${cats}
+        ${def ? `<button type="button" class="btn btn-secondary btn-small" data-mer="categorias">Categorías: agregar, renombrar u ocultar</button> ` : ''}
         ${def ? `<button type="button" class="btn btn-secondary btn-small" data-mer="copiar">Copiar lo de ${escapeHtml(merMesTexto(ant).toLowerCase())} (todos los restaurantes, solo casillas vacías)</button>` : ''}</div>
       <div><h2>Gastos del mes</h2>${lista}</div>
     </div>
@@ -13953,6 +13970,7 @@ function merEventos(){
     if(a === 'ant' || a === 'sig'){ MER.mes = new Date(MER.mes.getFullYear(), MER.mes.getMonth() + (a === 'ant' ? -1 : 1), 1); merCargar(); }
     else if(a === 'gasto') merAbrirGasto();
     else if(a === 'copiar') merCopiarMesAnterior(b);
+    else if(a === 'categorias') merCategorias();
     else if(a === 'descargar') merDescargar(false);
     else if(a === 'descargargastos') merDescargar(true);
   });
@@ -13964,6 +13982,43 @@ function merEventos(){
     MER.pres[MER.sel + '|' + inp.dataset.merPres] = valor;
     showToast('Presupuesto guardado', 'ok'); merPintar();
   });
+}
+function merCategorias(){
+  let m = document.getElementById('merCatModal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'merCatModal'; document.body.appendChild(m); }
+  const pintar = () => {
+    m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="merCatTit"><h3 id="merCatTit">Categorías de mercadeo</h3>
+      <p class="modal-sub">Cambia el nombre y sale de la casilla para guardarlo. Ocultar no borra: los gastos y presupuestos que ya tienen esa categoría se conservan.</p>
+      <div class="mer-catlist">${MER.catsTodas.map(c => `<div class="mer-catrow${c.activa ? '' : ' inactiva'}"><input type="text" maxlength="60" data-mercat-nom="${escapeHtml(c.clave)}" value="${escapeHtml(c.nombre)}" aria-label="Nombre de la categoría"><label class="cb"><input type="checkbox" data-mercat-act="${escapeHtml(c.clave)}"${c.activa ? ' checked' : ''}>Activa</label></div>`).join('')}</div>
+      <div class="field"><label class="field-label" for="merCatNueva">Nueva categoría</label><div class="mer-catnueva"><input type="text" id="merCatNueva" maxlength="60" placeholder="Ej.: Patrocinios"><button type="button" class="btn btn-accent" data-mercat="agregar">Agregar</button></div></div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" data-mercat="cerrar">Listo</button></div></div>`;
+  };
+  pintar();
+  m.classList.add('open');
+  const cerrar = () => { m.classList.remove('open'); m.onclick = null; m.onchange = null; merCargar(); };
+  m.onclick = async e => {
+    if(e.target === m){ cerrar(); return; }
+    const b = e.target.closest('[data-mercat]'); if(!b) return;
+    if(b.dataset.mercat === 'cerrar'){ cerrar(); return; }
+    const nombre = document.getElementById('merCatNueva').value.trim();
+    if(!nombre){ showToast('Escribe el nombre de la categoría', 'warn'); return; }
+    b.disabled = true;
+    const orden = Math.max(0, ...MER.catsTodas.map(c => c.orden || 0)) + 1;
+    const { data, error } = await supa.from('mercadeo_categorias').insert({ nombre, orden }).select().single();
+    b.disabled = false;
+    if(error){ showToast(/duplicate|unique/i.test(error.message) ? 'Ya existe una categoría con ese nombre' : 'No se guardó: ' + error.message, 'danger'); return; }
+    MER.catsTodas.push(data); showToast('Categoría agregada', 'ok'); pintar();
+  };
+  m.onchange = async e => {
+    const nom = e.target.closest('[data-mercat-nom]'), act = e.target.closest('[data-mercat-act]');
+    const clave = nom ? nom.dataset.mercatNom : act ? act.dataset.mercatAct : null; if(!clave) return;
+    const cambio = nom ? { nombre: nom.value.trim() } : { activa: act.checked };
+    if(nom && !cambio.nombre){ showToast('El nombre no puede quedar vacío', 'warn'); pintar(); return; }
+    const { error } = await supa.from('mercadeo_categorias').update(cambio).eq('clave', clave);
+    if(error){ showToast(/duplicate|unique/i.test(error.message) ? 'Ya existe una categoría con ese nombre' : 'No se guardó: ' + error.message, 'danger'); pintar(); return; }
+    Object.assign(MER.catsTodas.find(c => c.clave === clave), cambio);
+    showToast('Categoría actualizada', 'ok'); pintar();
+  };
 }
 async function merCopiarMesAnterior(btn){
   btn.disabled = true;
@@ -13978,7 +14033,8 @@ async function merCopiarMesAnterior(btn){
   showToast(filas.length + ' casilla' + (filas.length === 1 ? '' : 's') + ' copiada' + (filas.length === 1 ? '' : 's'), 'ok'); merCargar();
 }
 function merAbrirGasto(){
-  const F = { r: MER.sel, c: 'pauta' };
+  const activas = merCatsActivas();
+  const F = { r: MER.sel, c: (activas[0] || ['pauta'])[0] };
   const hoy = horHoy(), ini = merMesIso(MER.mes), fin = merFinIso(MER.mes);
   let m = document.getElementById('merModal');
   if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'merModal'; document.body.appendChild(m); }
@@ -13993,7 +14049,7 @@ function merAbrirGasto(){
     <div class="modal-actions"><button type="button" class="btn btn-ghost" data-merg="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-merg="guardar">Guardar</button></div></div>`;
   const chips = () => {
     document.getElementById('merRestChips').innerHTML = MER.rest.map(x => `<button type="button" data-merg-r="${x.id}" aria-pressed="${F.r === x.id}">${escapeHtml(x.name)}</button>`).join('');
-    document.getElementById('merCatChips').innerHTML = MER_CATS.map(([k, n]) => `<button type="button" data-merg-c="${k}" aria-pressed="${F.c === k}">${escapeHtml(n)}</button>`).join('');
+    document.getElementById('merCatChips').innerHTML = activas.map(([k, n]) => `<button type="button" data-merg-c="${k}" aria-pressed="${F.c === k}">${escapeHtml(n)}</button>`).join('');
   };
   const valor = () => Number(String(document.getElementById('merMonto').value).replace(/[^\d]/g, '')) || 0;
   const prev = () => {
