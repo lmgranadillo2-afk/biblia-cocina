@@ -874,6 +874,36 @@ nav.tabs button{position:relative;}
 }
 /* Eventos: vista Agenda (grupos por semana/mes) y Calendario */
 .ev-vista{margin-bottom:var(--space-3);}
+.seg-nota{font-size:13px; color:var(--text-muted); margin:var(--space-2) 0;}
+.seg-abrir{width:100%;}
+@media (min-width:1024px){ .seg-abrir{display:none;} }
+.seg-cab{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-3);}
+.seg-cab h2{font:700 22px 'Playfair Display',serif; margin:0;}
+.seg-tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--space-2); margin-bottom:var(--space-3);}
+.seg-tile{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--c); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); display:flex; flex-direction:column;}
+.seg-tile b{font:600 22px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.seg-tile span{font-size:12.5px; color:var(--text-muted);}
+.seg-wrap{overflow-x:auto; max-width:100%; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:var(--space-2);}
+.seg-tabla{border-collapse:separate; border-spacing:0; min-width:1500px; width:100%; font-size:13px;}
+.seg-tabla th, .seg-tabla td{border-bottom:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:middle; white-space:nowrap;}
+.seg-tabla thead th{background:var(--surface-2); font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.6px; text-transform:uppercase; color:var(--text-muted); white-space:normal;}
+.seg-tabla tr.seg-grupo th{background:var(--surface-3); color:var(--text); text-align:center; border-right:2px solid var(--surface);}
+.seg-tabla .seg-prim{position:sticky; left:0; z-index:1; background:var(--surface); border-right:1px solid var(--border); min-width:190px; font-weight:600; white-space:normal;}
+.seg-tabla thead .seg-prim{background:var(--surface-2); z-index:2;}
+.seg-tabla tr.seg-grupo .seg-prim{background:var(--surface-3);}
+.seg-tabla small{display:block; font-weight:400; font-size:12px; color:var(--text-muted); white-space:normal;}
+.seg-tabla tbody tr{cursor:pointer;}
+.seg-tabla tbody tr:hover td, .seg-tabla tbody tr:focus-visible td{background:var(--accent-soft);}
+.seg-tabla tbody tr:focus-visible{outline:none;}
+.seg-num{font:600 13px 'IBM Plex Mono',monospace; text-align:right !important; font-variant-numeric:tabular-nums;}
+.seg-si{color:var(--ok); font-weight:700;}
+.seg-no{color:var(--text-dim);}
+.seg-ficha{max-width:640px;}
+.seg-datos{display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2); background:var(--surface-2); border-radius:var(--radius-md); padding:var(--space-3); margin-bottom:var(--space-3);}
+.seg-datos b{display:block; font:600 15px 'IBM Plex Mono',monospace;}
+.seg-campos{display:grid; grid-template-columns:1fr 1fr; gap:0 var(--space-3);}
+.seg-campos .full{grid-column:1 / -1;}
+@media (max-width:560px){ .seg-campos, .seg-datos{grid-template-columns:1fr;} }
 .ev-vista .estado-op{min-height:38px;}
 .ev-vista .estado-op.active{background:var(--surface); border-color:var(--border-strong); color:var(--text);}
 .ev-grupo{margin-bottom:var(--space-4);}
@@ -8703,6 +8733,7 @@ async function loadCosteoEventos(){
     if(!r.data || r.data.length < PAG) break;
   }
   COSTEO_EVENTOS = error ? [] : todos;
+  SEG.cargado = false;
   if(error) showToast('No se pudieron cargar los eventos: ' + error.message);
 }
 
@@ -9464,15 +9495,20 @@ function renderCosteoEventosList(){
   const deEstado = k => k === 'sin' ? porTexto.filter(e => !e.estado) : porTexto.filter(e => e.estado === k);
   const list = eventosFiltroEstado ? deEstado(eventosFiltroEstado) : porTexto;
   const wrap = document.getElementById('costeoItems');
+  if(eventosVista === 'seguimiento' && !puedeSeguimiento()) eventosVista = 'agenda';
   document.getElementById('costeoCount').textContent = list.length + ' evento' + (list.length===1?'':'s');
   const filtros = [{ key:'', corto:'Todos' }, ...EVENTO_ESTADOS, ...(porTexto.some(e => !e.estado) ? [{ key:'sin', corto:'Sin estado' }] : [])];
   const chips = COSTEO_EVENTOS.length === 0 ? '' : `<div class="aud-estados ev-estados">${filtros.map(f =>
     `<button type="button" class="aud-chip${eventosFiltroEstado === f.key ? ' active' : ''}" data-ev-estado="${f.key}" aria-pressed="${eventosFiltroEstado === f.key}">${f.corto}<span>${f.key ? deEstado(f.key).length : porTexto.length}</span></button>`).join('')}</div>`;
   const vista = COSTEO_EVENTOS.length === 0 ? '' : `<div class="estado-seg ev-vista" role="group" aria-label="Vista de eventos">
-    ${[['agenda', 'Agenda'], ['calendario', 'Calendario']].map(([k, t]) => `<button type="button" class="estado-op${eventosVista === k ? ' active' : ''}" data-ev-vista="${k}" aria-pressed="${eventosVista === k}">${t}</button>`).join('')}
+    ${eventosVistas().map(([k, t]) => `<button type="button" class="estado-op${eventosVista === k ? ' active' : ''}" data-ev-vista="${k}" aria-pressed="${eventosVista === k}">${t}</button>`).join('')}
   </div>`;
   if(COSTEO_EVENTOS.length === 0){
     wrap.innerHTML = `<div class="empty-list">Todavía no hay eventos. Tocá "+ Nuevo evento".</div>`;
+  } else if(eventosVista === 'seguimiento'){
+    wrap.innerHTML = vista + chips + segListaHtml(list);
+    wrap.querySelector('#segAbrir').addEventListener('click', () => document.getElementById('costeoDetailPane').classList.add('open'));
+    segPintar(list);
   } else if(eventosVista === 'calendario'){
     wrap.innerHTML = vista + chips + eventosCalendarioHtml(list);
   } else {
@@ -9481,6 +9517,9 @@ function renderCosteoEventosList(){
   wrap.querySelectorAll('.rec-card').forEach(el=>el.addEventListener('click', ()=>openCosteoEvento(el.dataset.id)));
   wrap.querySelectorAll('[data-ev-estado]').forEach(b => b.addEventListener('click', ()=>{ eventosFiltroEstado = b.dataset.evEstado; renderCosteoEventosList(); }));
   wrap.querySelectorAll('[data-ev-vista]').forEach(b => b.addEventListener('click', ()=>{
+    // Al salir de Seguimiento se quita la tabla del panel derecho; al entrar se recargan los datos.
+    if(document.getElementById('segTabla') && !costeoEventoDraft){ document.getElementById('costeoDetailBody').innerHTML = ''; document.getElementById('costeoDetailPane').classList.remove('open'); }
+    if(b.dataset.evVista === 'seguimiento') SEG.cargado = false;
     eventosVista = b.dataset.evVista;
     try { localStorage.setItem('eventosVista', eventosVista); } catch(err){}
     renderCosteoEventosList();
@@ -9497,7 +9536,173 @@ function renderCosteoEventosList(){
 }
 
 /* Vistas de la lista de eventos: Agenda (próximos por semana y mes; pasados cerrados) y Calendario (puntos por estado). */
-let eventosVista = (()=>{ try { return localStorage.getItem('eventosVista') === 'calendario' ? 'calendario' : 'agenda'; } catch(err){ return 'agenda'; } })();
+let eventosVista = (()=>{ try { const v = localStorage.getItem('eventosVista'); return v === 'calendario' || v === 'seguimiento' ? v : 'agenda'; } catch(err){ return 'agenda'; } })();
+
+/* ---------- Seguimiento de eventos (solo punto Eventos y super admin; sql/eventos_seguimiento.sql) ----------
+   Tabla con cliente, contacto, tipo, PAX, fecha, horario, venue (restaurante), valor cotizado, estado, medio de llegada,
+   exclusividad, anticipo (valor, fecha, nota), contabilidad, reporte, bloqueo en reservas y factura.
+   Los datos del evento salen de costeo_eventos; lo demás de eventos_seguimiento (los restaurantes no lo ven). */
+const SEG = { datos: {}, cargado: false, lista: [] };
+const SEG_MEDIOS = { referido: 'Referido', whatsapp: 'WhatsApp', corporativo: 'Corporativo', lider_comercial: 'Líder comercial' };
+function puedeSeguimiento(){ return !!profile && (!!profile.is_super_admin || (!!currentLocation && currentLocation.slug === 'eventos')); }
+function eventosVistas(){ return [['agenda', 'Agenda'], ['calendario', 'Calendario'], ...(puedeSeguimiento() ? [['seguimiento', 'Seguimiento']] : [])]; }
+async function segCargar(){
+  const datos = {}; let desde = 0;
+  for(;;){
+    const r = await supa.from('eventos_seguimiento').select('*').range(desde, desde + 999);
+    if(r.error){ showToast('No se pudo cargar el seguimiento: ' + r.error.message, 'danger'); break; }
+    (r.data || []).forEach(x => { datos[x.evento_id] = x; });
+    if(!r.data || r.data.length < 1000) break;
+    desde += 1000;
+  }
+  SEG.datos = datos; SEG.cargado = true;
+}
+// Próximos primero (del más cercano), luego sin fecha, luego los pasados (del más reciente).
+function segOrdenar(list){
+  const d = e => diasParaEvento(e.fecha);
+  return [...list.filter(e => e.fecha && d(e) >= 0).sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    ...list.filter(e => !e.fecha),
+    ...list.filter(e => e.fecha && d(e) < 0).sort((a, b) => b.fecha.localeCompare(a.fecha))];
+}
+function segListaHtml(list){
+  return `<div class="seg-nota">${list.length} evento${list.length === 1 ? '' : 's'} en la tabla de seguimiento. Los filtros de estado y la búsqueda también aplican a la tabla.</div>
+    <button type="button" class="btn btn-secondary seg-abrir" id="segAbrir">Ver tabla de seguimiento</button>`;
+}
+function segFila(e){
+  const x = SEG.datos[e.id] || {}, t = eventoCalcTotals(e), r = restauranteDe(e.restaurante_id);
+  const sino = v => v ? '<span class="seg-si">Sí</span>' : '<span class="seg-no">No</span>';
+  const vac = '<span class="seg-no">—</span>';
+  const cliente = e.cliente || e.nombre || '';
+  return `<tr data-seg-ev="${e.id}" tabindex="0" role="button" aria-label="${escapeHtml('Seguimiento de ' + cliente)}">
+    <td class="seg-prim">${escapeHtml(cliente)}${e.nombre && e.nombre !== cliente ? `<small>${escapeHtml(e.nombre)}</small>` : ''}</td>
+    <td>${x.contacto ? escapeHtml(x.contacto) : vac}</td>
+    <td>${x.tipo_evento ? escapeHtml(x.tipo_evento) : vac}</td>
+    <td class="seg-num">${toNum(e.invitados) || vac}</td>
+    <td>${e.fecha ? escapeHtml(fmtFecha(e.fecha)) : vac}</td>
+    <td>${e.horario ? escapeHtml(e.horario) : vac}</td>
+    <td>${r ? escapeHtml(r.name) : vac}</td>
+    <td class="seg-num">${escapeHtml(fmtMoney(t.total))}</td>
+    <td>${eventoEstadoBadge(e)}</td>
+    <td>${x.medio_llegada ? escapeHtml(SEG_MEDIOS[x.medio_llegada] || x.medio_llegada) : vac}</td>
+    <td>${sino(x.exclusividad)}</td>
+    <td class="seg-num">${toNum(x.anticipo_valor) ? escapeHtml(fmtMoney(x.anticipo_valor)) : vac}${x.anticipo_nota ? `<small>${escapeHtml(x.anticipo_nota)}</small>` : ''}</td>
+    <td>${x.anticipo_fecha ? escapeHtml(fmtFecha(x.anticipo_fecha)) : vac}</td>
+    <td>${x.contabilidad_aprobado ? '<span class="badge ok">Aprobado</span>' : '<span class="badge neutral">No aprobado</span>'}</td>
+    <td>${x.reporte_enviado ? '<span class="seg-si">Enviado</span>' + (x.reporte_fecha ? `<small>${escapeHtml(fmtFecha(x.reporte_fecha))}</small>` : '') : '<span class="seg-no">No</span>'}</td>
+    <td>${sino(x.bloqueo_reservas)}</td>
+    <td>${sino(x.factura)}</td>
+  </tr>`;
+}
+function segTablaHtml(list){
+  const hoy = horHoy();
+  const vivos = list.filter(e => e.estado !== 'cancelado');
+  const conf = vivos.filter(e => e.estado === 'confirmado');
+  const x = e => SEG.datos[e.id] || {};
+  const tiles = [
+    ['info', vivos.length, 'eventos sin cancelados'],
+    ['ok', conf.length, 'confirmados'],
+    ['warn', conf.filter(e => !toNum(x(e).anticipo_valor)).length, 'confirmados sin anticipo'],
+    ['warn', vivos.filter(e => toNum(x(e).anticipo_valor) && !x(e).contabilidad_aprobado).length, 'anticipos sin aprobar en contabilidad'],
+    ['danger', vivos.filter(e => e.fecha && e.fecha < hoy && !x(e).factura).length, 'ya pasaron y no tienen factura']
+  ];
+  return `<div class="seg-cab"><h2>Seguimiento de eventos</h2><button type="button" class="btn btn-secondary btn-small" id="segDescargar">Descargar</button></div>
+    <div class="seg-tiles">${tiles.map(([c, n, t]) => `<div class="seg-tile" style="--c:var(--${c})"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
+    ${list.length ? `<div class="seg-wrap" id="segTabla"><table class="seg-tabla">
+      <thead><tr class="seg-grupo"><th class="seg-prim"></th><th colspan="6">Evento</th><th colspan="4">Comercial</th><th colspan="3">Anticipo</th><th colspan="3">Después del evento</th></tr>
+      <tr><th class="seg-prim">Cliente / empresa</th><th>Contacto</th><th>Tipo de evento</th><th>PAX</th><th>Fecha</th><th>Horario</th><th>Venue</th><th>Valor cotizado</th><th>Estado</th><th>Medio de llegada</th><th>Exclusividad</th><th>Anticipo recibido</th><th>Fecha pago</th><th>Contabilidad</th><th>Reporte evento</th><th>Bloqueo en reservas</th><th>Factura</th></tr></thead>
+      <tbody>${list.map(segFila).join('')}</tbody></table></div>` : '<div class="empty-list" id="segTabla">No hay eventos con este filtro.</div>'}
+    <p class="field-help">Toca un evento para llenar su seguimiento.</p>`;
+}
+async function segPintar(list){
+  if(costeoEventoDraft || costeoSub !== 'eventos') return; // hay un evento abierto: no se tapa
+  const body = document.getElementById('costeoDetailBody');
+  if(!SEG.cargado){
+    body.innerHTML = '<div class="empty-note">Cargando el seguimiento…</div>';
+    await segCargar();
+    if(eventosVista !== 'seguimiento' || costeoEventoDraft || costeoSub !== 'eventos') return;
+  }
+  SEG.lista = segOrdenar(list);
+  body.innerHTML = segTablaHtml(SEG.lista);
+  body.querySelectorAll('[data-seg-ev]').forEach(tr => {
+    tr.addEventListener('click', () => segAbrirFicha(tr.dataset.segEv));
+    tr.addEventListener('keydown', ev => { if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); segAbrirFicha(tr.dataset.segEv); } });
+  });
+  const dl = body.querySelector('#segDescargar'); if(dl) dl.addEventListener('click', segDescargar);
+}
+function segAbrirFicha(id){
+  const e = COSTEO_EVENTOS.find(z => z.id === id); if(!e) return;
+  const x = SEG.datos[id] || {}, t = eventoCalcTotals(e), r = restauranteDe(e.restaurante_id);
+  const tipos = [...new Set(Object.values(SEG.datos).map(z => (z.tipo_evento || '').trim()).filter(Boolean))].sort();
+  const sel = (idc, val, ops) => `<select id="${idc}">${ops.map(([v, t]) => `<option value="${v}"${String(val) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+  const sn = (idc, val) => sel(idc, !!val, [['false', 'No'], ['true', 'Sí']]);
+  let m = document.getElementById('segModal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'segModal'; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-box seg-ficha" role="dialog" aria-modal="true" aria-labelledby="segTit">
+    <h3 id="segTit">${escapeHtml(e.cliente || e.nombre || 'Evento')}</h3>
+    <div class="modal-sub">${escapeHtml([e.fecha ? fmtFecha(e.fecha) : 'Sin fecha', e.horario, r && r.name, toNum(e.invitados) ? toNum(e.invitados) + ' PAX' : ''].filter(Boolean).join(' · '))}</div>
+    <div class="seg-datos"><div><span class="field-label">Valor cotizado</span><b>${escapeHtml(fmtMoney(t.total))}</b></div><div><span class="field-label">Anticipo esperado (${toNum(e.anticipo_pct)} %)</span><b>${escapeHtml(fmtMoney(t.anticipo))}</b></div></div>
+    <div class="seg-campos">
+      <div class="field full"><label class="field-label" for="segContacto">Contacto</label><input type="text" id="segContacto" maxlength="160" value="${escapeHtml(x.contacto || '')}" placeholder="Nombre y teléfono"></div>
+      <div class="field"><label class="field-label" for="segTipo">Tipo de evento</label><input type="text" id="segTipo" maxlength="80" list="segTipos" value="${escapeHtml(x.tipo_evento || '')}"><datalist id="segTipos">${tipos.map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist></div>
+      <div class="field"><label class="field-label" for="segMedio">Medio de llegada</label>${sel('segMedio', x.medio_llegada || '', [['', 'Sin definir'], ...Object.entries(SEG_MEDIOS)])}</div>
+      <div class="field"><label class="field-label" for="segExcl">Exclusividad</label>${sn('segExcl', x.exclusividad)}</div>
+      <div class="field"><label class="field-label" for="segAntValor">Anticipo recibido ($)</label><input type="text" inputmode="numeric" id="segAntValor" value="${toNum(x.anticipo_valor) ? escapeHtml(fmtMoney(x.anticipo_valor)) : ''}" placeholder="0"></div>
+      <div class="field"><label class="field-label" for="segAntFecha">Fecha de pago del anticipo</label><input type="date" id="segAntFecha" value="${escapeHtml(x.anticipo_fecha || '')}"></div>
+      <div class="field full"><label class="field-label" for="segAntNota">Nota del anticipo</label><input type="text" id="segAntNota" maxlength="300" value="${escapeHtml(x.anticipo_nota || '')}" placeholder="Ej.: transferencia Bancolombia, falta el saldo"></div>
+      <div class="field"><label class="field-label" for="segConta">Pago aprobado por contabilidad</label>${sel('segConta', !!x.contabilidad_aprobado, [['false', 'No aprobado'], ['true', 'Aprobado']])}${x.contabilidad_aprobado && x.contabilidad_por ? `<span class="field-help">Por ${escapeHtml(x.contabilidad_por)}${x.contabilidad_at ? ' · ' + escapeHtml(new Date(x.contabilidad_at).toLocaleDateString('es-CO')) : ''}</span>` : ''}</div>
+      <div class="field"><label class="field-label" for="segRep">Reporte del evento</label>${sel('segRep', !!x.reporte_enviado, [['false', 'No enviado'], ['true', 'Enviado']])}</div>
+      <div class="field"><label class="field-label" for="segRepFecha">Fecha del reporte</label><input type="date" id="segRepFecha" value="${escapeHtml(x.reporte_fecha || '')}"></div>
+      <div class="field"><label class="field-label" for="segBloq">Bloqueo en reservas</label>${sn('segBloq', x.bloqueo_reservas)}</div>
+      <div class="field"><label class="field-label" for="segFact">Factura</label>${sn('segFact', x.factura)}</div>
+    </div>
+    ${x.actualizado_por ? `<p class="field-help">Último cambio: ${escapeHtml(x.actualizado_por)}${x.updated_at ? ' · ' + escapeHtml(new Date(x.updated_at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : ''}</p>` : ''}
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-seg="cerrar">Cerrar</button><button type="button" class="btn btn-secondary" data-seg="cotizacion">Abrir cotización</button><button type="button" class="btn btn-accent" data-seg="guardar">Guardar</button></div>
+  </div>`;
+  m.classList.add('open');
+  const cerrar = () => { m.classList.remove('open'); m.onclick = null; document.removeEventListener('keydown', esc); };
+  const esc = ev => { if(ev.key === 'Escape') cerrar(); };
+  document.addEventListener('keydown', esc);
+  m.onclick = async ev => {
+    if(ev.target === m){ cerrar(); return; }
+    const b = ev.target.closest('[data-seg]'); if(!b) return;
+    if(b.dataset.seg === 'cerrar') cerrar();
+    else if(b.dataset.seg === 'cotizacion'){ cerrar(); openCosteoEvento(id); }
+    else if(b.dataset.seg === 'guardar'){
+      const v = idc => document.getElementById(idc).value;
+      const valor = Number(String(v('segAntValor')).replace(/[^\d]/g, '')) || null;
+      const fila = {
+        evento_id: id, contacto: v('segContacto').trim() || null, tipo_evento: v('segTipo').trim() || null,
+        medio_llegada: v('segMedio') || null, exclusividad: v('segExcl') === 'true',
+        anticipo_valor: valor, anticipo_fecha: v('segAntFecha') || null, anticipo_nota: v('segAntNota').trim() || null,
+        contabilidad_aprobado: v('segConta') === 'true',
+        reporte_enviado: v('segRep') === 'true', reporte_fecha: v('segRepFecha') || null,
+        bloqueo_reservas: v('segBloq') === 'true', factura: v('segFact') === 'true'
+      };
+      b.disabled = true;
+      const { data, error } = await supa.from('eventos_seguimiento').upsert(fila, { onConflict: 'evento_id' }).select().single();
+      if(error){ b.disabled = false; showToast('No se guardó: ' + error.message, 'danger'); return; }
+      SEG.datos[id] = data;
+      cerrar(); showToast('Seguimiento guardado', 'ok');
+      renderCosteoEventosList();
+    }
+  };
+  setTimeout(() => document.getElementById('segContacto')?.focus(), 50);
+}
+async function segDescargar(){
+  const formato = await elegirFormato('Seguimiento de eventos', EXP_OPC_CSV); if(!formato) return;
+  const sino = v => v ? 'Sí' : 'No';
+  const filas = SEG.lista.map(e => {
+    const x = SEG.datos[e.id] || {}, t = eventoCalcTotals(e), r = restauranteDe(e.restaurante_id);
+    return [e.cliente || e.nombre || '', x.contacto || '', x.tipo_evento || '', toNum(e.invitados), e.fecha || '', e.horario || '', r ? r.name : '',
+      Math.round(t.total), (EVENTO_ESTADOS.find(k => k.key === e.estado) || {}).label || 'Sin estado', SEG_MEDIOS[x.medio_llegada] || '', sino(x.exclusividad),
+      toNum(x.anticipo_valor) || 0, x.anticipo_fecha || '', x.anticipo_nota || '', x.contabilidad_aprobado ? 'Aprobado' : 'No aprobado',
+      x.reporte_enviado ? 'Enviado' : 'No', x.reporte_fecha || '', sino(x.bloqueo_reservas), sino(x.factura)];
+  });
+  await descargarFilas({ formato, horizontal: true, hoja: 'Seguimiento', nombre: 'seguimiento_eventos_' + horHoy(),
+    titulo: 'Seguimiento de eventos', subtitulo: filas.length + ' eventos',
+    cab: ['Cliente / empresa', 'Contacto', 'Tipo de evento', 'PAX', 'Fecha', 'Horario', 'Venue', 'Valor cotizado', 'Estado', 'Medio de llegada', 'Exclusividad',
+      'Anticipo recibido', 'Fecha pago anticipo', 'Nota anticipo', 'Contabilidad', 'Reporte evento', 'Fecha reporte', 'Bloqueo en reservas', 'Factura'], filas });
+}
 let eventosPasadosAbiertos = false;
 let eventosCalMes = (()=>{ const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1); })();
 let eventosCalDia = null; // 'YYYY-MM-DD'
