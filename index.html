@@ -906,6 +906,28 @@ nav.tabs button{position:relative;}
 .mer-hoja{max-width:520px;}
 .mer-monto{font:600 22px 'IBM Plex Mono',monospace; text-align:right; min-height:52px;}
 .mer-chips{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.infs-dos{display:grid; grid-template-columns:minmax(260px,340px) minmax(0,1fr); gap:var(--space-4); align-items:start;}
+@media (max-width:1000px){ .infs-dos{grid-template-columns:1fr;} }
+.infs-cat{display:flex; flex-direction:column; gap:var(--space-3);}
+.infs-grupo{display:flex; flex-direction:column; gap:6px;}
+.infs-item{display:flex; flex-direction:column; gap:2px; text-align:left; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--surface); font:inherit; color:inherit; cursor:pointer;}
+.infs-item b{font-size:14.5px;}
+.infs-item span{font-size:12.5px; color:var(--text-muted);}
+.infs-item:hover{border-color:var(--border-strong);}
+.infs-item[aria-pressed="true"]{border-color:var(--accent); background:var(--accent-soft); box-shadow:var(--focus-ring);}
+.infs-item:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.infs-panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-3); min-width:0;}
+.infs-panel h3{font:700 20px 'Playfair Display',serif; margin:0;}
+.infs-filtros{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:var(--space-2);}
+.infs-filtros label{display:flex; flex-direction:column; gap:4px; min-width:0;}
+.infs-rapidos{display:flex; flex-wrap:wrap; gap:6px;}
+.infs-rapidos button{min-height:36px; padding:0 12px; border-radius:var(--radius-pill); border:1px solid var(--border-strong); background:var(--surface); font:500 13px Inter,sans-serif; color:var(--text); cursor:pointer;}
+.infs-prev{border:1px solid var(--border); border-radius:var(--radius-md); overflow:auto; max-width:100%;}
+.infs-prev table{border-collapse:separate; border-spacing:0; width:100%; font-size:13px;}
+.infs-prev th{background:var(--surface-2); font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.8px; text-transform:uppercase; color:var(--text-muted); text-align:left; padding:8px 10px; white-space:nowrap;}
+.infs-prev td{padding:8px 10px; border-top:1px solid var(--border); white-space:nowrap;}
+.infs-prev td.num{text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.infs-desc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
 .mer-catlist{display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-3);}
 .mer-catrow{display:flex; gap:var(--space-2); align-items:center;}
 .mer-catrow input[type=text]{flex:1;}
@@ -1605,6 +1627,7 @@ nav.tabs button{position:relative;}
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-rrhh" style="display:none" title="Recursos humanos" aria-label="Recursos humanos"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg><span class="tab-label">RRHH</span></button>
+      <button id="tab-informes" style="display:none" title="Informes" aria-label="Informes"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M11 16V8"/><path d="M15 16v-6"/><path d="M19 16V5"/></svg><span class="tab-label">Informes</span></button>
       <button id="tab-mercadeo" style="display:none" title="Mercadeo" aria-label="Mercadeo"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg><span class="tab-label">Mercadeo</span></button>
       <button id="tab-facturas" style="display:none" title="Facturas" aria-label="Facturas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h1"/><path d="M9 17h1"/><path d="M13 13h2"/><path d="M13 17h2"/></svg><span class="tab-label">Facturas</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
@@ -1870,6 +1893,8 @@ nav.tabs button{position:relative;}
     </div>
 
     <div id="view-mercadeo" class="view" style="padding:18px 20px 110px; overflow-y:auto;"><div id="merBox"></div></div>
+
+    <div id="view-informes" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="infsBox"></div></div>
 
     <div id="view-facturas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header"><h2>Facturas</h2></div>
@@ -2911,8 +2936,8 @@ async function onLoggedIn(sess){
   }
 
   let locations;
-  if(esRrhh() || esFacturas() || esMercadeo()){
-    // Recursos humanos / Facturas / Mercadeo: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
+  if(esRrhh() || esFacturas() || esMercadeo() || esInformes()){
+    // Recursos humanos / Facturas / Mercadeo / Informes: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
     const { data: todas, error: tErr } = await supa.from('locations').select('*').order('name');
     if(tErr){ showToast('No se pudieron cargar los puntos.'); return; }
     locations = (todas || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug));
@@ -3018,6 +3043,9 @@ function esFacturas(){ return !!(profile && profile.es_facturas && !profile.is_s
 // Mercadeo: rol global (sql/mercadeo_presupuesto.sql). Solo ve la pestaña Mercadeo, sin accesos por punto.
 function esMercadeo(){ return !!(profile && profile.es_mercadeo && !profile.is_super_admin); }
 function puedeMercadeo(){ return !!(profile && (profile.is_super_admin || profile.es_mercadeo)); }
+// Informes: rol global de solo lectura (sql/informes_perfil.sql). Solo ve la pestaña Informes.
+function esInformes(){ return !!(profile && profile.es_informes && !profile.is_super_admin); }
+function puedeInformes(){ return !!(profile && (profile.is_super_admin || profile.es_informes)); }
 
 /* ---------- RRHH: documentación de vinculación ---------- */
 async function rrhhCargarPuntos(){
@@ -3461,7 +3489,7 @@ async function areaCualquieraDe(locId){
 async function pickAreaForLocation(loc){
   let areas;
   if(esRrhh()) areas = await areasDeRrhh(loc.id);
-  else if(esFacturas() || esMercadeo()) areas = await areaCualquieraDe(loc.id);
+  else if(esFacturas() || esMercadeo() || esInformes()) areas = await areaCualquieraDe(loc.id);
   else {
     const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
     if(error){
@@ -3531,11 +3559,12 @@ function enterArea(loc, area){
   document.getElementById('ctxLoc').textContent = loc.name;
   document.getElementById('userInitial').textContent = (profile.name || session.user.email || '?').trim().charAt(0).toUpperCase();
   const roleBadge = document.getElementById('whoRole');
-  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : esMercadeo() ? 'Mercadeo' : profile.role === 'admin' ? 'Admin' : 'Cocina';
+  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : esMercadeo() ? 'Mercadeo' : esInformes() ? 'Informes' : profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = (profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('tab-mercadeo').style.display = puedeMercadeo() ? '' : 'none';
+  document.getElementById('tab-informes').style.display = puedeInformes() ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -3544,6 +3573,13 @@ function enterArea(loc, area){
     ['tab-chat', 'tab-admin', 'tab-calculadora'].forEach(id => { document.getElementById(id).style.display = 'none'; });
     HOR.subPedida = 'prenomina';
     applyAreaModuleVisibility(['horarios']);
+    return;
+  }
+  if(esInformes()){
+    ['tab-chat', 'tab-admin', 'tab-calculadora', 'tab-rrhh', 'tab-mercadeo'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    applyAreaModuleVisibility([]);
+    document.getElementById('tab-informes').style.display = '';
+    switchTab('informes');
     return;
   }
   if(esMercadeo()){
@@ -4324,8 +4360,9 @@ document.getElementById('tab-horarios').addEventListener('click', ()=>switchTab(
 document.getElementById('tab-rrhh').addEventListener('click', ()=>switchTab('rrhh'));
 document.getElementById('tab-facturas').addEventListener('click', ()=>switchTab('facturas'));
 document.getElementById('tab-mercadeo').addEventListener('click', ()=>switchTab('mercadeo'));
+document.getElementById('tab-informes').addEventListener('click', ()=>switchTab('informes'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -4334,6 +4371,7 @@ function switchTab(name){
   if(name==='admin'){ loadAdminHistory(); if(adminGrupo === 'inicio') adminPintarInicio(); adminActualizarConteos(); }
   if(name==='calculadora') abrirCalculadoraPrecios();
   if(name==='mercadeo') merAbrir();
+  if(name==='informes') infsAbrir();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
@@ -4360,7 +4398,7 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','chat','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','informes','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
   cocina: ['recetario','produccion','pedidos','chat'],
@@ -11666,6 +11704,10 @@ async function loadUsers(){
           <input type="checkbox" data-mercadeo-for="${u.id}" ${u.es_mercadeo?'checked':''}>
           Mercadeo
         </label>
+        <label class="chip-check" title="Solo lectura: descarga informes de todos los puntos y áreas">
+          <input type="checkbox" data-informes-for="${u.id}" ${u.es_informes?'checked':''}>
+          Informes
+        </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
         <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
@@ -11695,6 +11737,7 @@ async function loadUsers(){
       const newRrhh = wrap.querySelector(`[data-rrhh-for="${id}"]`).checked;
       const newFacturas = wrap.querySelector(`[data-facturas-for="${id}"]`).checked;
       const newMercadeo = wrap.querySelector(`[data-mercadeo-for="${id}"]`).checked;
+      const newInformes = wrap.querySelector(`[data-informes-for="${id}"]`).checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
@@ -11705,7 +11748,7 @@ async function loadUsers(){
         superCb.checked = true;
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas, es_mercadeo: newMercadeo }).eq('id', id);
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas, es_mercadeo: newMercadeo, es_informes: newInformes }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
       showToast('Usuario actualizado');
     });
@@ -14116,9 +14159,172 @@ async function merDescargar(gastos){
     cab: ['Restaurante', 'Categoría', 'Presupuesto', 'Gastado', 'Disponible', '% gastado'], filas });
 }
 
+/* ---------- Informes: catálogo de descargas de solo lectura (perfil Informes y super admin) ----------
+   Cada informe: { id, grupo, t, d, rango: 'fechas'|'mes', cargar(f) -> { cab, filas } }. Filtros: punto (o todos),
+   área (o todas) y fechas. Vista previa de las primeras filas y descarga en Excel, PDF o CSV (descargarFilas).
+   Paso 1: Operación (pedidos, por proveedor e insumo, producciones, bajas, inventarios). */
+const INFS = { sel: 'pedidos', locs: [], areas: [], f: { loc: '', area: '', desde: '', hasta: '' }, res: null, cargando: false, listo: false, q: '' };
+async function infsTodas(q){
+  const filas = []; let desde = 0;
+  for(;;){
+    const r = await q().range(desde, desde + 999);
+    if(r.error) throw r.error;
+    filas.push(...(r.data || []));
+    if(!r.data || r.data.length < 1000) break;
+    desde += 1000;
+  }
+  return filas;
+}
+function infsFiltrar(q, campoFecha){
+  const f = INFS.f;
+  if(f.loc) q = q.eq('location_id', f.loc);
+  if(f.area) q = q.eq('area_id', f.area);
+  if(campoFecha){ if(f.desde) q = q.gte(campoFecha, f.desde); if(f.hasta) q = q.lte(campoFecha, f.hasta); }
+  return q;
+}
+const infsLoc = id => (INFS.locs.find(l => l.id === id) || {}).name || '';
+const infsArea = id => (INFS.areas.find(a => a.id === id) || {}).name || (id ? '' : 'Sin área');
+function infsEstadoPedido(o){
+  if(o.status === 'rechazado') return 'Rechazado';
+  if(o.status !== 'aprobado') return 'Por aprobar';
+  if(o.recibido) return 'Recibido';
+  return o.enviado ? 'Por recibir' : 'Por enviar';
+}
+async function infsPedidos(){
+  return infsTodas(() => infsFiltrar(supa.from('orders').select('id, codigo, fecha, proveedor, status, enviado, recibido, urgente, location_id, area_id, creado_por_nombre, order_items(ingredient_code, ingredient_name, cantidad, unidad)'), 'fecha').order('fecha').order('codigo'));
+}
+const INFS_CAT = [
+  { id: 'pedidos', grupo: 'Operación', t: 'Pedidos', d: 'Cada línea: punto, área, código, fecha, proveedor, insumo, cantidad y estado.', async cargar(){
+      const ped = await infsPedidos(), filas = [];
+      ped.forEach(o => (o.order_items || []).forEach(i => filas.push([o.fecha, infsLoc(o.location_id), infsArea(o.area_id), o.codigo || '', o.proveedor || '', i.ingredient_name || '', Number(i.cantidad) || 0, i.unidad || '', infsEstadoPedido(o), o.urgente ? 'Sí' : 'No', o.creado_por_nombre || ''])));
+      return { cab: ['Fecha', 'Punto', 'Área', 'Código', 'Proveedor', 'Insumo', 'Cantidad', 'Unidad', 'Estado', 'Urgente', 'Pidió'], filas };
+  } },
+  { id: 'pedprov', grupo: 'Operación', t: 'Pedidos por proveedor e insumo', d: 'Cantidades sumadas por punto, sin pedidos por aprobar ni rechazados.', async cargar(){
+      const ped = (await infsPedidos()).filter(o => o.status === 'aprobado');
+      const puntos = [...new Set(ped.map(o => o.location_id))].sort((a, b) => infsLoc(a).localeCompare(infsLoc(b)));
+      const m = new Map();
+      ped.forEach(o => (o.order_items || []).forEach(i => {
+        const k = [o.proveedor || '', i.ingredient_name || '', i.unidad || ''].join('|');
+        if(!m.has(k)) m.set(k, { prov: o.proveedor || '', ins: i.ingredient_name || '', uni: i.unidad || '', por: {} });
+        const x = m.get(k); x.por[o.location_id] = (x.por[o.location_id] || 0) + (Number(i.cantidad) || 0);
+      }));
+      const filas = [...m.values()].sort((a, b) => a.prov.localeCompare(b.prov) || a.ins.localeCompare(b.ins))
+        .map(x => [x.prov, x.ins, x.uni, ...puntos.map(l => x.por[l] || 0), puntos.reduce((t, l) => t + (x.por[l] || 0), 0)]);
+      return { cab: ['Proveedor', 'Insumo', 'Unidad', ...puntos.map(infsLoc), 'Total'], filas };
+  } },
+  { id: 'producciones', grupo: 'Operación', t: 'Producciones', d: 'Fecha, receta, cantidad, responsable, si se anuló y si se ingresó al inventario.', async cargar(){
+      const pr = await infsTodas(() => infsFiltrar(supa.from('productions').select('fecha, recipe_code, recipe_name, cantidad_mult, cantidad_label, responsable, status, anulado_motivo, ingresado, observacion, location_id, area_id'), 'fecha').order('fecha').order('created_at'));
+      return { cab: ['Fecha', 'Punto', 'Área', 'Código', 'Receta', 'Cantidad', 'Responsable', 'Estado', 'Motivo anulación', 'Ingresada', 'Observación'],
+        filas: pr.map(x => [x.fecha, infsLoc(x.location_id), infsArea(x.area_id), x.recipe_code || '', x.recipe_name || '', x.cantidad_label || (x.cantidad_mult != null ? 'x' + String(x.cantidad_mult).replace('.', ',') : ''), x.responsable || '', x.status === 'anulado' ? 'Anulada' : 'Válida', x.anulado_motivo || '', x.ingresado ? 'Sí' : 'No', x.observacion || '']) };
+  } },
+  { id: 'bajas', grupo: 'Operación', t: 'Bajas', d: 'Producto, cantidad, causa, detalle y estado.', async cargar(){
+      const b = await infsTodas(() => infsFiltrar(supa.from('bajas').select('fecha, codigo, tipo, item_name, cantidad, unidad, causa, causa_dato, motivo, status, creado_por_nombre, resuelto_por, rechazo_motivo, location_id, area_id'), 'fecha').order('fecha').order('created_at'));
+      return { cab: ['Fecha', 'Punto', 'Área', 'Código', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Causa', 'Detalle', 'Estado', 'Registró', 'Resolvió', 'Motivo del rechazo'],
+        filas: b.map(x => [x.fecha, infsLoc(x.location_id), infsArea(x.area_id), x.codigo || '', x.tipo === 'insumo' ? 'Insumo' : 'Receta preparada', x.item_name || '', Number(x.cantidad) || 0, x.unidad || '',
+          x.causa ? bajaCausaTexto(x) : '', x.motivo || '', (BAJA_ESTADO_LABEL[x.status] || x.status || '').replace(/^./, c => c.toUpperCase()), x.creado_por_nombre || '', x.resuelto_por || '', x.rechazo_motivo || '']) };
+  } },
+  { id: 'inventarios', grupo: 'Operación', t: 'Inventarios', d: 'Conteos por fecha e insumo.', async cargar(){
+      const ses = await infsTodas(() => infsFiltrar(supa.from('inventory_sessions').select('fecha, status, location_id, area_id, creado_por_nombre, inventory_items(item_code, item_name, cantidad, unidad, bodega)'), 'fecha').order('fecha'));
+      const filas = [];
+      ses.forEach(x => (x.inventory_items || []).forEach(i => filas.push([x.fecha, infsLoc(x.location_id), infsArea(x.area_id), i.item_code || '', i.item_name || '', Number(i.cantidad) || 0, i.unidad || '', i.bodega || '', x.status === 'cerrado' ? 'Cerrado' : (x.status || ''), x.creado_por_nombre || ''])));
+      return { cab: ['Fecha', 'Punto', 'Área', 'Código', 'Insumo', 'Cantidad', 'Unidad', 'Bodega', 'Estado del conteo', 'Contó'], filas };
+  } }
+];
+async function infsAbrir(){
+  if(!puedeInformes()) return;
+  const box = document.getElementById('infsBox');
+  if(!INFS.listo){
+    box.innerHTML = '<div class="empty-note">Cargando…</div>';
+    const [l, a] = await Promise.all([supa.from('locations').select('id, name, slug, activo').order('name'), supa.from('areas').select('id, name, location_id').order('name')]);
+    if(l.error || a.error){ box.innerHTML = '<div class="empty-note">No se pudo cargar: ' + escapeHtml((l.error || a.error).message) + '</div>'; return; }
+    INFS.locs = (l.data || []).filter(x => x.activo !== false && !['admin', 'eventos'].includes(x.slug));
+    INFS.areas = a.data || [];
+    const h = new Date(); INFS.f.desde = horIso(new Date(h.getFullYear(), h.getMonth(), 1)); INFS.f.hasta = horHoy();
+    infsEventos(); INFS.listo = true;
+  }
+  infsPintar(); infsCargar();
+}
+function infsPintar(){
+  const box = document.getElementById('infsBox'), inf = INFS_CAT.find(x => x.id === INFS.sel), f = INFS.f, q = INFS.q.trim().toLowerCase();
+  const grupos = [...new Set(INFS_CAT.map(x => x.grupo))];
+  const areas = INFS.areas.filter(a => !f.loc || a.location_id === f.loc);
+  const nombresArea = [...new Set(areas.map(a => a.name))].sort();
+  const r = INFS.res;
+  const prev = INFS.cargando ? '<div class="empty-note">Preparando el informe…</div>'
+    : !r ? '' : r.error ? `<div class="empty-note">No se pudo cargar: ${escapeHtml(r.error)}</div>`
+    : !r.filas.length ? '<div class="empty-note">No hay datos con esos filtros.</div>'
+    : `<div class="infs-prev"><table><thead><tr>${r.cab.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${r.filas.slice(0, 8).map(fl => `<tr>${fl.map(v => `<td${typeof v === 'number' ? ' class="num"' : ''}>${escapeHtml(typeof v === 'number' ? v.toLocaleString('es-CO') : v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <span class="field-help">${r.filas.length.toLocaleString('es-CO')} fila${r.filas.length === 1 ? '' : 's'} en total${r.filas.length > 8 ? ' · aquí se ven las primeras 8' : ''}</span>`;
+  box.innerHTML = `<div class="admin-header"><h2>Informes</h2></div>
+    <div class="infs-dos">
+      <section class="infs-cat" aria-label="Catálogo de informes"><input type="search" id="infsBuscar" placeholder="Buscar informe…" aria-label="Buscar informe" value="${escapeHtml(INFS.q)}">
+        ${grupos.map(g => { const l = INFS_CAT.filter(x => x.grupo === g && (!q || (x.t + ' ' + x.d).toLowerCase().includes(q))); return l.length ? `<div class="infs-grupo"><span class="field-label">${escapeHtml(g)}</span>${l.map(x => `<button type="button" class="infs-item" data-infs="${x.id}" aria-pressed="${x.id === INFS.sel}"><b>${escapeHtml(x.t)}</b><span>${escapeHtml(x.d)}</span></button>`).join('')}</div>` : ''; }).join('')}
+        <p class="field-help">Pronto: horarios y nómina, eventos, mercadeo y costos.</p></section>
+      <section class="infs-panel" aria-live="polite"><h3>${escapeHtml(inf.t)}</h3><p class="field-help">${escapeHtml(inf.d)}</p>
+        <div class="infs-filtros">
+          <label><span class="field-label">Punto</span><select id="infsLoc"><option value="">Todos los puntos</option>${INFS.locs.map(l => `<option value="${l.id}"${l.id === f.loc ? ' selected' : ''}>${escapeHtml(l.name)}</option>`).join('')}</select></label>
+          <label><span class="field-label">Área</span><select id="infsArea"><option value="">Todas las áreas</option>${f.loc ? areas.map(a => `<option value="${a.id}"${a.id === f.area ? ' selected' : ''}>${escapeHtml(a.name)}</option>`).join('') : nombresArea.map(n => `<option value="nombre:${escapeHtml(n)}"${f.area === 'nombre:' + n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
+          <label><span class="field-label">Desde</span><input type="date" id="infsDesde" value="${escapeHtml(f.desde)}"></label>
+          <label><span class="field-label">Hasta</span><input type="date" id="infsHasta" value="${escapeHtml(f.hasta)}"></label>
+        </div>
+        <div class="infs-rapidos" role="group" aria-label="Rango rápido">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['ant', 'Mes pasado']].map(([k, t]) => `<button type="button" data-infs-r="${k}">${t}</button>`).join('')}</div>
+        ${prev}
+        <div class="infs-desc"><button type="button" class="btn btn-accent" data-infs-dl="xlsx"${r && r.filas && r.filas.length ? '' : ' disabled'}>Descargar Excel</button><button type="button" class="btn btn-secondary" data-infs-dl="pdf"${r && r.filas && r.filas.length ? '' : ' disabled'}>PDF</button><button type="button" class="btn btn-secondary" data-infs-dl="csv"${r && r.filas && r.filas.length ? '' : ' disabled'}>CSV</button></div>
+      </section>
+    </div>`;
+}
+async function infsCargar(){
+  const inf = INFS_CAT.find(x => x.id === INFS.sel), turno = (INFS.turno = (INFS.turno || 0) + 1);
+  INFS.cargando = true; INFS.res = null; infsPintar();
+  // Área por nombre (con "Todos los puntos"): se filtra después de cargar, por todas las áreas con ese nombre.
+  const areaNombre = INFS.f.area.startsWith('nombre:') ? INFS.f.area.slice(7) : null, areaGuardada = INFS.f.area;
+  if(areaNombre) INFS.f.area = '';
+  let res;
+  try { res = await inf.cargar(); }
+  catch(e){ res = { error: e.message || String(e) }; }
+  finally { INFS.f.area = areaGuardada; }
+  if(turno !== INFS.turno) return;
+  if(areaNombre && res.filas){ const i = res.cab.indexOf('Área'); if(i >= 0) res.filas = res.filas.filter(fl => fl[i] === areaNombre); }
+  INFS.res = res; INFS.cargando = false; infsPintar();
+}
+function infsEventos(){
+  const box = document.getElementById('infsBox');
+  box.addEventListener('click', async e => {
+    const it = e.target.closest('[data-infs]'); if(it){ INFS.sel = it.dataset.infs; infsCargar(); return; }
+    const rr = e.target.closest('[data-infs-r]');
+    if(rr){
+      const h = new Date(), k = rr.dataset.infsR, f = INFS.f;
+      if(k === 'hoy'){ f.desde = f.hasta = horHoy(); }
+      else if(k === 'semana'){ f.desde = horIso(horLunesDe(h)); f.hasta = horHoy(); }
+      else if(k === 'mes'){ f.desde = horIso(new Date(h.getFullYear(), h.getMonth(), 1)); f.hasta = horHoy(); }
+      else { f.desde = horIso(new Date(h.getFullYear(), h.getMonth() - 1, 1)); f.hasta = horIso(new Date(h.getFullYear(), h.getMonth(), 0)); }
+      infsCargar(); return;
+    }
+    const dl = e.target.closest('[data-infs-dl]');
+    if(dl && INFS.res && INFS.res.filas){
+      const inf = INFS_CAT.find(x => x.id === INFS.sel), f = INFS.f, r = INFS.res;
+      const lugar = [f.loc ? infsLoc(f.loc) : 'Todos los puntos', f.area ? (f.area.startsWith('nombre:') ? f.area.slice(7) : infsArea(f.area)) : 'todas las áreas'].join(' · ');
+      dl.disabled = true;
+      try { await descargarFilas({ formato: dl.dataset.infsDl, horizontal: r.cab.length > 7, hoja: inf.t.slice(0, 30), nombre: inf.id + '_' + (f.desde || 'inicio') + '_' + (f.hasta || 'hoy'),
+        titulo: inf.t, subtitulo: lugar + ' · ' + (f.desde ? fmtFecha(f.desde) : 'inicio') + ' a ' + (f.hasta ? fmtFecha(f.hasta) : 'hoy') + ' · ' + r.filas.length + ' filas', cab: r.cab, filas: r.filas }); }
+      catch(err){ showToast('No se pudo descargar: ' + err.message, 'danger'); }
+      dl.disabled = false;
+    }
+  });
+  box.addEventListener('change', e => {
+    const f = INFS.f;
+    if(e.target.id === 'infsLoc'){ f.loc = e.target.value; f.area = ''; infsCargar(); }
+    else if(e.target.id === 'infsArea'){ f.area = e.target.value; infsCargar(); }
+    else if(e.target.id === 'infsDesde'){ f.desde = e.target.value; infsCargar(); }
+    else if(e.target.id === 'infsHasta'){ f.hasta = e.target.value; infsCargar(); }
+  });
+  box.addEventListener('input', e => { if(e.target.id === 'infsBuscar'){ INFS.q = e.target.value; const pos = e.target.selectionStart; infsPintar(); const b = document.getElementById('infsBuscar'); b.focus(); b.setSelectionRange(pos, pos); } });
+}
+
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
   if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
+  if(esInformes()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-informes').style.display = ''; switchTab('informes'); return; }
   if(esMercadeo()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-mercadeo').style.display = ''; switchTab('mercadeo'); return; }
   if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-facturas').style.display = ''; switchTab('facturas'); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
