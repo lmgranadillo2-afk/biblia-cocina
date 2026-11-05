@@ -6204,10 +6204,9 @@ function prenConfirmarSinCerrar(grupos){
   });
 }
 const prenPendientes = res => res.filter(r => r.prog > 0).map(r => ({ nombre: r.p.nombre, dias: r.prog }));
-async function prenCsvTodos(btn){
-  const per = PREN.datos.per;
-  const formato = await elegirFormato('Pre-nómina de todos los puntos', EXP_OPC_CSV); if(!formato) return;
-  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Armando…';
+const PREN_CAB_TODOS = () => ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Días compensatorio', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
+// Arma la pre-nómina de todas las áreas con Horarios de todos los puntos (la usan Pre-nómina e Informes).
+async function prenFilasTodos(per){
   const guardado = { areaId: HOR.areaId, cfg: HOR.cfg, estaciones: HOR.estaciones, personal: HOR.personal, turnos: HOR.turnos };
   const filas = [], grupos = [];
   try {
@@ -6236,11 +6235,19 @@ async function prenCsvTodos(btn){
     }
   } finally {
     Object.assign(HOR, guardado);
-    btn.disabled = false; btn.textContent = txt;
   }
+  return { cab: PREN_CAB_TODOS(), filas, grupos };
+}
+async function prenCsvTodos(btn){
+  const per = PREN.datos.per;
+  const formato = await elegirFormato('Pre-nómina de todos los puntos', EXP_OPC_CSV); if(!formato) return;
+  btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Armando…';
+  let todo;
+  try { todo = await prenFilasTodos(per); }
+  finally { btn.disabled = false; btn.textContent = txt; }
+  const { filas, grupos, cab } = todo;
   if(!filas.length){ showToast('No hay personal cargado en ningún área para esta quincena', 'warn'); return; }
   if(!(await prenConfirmarSinCerrar(grupos))) return;
-  const cab = ['Punto', 'Área', 'Persona', 'Estación', 'Cargo', 'Salario fijo', 'Días trabajados', ...PREN_CATS.map(c => c[2]), 'Días incapacidad', 'Días vacaciones', 'Días permiso remunerado', 'Días permiso no remunerado', 'Días calamidad', 'Días compensatorio', 'Faltas', 'Llegadas tarde', 'Minutos tarde', 'Días sin cerrar', 'Quincena', 'Salario', 'Valor hora', 'Valor recargos y extras'];
   await descargarFilas({ formato, cab, filas, horizontal: true, hoja: 'Pre-nómina',
     nombre: 'prenomina_todos_los_puntos_' + horIso(per.desde) + '_al_' + horIso(per.hasta),
     titulo: 'Pre-nómina · todos los puntos', subtitulo: 'Quincena ' + horIso(per.desde) + ' a ' + horIso(per.hasta) + ' · ' + filas.length + ' personas',
@@ -9768,7 +9775,7 @@ async function segPintar(list){
     tr.addEventListener('keydown', ev => { if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); segAbrirFicha(tr.dataset.segEv); } });
   });
   const dl = body.querySelector('#segDescargar'); if(dl) dl.addEventListener('click', segDescargar);
-  const inf = body.querySelector('#segInforme'); if(inf) inf.addEventListener('click', () => infAbrir());
+  const inf = body.querySelector('#segInforme'); if(inf) inf.addEventListener('click', () => { INF.fuente = null; INF.rests = null; infAbrir(); });
 }
 function segAbrirFicha(id){
   const e = COSTEO_EVENTOS.find(z => z.id === id); if(!e) return;
@@ -9853,13 +9860,13 @@ function segAbrirFicha(id){
    personas (PAX) y valor cotizado (segValor); sin comparación con el mes anterior; lo descargan los que ven Seguimiento.
    Se ve como una hoja con portada, cifras, gráfico por restaurante y tablas; se descarga como PDF con el mismo diseño
    (html2canvas + jsPDF), imagen PNG para WhatsApp o Excel con los datos. */
-const INF = { mes: null };
+const INF = { mes: null, fuente: null, rests: null };  // fuente/rests: los pone la pestaña Informes
 function infDatos(){
   const ini = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth(), 1)), fin = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth() + 1, 0));
-  const ev = COSTEO_EVENTOS.filter(e => e.estado === 'confirmado' && e.fecha && e.fecha >= ini && e.fecha <= fin)
-    .map(e => ({ e, fecha: e.fecha, cliente: e.cliente || e.nombre || '', rest: (restauranteDe(e.restaurante_id) || {}).name || 'Sin restaurante', rid: e.restaurante_id || '-', pax: toNum(e.invitados), valor: segValor(e) }))
+  const ev = (INF.fuente || COSTEO_EVENTOS).filter(e => e.estado === 'confirmado' && e.fecha && e.fecha >= ini && e.fecha <= fin)
+    .map(e => ({ e, fecha: e.fecha, cliente: e.cliente || e.nombre || '', rest: ((INF.rests || []).find(r => r.id === e.restaurante_id) || restauranteDe(e.restaurante_id) || {}).name || 'Sin restaurante', rid: e.restaurante_id || '-', pax: toNum(e.invitados), valor: segValor(e) }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.cliente.localeCompare(b.cliente));
-  const rests = (RESTAURANTES.length ? RESTAURANTES : []).map(r => ({ id: r.id, nombre: r.name }));
+  const rests = (INF.rests || RESTAURANTES || []).map(r => ({ id: r.id, nombre: r.name }));
   ev.forEach(x => { if(!rests.some(r => r.id === x.rid)) rests.push({ id: x.rid, nombre: x.rest }); });
   const porRest = rests.map(r => { const l = ev.filter(x => x.rid === r.id); return { nombre: r.nombre, n: l.length, pax: l.reduce((t, x) => t + x.pax, 0), valor: l.reduce((t, x) => t + x.valor, 0) }; });
   return { ev, porRest, n: ev.length, pax: ev.reduce((t, x) => t + x.pax, 0), valor: ev.reduce((t, x) => t + x.valor, 0) };
@@ -14163,7 +14170,7 @@ async function merDescargar(gastos){
    Cada informe: { id, grupo, t, d, rango: 'fechas'|'mes', cargar(f) -> { cab, filas } }. Filtros: punto (o todos),
    área (o todas) y fechas. Vista previa de las primeras filas y descarga en Excel, PDF o CSV (descargarFilas).
    Paso 1: Operación (pedidos, por proveedor e insumo, producciones, bajas, inventarios). */
-const INFS = { sel: 'pedidos', locs: [], areas: [], f: { loc: '', area: '', desde: '', hasta: '' }, res: null, cargando: false, listo: false, q: '' };
+const INFS = { sel: 'pedidos', locs: [], areas: [], f: { loc: '', area: '', desde: '', hasta: '' }, res: null, cargando: false, listo: false, q: '', quincena: null, personal: null };
 async function infsTodas(q){
   const filas = []; let desde = 0;
   for(;;){
@@ -14183,6 +14190,30 @@ function infsFiltrar(q, campoFecha){
   return q;
 }
 const infsLoc = id => (INFS.locs.find(l => l.id === id) || {}).name || '';
+// Áreas que cumplen el filtro (null = todas). Para tablas que solo tienen area_id (horarios).
+function infsAreasIds(){
+  const f = INFS.f;
+  if(f.area && !f.area.startsWith('nombre:')) return [f.area];
+  let l = INFS.areas;
+  if(f.loc) l = l.filter(a => a.location_id === f.loc);
+  if(f.area.startsWith('nombre:')) l = l.filter(a => a.name === f.area.slice(7));
+  return f.loc || f.area ? l.map(a => a.id) : null;
+}
+async function infsPersonal(){
+  if(INFS.personal) return;
+  const [pe, es] = await Promise.all([infsTodas(() => supa.from('horario_personal').select('id, nombre, estacion_id, area_id, orden')), infsTodas(() => supa.from('horario_estaciones').select('id, nombre'))]);
+  INFS.personal = {}; pe.forEach(x => { INFS.personal[x.id] = { nombre: x.nombre, orden: x.orden, estacion: (es.find(e => e.id === x.estacion_id) || {}).nombre || '' }; });
+}
+// Eventos con su seguimiento (deja SEG.datos lleno para segValor).
+async function infsEventos(){
+  const f = INFS.f;
+  const [ev, sg] = await Promise.all([
+    infsTodas(() => { let q = supa.from('costeo_eventos').select('*'); if(f.loc) q = q.eq('restaurante_id', f.loc); return q.order('fecha', { ascending: true, nullsFirst: false }).order('id'); }),
+    infsTodas(() => supa.from('eventos_seguimiento').select('*'))
+  ]);
+  sg.forEach(x => { SEG.datos[x.evento_id] = x; });
+  return ev;
+}
 const infsArea = id => (INFS.areas.find(a => a.id === id) || {}).name || (id ? '' : 'Sin área');
 function infsEstadoPedido(o){
   if(o.status === 'rechazado') return 'Rechazado';
@@ -14223,6 +14254,97 @@ const INFS_CAT = [
         filas: b.map(x => [x.fecha, infsLoc(x.location_id), infsArea(x.area_id), x.codigo || '', x.tipo === 'insumo' ? 'Insumo' : 'Receta preparada', x.item_name || '', Number(x.cantidad) || 0, x.unidad || '',
           x.causa ? bajaCausaTexto(x) : '', x.motivo || '', (BAJA_ESTADO_LABEL[x.status] || x.status || '').replace(/^./, c => c.toUpperCase()), x.creado_por_nombre || '', x.resuelto_por || '', x.rechazo_motivo || '']) };
   } },
+  { id: 'horarios', grupo: 'Horarios y nómina', t: 'Horarios publicados', d: 'Por semana: persona por día (turno, descanso o novedad) y horas.', sinArea: false, async cargar(){
+      const ids = infsAreasIds(), f = INFS.f;
+      const lunesD = f.desde ? horIso(horLunesDe(new Date(f.desde + 'T12:00'))) : null;
+      const sem = await infsTodas(() => { let q = supa.from('horario_semanas').select('id, area_id, lunes, estado').eq('estado', 'publicada'); if(ids) q = q.in('area_id', ids); if(lunesD) q = q.gte('lunes', lunesD); if(f.hasta) q = q.lte('lunes', f.hasta); return q.order('lunes'); });
+      if(!sem.length) return { cab: [], filas: [] };
+      await infsPersonal();
+      const asig = [];
+      for(let i = 0; i < sem.length; i += 50) asig.push(...await infsTodas(() => supa.from('horario_asignaciones').select('semana_id, personal_id, dia, tipo, codigo, horas').in('semana_id', sem.slice(i, i + 50).map(x => x.id))));
+      const areasSem = [...new Set(sem.map(x => x.area_id))];
+      const nov = await infsTodas(() => supa.from('horario_novedades').select('personal_id, tipo, desde, hasta').in('area_id', areasSem).neq('tipo', 'retardo').lte('desde', prenSumarDias(sem[sem.length - 1].lunes, 6)).gte('hasta', sem[0].lunes));
+      const filas = [];
+      sem.forEach(se => {
+        const personas = [...new Set(asig.filter(a => a.semana_id === se.id).map(a => a.personal_id))];
+        personas.map(pid => INFS.personal[pid] || { nombre: '?', orden: 0 }).forEach((pp, k) => {
+          const pid = personas[k]; let horas = 0;
+          const dias = [1, 2, 3, 4, 5, 6, 7].map(d => {
+            const fecha = prenSumarDias(se.lunes, d - 1), n = nov.find(x => x.personal_id === pid && x.desde <= fecha && x.hasta >= fecha);
+            if(n) return HOR_TIPOS[n.tipo] || n.tipo;
+            const a = asig.find(x => x.semana_id === se.id && x.personal_id === pid && x.dia === d);
+            if(!a) return '';
+            if(a.tipo === 'descanso') return 'Descanso';
+            horas += Number(a.horas) || 0; return a.codigo || '';
+          });
+          const ar = INFS.areas.find(a => a.id === se.area_id) || {};
+          filas.push([se.lunes, infsLoc(ar.location_id), ar.name || '', pp.nombre, pp.estacion || '', ...dias, Math.round(horas * 100) / 100]);
+        });
+      });
+      filas.sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]) || a[2].localeCompare(b[2]) || a[3].localeCompare(b[3]));
+      return { cab: ['Semana (lunes)', 'Punto', 'Área', 'Persona', 'Estación', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom', 'Horas'], filas };
+  } },
+  { id: 'asistencia', grupo: 'Horarios y nómina', t: 'Registro de asistencia', d: 'Por día: asistió, llegó tarde o faltó, minutos tarde, horas reales y si el turno se cerró.', async cargar(){
+      const ids = infsAreasIds(), f = INFS.f;
+      const reg = await infsTodas(() => { let q = supa.from('horario_registro_dia').select('area_id, personal_id, fecha, estado, minutos_tarde, horas_reales, extra, cerrado, nota'); if(ids) q = q.in('area_id', ids); if(f.desde) q = q.gte('fecha', f.desde); if(f.hasta) q = q.lte('fecha', f.hasta); return q.order('fecha'); });
+      await infsPersonal();
+      const est = { asistio: 'Asistió', tarde: 'Tarde', falto: 'Faltó' };
+      return { cab: ['Fecha', 'Punto', 'Área', 'Persona', 'Estado', 'Minutos tarde', 'Horas reales', 'Extra', 'Turno cerrado', 'Nota'],
+        filas: reg.map(x => { const ar = INFS.areas.find(a => a.id === x.area_id) || {}; return [x.fecha, infsLoc(ar.location_id), ar.name || '', (INFS.personal[x.personal_id] || {}).nombre || '?', est[x.estado] || x.estado || '', Number(x.minutos_tarde) || 0, x.horas_reales != null ? Number(x.horas_reales) : '', x.extra != null ? Number(x.extra) : '', x.cerrado ? 'Sí' : 'No', x.nota || '']; })
+          .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]) || a[3].localeCompare(b[3])) };
+  } },
+  { id: 'prenomina', grupo: 'Horarios y nómina', t: 'Pre-nómina por quincena', d: 'Todos los puntos: horas por tipo, novedades, salario y valor de recargos y extras.', sensible: true, rango: 'quincena', async cargar(){
+      const per = prenPeriodos().find(x => x.id === INFS.quincena) || prenPeriodos()[0];
+      const r = await prenFilasTodos(per);
+      return { cab: r.cab, filas: r.filas.filter(fl => (!INFS.f.loc || fl[0] === infsLoc(INFS.f.loc)) && (!INFS.f.area || INFS.f.area.startsWith('nombre:') || fl[1] === infsArea(INFS.f.area))) };
+  } },
+  { id: 'seguimiento', grupo: 'Eventos', t: 'Seguimiento de eventos', d: 'Cliente, contacto, PAX, fecha, restaurante, valor cotizado, estado, anticipo, contabilidad y factura.', sensible: true, sinArea: true, async cargar(){
+      const ev = await infsEventos(), f = INFS.f, sino = v => v ? 'Sí' : 'No';
+      return { cab: ['Fecha', 'Cliente / empresa', 'Contacto', 'Tipo de evento', 'PAX', 'Horario', 'Restaurante', 'Valor cotizado', 'Estado', 'Detalle del estado', 'Medio de llegada', 'Referido por', 'Exclusividad', 'Anticipo recibido', 'Fecha pago anticipo', 'Contabilidad', 'Reporte evento', 'Bloqueo en reservas', 'Tabla de abonos', 'Factura'],
+        filas: ev.filter(e => (!f.desde || (e.fecha && e.fecha >= f.desde)) && (!f.hasta || (e.fecha && e.fecha <= f.hasta)))
+          .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
+          .map(e => { const x = SEG.datos[e.id] || {}; return [e.fecha || '', e.cliente || e.nombre || '', x.contacto || '', x.tipo_evento || '', toNum(e.invitados), e.horario || '', infsLoc(e.restaurante_id), Math.round(segValor(e)),
+            (EVENTO_ESTADOS.find(k => k.key === e.estado) || {}).label || 'Sin estado', x.estado_detalle || '', SEG_MEDIOS[x.medio_llegada] || '', x.referido_por || '', sino(x.exclusividad),
+            toNum(x.anticipo_valor) || 0, x.anticipo_fecha || '', x.contabilidad_aprobado ? 'Aprobado' : 'No aprobado', x.reporte_enviado ? 'Enviado' : 'No', sino(x.bloqueo_reservas), sino(x.tabla_abonos), sino(x.factura)]; }) };
+  } },
+  { id: 'infmes', grupo: 'Eventos', t: 'Informe mensual de confirmados', d: 'El informe con diseño de Seguimiento: eventos confirmados del mes, PAX y valor (PDF, imagen o Excel).', sinArea: true, rango: 'mes', abre: true },
+  { id: 'mercadeo', grupo: 'Mercadeo y costos', t: 'Mercadeo: presupuesto y gastado', d: 'Por mes, restaurante y categoría: presupuesto, gastado, disponible y porcentaje.', sinArea: true, async cargar(){
+      const f = INFS.f, mIni = (f.desde || '2000-01-01').slice(0, 7) + '-01', mFin = (f.hasta || horHoy()).slice(0, 7) + '-01';
+      const [pr, ga, ca] = await Promise.all([
+        infsTodas(() => { let q = supa.from('mercadeo_presupuestos').select('location_id, mes, categoria, valor').gte('mes', mIni).lte('mes', mFin); if(f.loc) q = q.eq('location_id', f.loc); return q; }),
+        infsTodas(() => { let q = supa.from('mercadeo_gastos').select('location_id, fecha, categoria, valor'); if(f.desde) q = q.gte('fecha', f.desde); if(f.hasta) q = q.lte('fecha', f.hasta); if(f.loc) q = q.eq('location_id', f.loc); return q; }),
+        supa.from('mercadeo_categorias').select('clave, nombre, orden').order('orden')
+      ]);
+      const cat = k => ((ca.data || []).find(c => c.clave === k) || {}).nombre || k, m = new Map();
+      const fila = (mes, loc, c) => { const k = mes + '|' + loc + '|' + c; if(!m.has(k)) m.set(k, { mes, loc, c, p: 0, g: 0 }); return m.get(k); };
+      pr.forEach(x => { fila(x.mes.slice(0, 7), x.location_id, x.categoria).p += Number(x.valor) || 0; });
+      ga.forEach(x => { fila(x.fecha.slice(0, 7), x.location_id, x.categoria).g += Number(x.valor) || 0; });
+      return { cab: ['Mes', 'Restaurante', 'Categoría', 'Presupuesto', 'Gastado', 'Disponible', '% gastado'],
+        filas: [...m.values()].sort((a, b) => a.mes.localeCompare(b.mes) || infsLoc(a.loc).localeCompare(infsLoc(b.loc)) || cat(a.c).localeCompare(cat(b.c)))
+          .map(x => [x.mes, infsLoc(x.loc), cat(x.c), x.p, x.g, x.p - x.g, x.p ? Math.round(x.g / x.p * 100) : '']) };
+  } },
+  { id: 'mercgastos', grupo: 'Mercadeo y costos', t: 'Gastos de mercadeo', d: 'Cada gasto: fecha, restaurante, categoría, detalle, valor y si tiene soporte.', sinArea: true, async cargar(){
+      const f = INFS.f;
+      const [ga, ca] = await Promise.all([
+        infsTodas(() => { let q = supa.from('mercadeo_gastos').select('location_id, fecha, categoria, valor, detalle, soporte_path, creado_por'); if(f.desde) q = q.gte('fecha', f.desde); if(f.hasta) q = q.lte('fecha', f.hasta); if(f.loc) q = q.eq('location_id', f.loc); return q.order('fecha'); }),
+        supa.from('mercadeo_categorias').select('clave, nombre')
+      ]);
+      const cat = k => ((ca.data || []).find(c => c.clave === k) || {}).nombre || k;
+      return { cab: ['Fecha', 'Restaurante', 'Categoría', 'Detalle', 'Valor', 'Soporte', 'Registró'], filas: ga.map(x => [x.fecha, infsLoc(x.location_id), cat(x.categoria), x.detalle || '', Number(x.valor) || 0, x.soporte_path ? 'Sí' : 'No', x.creado_por || '']) };
+  } },
+  { id: 'carta', grupo: 'Mercadeo y costos', t: 'Carta: costo, precio y margen', d: 'Productos activos de la carta de cada restaurante con su costo, precio, margen y food cost.', sensible: true, sinArea: true, sinFechas: true, async cargar(){
+      const it = await infsTodas(() => { let q = supa.from('carta_items').select('location_id, categoria, nombre, precio, costo, activo').eq('activo', true); if(INFS.f.loc) q = q.eq('location_id', INFS.f.loc); return q.order('categoria').order('nombre'); });
+      return { cab: ['Restaurante', 'Categoría', 'Producto', 'Precio', 'Costo', 'Margen', 'Food cost %'],
+        filas: it.map(x => { const pr = Number(x.precio) || 0, co = x.costo != null ? Number(x.costo) : null; return [infsLoc(x.location_id), x.categoria || '', x.nombre || '', pr, co != null ? co : '', co != null ? pr - co : '', co != null && pr ? Math.round(co / pr * 1000) / 10 : '']; })
+          .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]) || a[2].localeCompare(b[2])) };
+  } },
+  { id: 'foodcost', grupo: 'Mercadeo y costos', t: 'Food cost', d: 'Informes mensuales de food cost por restaurante: ventas netas, costo y porcentaje teórico y real.', sensible: true, sinArea: true, async cargar(){
+      const f = INFS.f, mIni = (f.desde || '2000-01-01').slice(0, 7) + '-01', mFin = (f.hasta || horHoy()).slice(0, 7) + '-01';
+      const fc = await infsTodas(() => { let q = supa.from('foodcost_informes').select('location_id, mes, datos, origen, generado').gte('mes', mIni).lte('mes', mFin); if(f.loc) q = q.eq('location_id', f.loc); return q.order('mes'); });
+      const n = v => v == null || v === '' ? '' : Number(v);
+      return { cab: ['Mes', 'Restaurante', 'Ventas netas', 'Costo teórico', 'Food cost teórico %', 'Costo real', 'Food cost real %', 'Mermas', 'Origen', 'Generado'],
+        filas: fc.map(x => { const d = x.datos || {}; return [x.mes.slice(0, 7), infsLoc(x.location_id), n(d.ventas_netas), n(d.costo_teorico), n(d.foodcost_teorico), n(d.costo_real), n(d.foodcost_real), n(d.merma_valor), x.origen === 'automatico' ? 'Automático' : 'Manual', x.generado ? fmtFecha(String(x.generado).slice(0, 10)) : '']; }) };
+  } },
   { id: 'inventarios', grupo: 'Operación', t: 'Inventarios', d: 'Conteos por fecha e insumo.', async cargar(){
       const ses = await infsTodas(() => infsFiltrar(supa.from('inventory_sessions').select('fecha, status, location_id, area_id, creado_por_nombre, inventory_items(item_code, item_name, cantidad, unidad, bodega)'), 'fecha').order('fecha'));
       const filas = [];
@@ -14255,26 +14377,30 @@ function infsPintar(){
     : !r.filas.length ? '<div class="empty-note">No hay datos con esos filtros.</div>'
     : `<div class="infs-prev"><table><thead><tr>${r.cab.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${r.filas.slice(0, 8).map(fl => `<tr>${fl.map(v => `<td${typeof v === 'number' ? ' class="num"' : ''}>${escapeHtml(typeof v === 'number' ? v.toLocaleString('es-CO') : v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <span class="field-help">${r.filas.length.toLocaleString('es-CO')} fila${r.filas.length === 1 ? '' : 's'} en total${r.filas.length > 8 ? ' · aquí se ven las primeras 8' : ''}</span>`;
+  const quincenas = prenPeriodos(); if(!INFS.quincena) INFS.quincena = quincenas[0].id;
   box.innerHTML = `<div class="admin-header"><h2>Informes</h2></div>
     <div class="infs-dos">
       <section class="infs-cat" aria-label="Catálogo de informes"><input type="search" id="infsBuscar" placeholder="Buscar informe…" aria-label="Buscar informe" value="${escapeHtml(INFS.q)}">
         ${grupos.map(g => { const l = INFS_CAT.filter(x => x.grupo === g && (!q || (x.t + ' ' + x.d).toLowerCase().includes(q))); return l.length ? `<div class="infs-grupo"><span class="field-label">${escapeHtml(g)}</span>${l.map(x => `<button type="button" class="infs-item" data-infs="${x.id}" aria-pressed="${x.id === INFS.sel}"><b>${escapeHtml(x.t)}</b><span>${escapeHtml(x.d)}</span></button>`).join('')}</div>` : ''; }).join('')}
-        <p class="field-help">Pronto: horarios y nómina, eventos, mercadeo y costos.</p></section>
-      <section class="infs-panel" aria-live="polite"><h3>${escapeHtml(inf.t)}</h3><p class="field-help">${escapeHtml(inf.d)}</p>
+        </section>
+      <section class="infs-panel" aria-live="polite"><h3>${escapeHtml(inf.t)}</h3><p class="field-help">${escapeHtml(inf.d)}</p>${inf.sensible ? '<span class="badge warn">Incluye datos sensibles</span>' : ''}
         <div class="infs-filtros">
           <label><span class="field-label">Punto</span><select id="infsLoc"><option value="">Todos los puntos</option>${INFS.locs.map(l => `<option value="${l.id}"${l.id === f.loc ? ' selected' : ''}>${escapeHtml(l.name)}</option>`).join('')}</select></label>
-          <label><span class="field-label">Área</span><select id="infsArea"><option value="">Todas las áreas</option>${f.loc ? areas.map(a => `<option value="${a.id}"${a.id === f.area ? ' selected' : ''}>${escapeHtml(a.name)}</option>`).join('') : nombresArea.map(n => `<option value="nombre:${escapeHtml(n)}"${f.area === 'nombre:' + n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>
-          <label><span class="field-label">Desde</span><input type="date" id="infsDesde" value="${escapeHtml(f.desde)}"></label>
-          <label><span class="field-label">Hasta</span><input type="date" id="infsHasta" value="${escapeHtml(f.hasta)}"></label>
+          ${inf.sinArea ? '' : `<label><span class="field-label">Área</span><select id="infsArea"><option value="">Todas las áreas</option>${f.loc ? areas.map(a => `<option value="${a.id}"${a.id === f.area ? ' selected' : ''}>${escapeHtml(a.name)}</option>`).join('') : nombresArea.map(n => `<option value="nombre:${escapeHtml(n)}"${f.area === 'nombre:' + n ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select></label>`}
+          ${inf.rango === 'quincena' ? `<label><span class="field-label">Quincena</span><select id="infsQuincena">${quincenas.map(q => `<option value="${q.id}"${q.id === INFS.quincena ? ' selected' : ''}>${escapeHtml(fmtFecha(horIso(q.desde)) + ' a ' + fmtFecha(horIso(q.hasta)))}${q.actual ? ' (en curso)' : ''}</option>`).join('')}</select></label>`
+            : inf.rango === 'mes' ? `<label><span class="field-label">Mes</span><input type="month" id="infsMes" value="${escapeHtml((f.desde || horHoy()).slice(0, 7))}"></label>`
+            : inf.sinFechas ? '' : `<label><span class="field-label">Desde</span><input type="date" id="infsDesde" value="${escapeHtml(f.desde)}"></label>
+          <label><span class="field-label">Hasta</span><input type="date" id="infsHasta" value="${escapeHtml(f.hasta)}"></label>`}
         </div>
-        <div class="infs-rapidos" role="group" aria-label="Rango rápido">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['ant', 'Mes pasado']].map(([k, t]) => `<button type="button" data-infs-r="${k}">${t}</button>`).join('')}</div>
-        ${prev}
-        <div class="infs-desc"><button type="button" class="btn btn-accent" data-infs-dl="xlsx"${r && r.filas && r.filas.length ? '' : ' disabled'}>Descargar Excel</button><button type="button" class="btn btn-secondary" data-infs-dl="pdf"${r && r.filas && r.filas.length ? '' : ' disabled'}>PDF</button><button type="button" class="btn btn-secondary" data-infs-dl="csv"${r && r.filas && r.filas.length ? '' : ' disabled'}>CSV</button></div>
+        ${inf.rango || inf.sinFechas ? '' : `<div class="infs-rapidos" role="group" aria-label="Rango rápido">${[['hoy', 'Hoy'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['ant', 'Mes pasado']].map(([k, t]) => `<button type="button" data-infs-r="${k}">${t}</button>`).join('')}</div>`}
+        ${inf.abre ? '<p class="field-help">Se abre con su diseño (portada, cifras, gráfico y tablas) y desde ahí se descarga como PDF, imagen o Excel.</p><div class="infs-desc"><button type="button" class="btn btn-accent" data-infs-abrir>Abrir informe</button></div>' : prev}
+        ${inf.abre ? '' : `<div class="infs-desc"><button type="button" class="btn btn-accent" data-infs-dl="xlsx"${r && r.filas && r.filas.length ? '' : ' disabled'}>Descargar Excel</button><button type="button" class="btn btn-secondary" data-infs-dl="pdf"${r && r.filas && r.filas.length ? '' : ' disabled'}>PDF</button><button type="button" class="btn btn-secondary" data-infs-dl="csv"${r && r.filas && r.filas.length ? '' : ' disabled'}>CSV</button></div>`}
       </section>
     </div>`;
 }
 async function infsCargar(){
   const inf = INFS_CAT.find(x => x.id === INFS.sel), turno = (INFS.turno = (INFS.turno || 0) + 1);
+  if(inf.abre){ INFS.res = null; INFS.cargando = false; infsPintar(); return; }
   INFS.cargando = true; INFS.res = null; infsPintar();
   // Área por nombre (con "Todos los puntos"): se filtra después de cargar, por todas las áreas con ese nombre.
   const areaNombre = INFS.f.area.startsWith('nombre:') ? INFS.f.area.slice(7) : null, areaGuardada = INFS.f.area;
@@ -14300,13 +14426,26 @@ function infsEventos(){
       else { f.desde = horIso(new Date(h.getFullYear(), h.getMonth() - 1, 1)); f.hasta = horIso(new Date(h.getFullYear(), h.getMonth(), 0)); }
       infsCargar(); return;
     }
+    const ab = e.target.closest('[data-infs-abrir]');
+    if(ab){
+      ab.disabled = true;
+      try {
+        const m = (document.getElementById('infsMes') || {}).value || horHoy().slice(0, 7);
+        INF.fuente = await infsEventos(); INF.rests = INFS.locs.map(l => ({ id: l.id, name: l.name }));
+        INF.mes = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1);
+        infAbrir();
+      } catch(err){ showToast('No se pudo abrir: ' + (err.message || err), 'danger'); }
+      ab.disabled = false; return;
+    }
     const dl = e.target.closest('[data-infs-dl]');
     if(dl && INFS.res && INFS.res.filas){
       const inf = INFS_CAT.find(x => x.id === INFS.sel), f = INFS.f, r = INFS.res;
-      const lugar = [f.loc ? infsLoc(f.loc) : 'Todos los puntos', f.area ? (f.area.startsWith('nombre:') ? f.area.slice(7) : infsArea(f.area)) : 'todas las áreas'].join(' · ');
+      const lugar = [f.loc ? infsLoc(f.loc) : 'Todos los puntos', inf.sinArea ? '' : f.area ? (f.area.startsWith('nombre:') ? f.area.slice(7) : infsArea(f.area)) : 'todas las áreas'].filter(Boolean).join(' · ');
+      const q = inf.rango === 'quincena' ? prenPeriodos().find(x => x.id === INFS.quincena) : null;
+      const periodo = q ? 'quincena ' + fmtFecha(horIso(q.desde)) + ' a ' + fmtFecha(horIso(q.hasta)) : inf.sinFechas ? 'al ' + fmtFecha(horHoy()) : (f.desde ? fmtFecha(f.desde) : 'inicio') + ' a ' + (f.hasta ? fmtFecha(f.hasta) : 'hoy');
       dl.disabled = true;
-      try { await descargarFilas({ formato: dl.dataset.infsDl, horizontal: r.cab.length > 7, hoja: inf.t.slice(0, 30), nombre: inf.id + '_' + (f.desde || 'inicio') + '_' + (f.hasta || 'hoy'),
-        titulo: inf.t, subtitulo: lugar + ' · ' + (f.desde ? fmtFecha(f.desde) : 'inicio') + ' a ' + (f.hasta ? fmtFecha(f.hasta) : 'hoy') + ' · ' + r.filas.length + ' filas', cab: r.cab, filas: r.filas }); }
+      try { await descargarFilas({ formato: dl.dataset.infsDl, horizontal: r.cab.length > 7, hoja: inf.t.slice(0, 30), nombre: inf.id + '_' + (q ? horIso(q.desde) : inf.sinFechas ? horHoy() : (f.desde || 'inicio') + '_' + (f.hasta || 'hoy')),
+        titulo: inf.t, subtitulo: lugar + ' · ' + periodo + ' · ' + r.filas.length + ' filas', cab: r.cab, filas: r.filas }); }
       catch(err){ showToast('No se pudo descargar: ' + err.message, 'danger'); }
       dl.disabled = false;
     }
@@ -14317,6 +14456,8 @@ function infsEventos(){
     else if(e.target.id === 'infsArea'){ f.area = e.target.value; infsCargar(); }
     else if(e.target.id === 'infsDesde'){ f.desde = e.target.value; infsCargar(); }
     else if(e.target.id === 'infsHasta'){ f.hasta = e.target.value; infsCargar(); }
+    else if(e.target.id === 'infsQuincena'){ INFS.quincena = e.target.value; infsCargar(); }
+    else if(e.target.id === 'infsMes'){ /* se usa al abrir el informe */ }
   });
   box.addEventListener('input', e => { if(e.target.id === 'infsBuscar'){ INFS.q = e.target.value; const pos = e.target.selectionStart; infsPintar(); const b = document.getElementById('infsBuscar'); b.focus(); b.setSelectionRange(pos, pos); } });
 }
