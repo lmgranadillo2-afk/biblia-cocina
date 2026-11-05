@@ -9544,7 +9544,9 @@ let eventosVista = (()=>{ try { const v = localStorage.getItem('eventosVista'); 
    Los datos del evento salen de costeo_eventos; lo demás de eventos_seguimiento (los restaurantes no lo ven). */
 const SEG = { datos: {}, cargado: false, lista: [] };
 const SEG_MEDIOS = { referido: 'Referido', whatsapp: 'WhatsApp', corporativo: 'Corporativo', lider_comercial: 'Líder comercial' };
-function puedeSeguimiento(){ return !!profile && (!!profile.is_super_admin || (!!currentLocation && currentLocation.slug === 'eventos')); }
+// Ven: quienes están en los puntos Eventos o Admin (y el super admin). Editan: super admin y profiles.edita_seguimiento_eventos.
+function puedeSeguimiento(){ return !!profile && (!!profile.is_super_admin || esHub()); }
+function segPuedeEditar(){ return !!profile && (!!profile.is_super_admin || !!profile.edita_seguimiento_eventos); }
 function eventosVistas(){ return [['agenda', 'Agenda'], ['calendario', 'Calendario'], ...(puedeSeguimiento() ? [['seguimiento', 'Seguimiento']] : [])]; }
 async function segCargar(){
   const datos = {}; let desde = 0;
@@ -9611,7 +9613,7 @@ function segTablaHtml(list){
       <thead><tr class="seg-grupo"><th class="seg-prim"></th><th colspan="6">Evento</th><th colspan="4">Comercial</th><th colspan="3">Anticipo</th><th colspan="3">Después del evento</th></tr>
       <tr><th class="seg-prim">Cliente / empresa</th><th>Contacto</th><th>Tipo de evento</th><th>PAX</th><th>Fecha</th><th>Horario</th><th>Venue</th><th>Valor cotizado</th><th>Estado</th><th>Medio de llegada</th><th>Exclusividad</th><th>Anticipo recibido</th><th>Fecha pago</th><th>Contabilidad</th><th>Reporte evento</th><th>Bloqueo en reservas</th><th>Factura</th></tr></thead>
       <tbody>${list.map(segFila).join('')}</tbody></table></div>` : '<div class="empty-list" id="segTabla">No hay eventos con este filtro.</div>'}
-    <p class="field-help">Toca un evento para llenar su seguimiento.</p>`;
+    <p class="field-help">${segPuedeEditar() ? 'Toca un evento para llenar su seguimiento.' : 'Solo lectura: toca un evento para ver su ficha. Lo editan los super admin y el equipo de Eventos autorizado.'}</p>`;
 }
 async function segPintar(list){
   if(costeoEventoDraft || costeoSub !== 'eventos') return; // hay un evento abierto: no se tapa
@@ -9658,6 +9660,11 @@ function segAbrirFicha(id){
     ${x.actualizado_por ? `<p class="field-help">Último cambio: ${escapeHtml(x.actualizado_por)}${x.updated_at ? ' · ' + escapeHtml(new Date(x.updated_at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : ''}</p>` : ''}
     <div class="modal-actions"><button type="button" class="btn btn-ghost" data-seg="cerrar">Cerrar</button><button type="button" class="btn btn-secondary" data-seg="cotizacion">Abrir cotización</button><button type="button" class="btn btn-accent" data-seg="guardar">Guardar</button></div>
   </div>`;
+  if(!segPuedeEditar()){
+    m.querySelectorAll('.seg-campos input, .seg-campos select').forEach(el => { el.disabled = true; });
+    m.querySelector('[data-seg="guardar"]').remove();
+    m.querySelector('.seg-campos').insertAdjacentHTML('beforebegin', '<p class="field-help">Solo lectura. Lo editan los super admin y el equipo de Eventos autorizado.</p>');
+  }
   m.classList.add('open');
   const cerrar = () => { m.classList.remove('open'); m.onclick = null; document.removeEventListener('keydown', esc); };
   const esc = ev => { if(ev.key === 'Escape') cerrar(); };
@@ -9667,7 +9674,7 @@ function segAbrirFicha(id){
     const b = ev.target.closest('[data-seg]'); if(!b) return;
     if(b.dataset.seg === 'cerrar') cerrar();
     else if(b.dataset.seg === 'cotizacion'){ cerrar(); openCosteoEvento(id); }
-    else if(b.dataset.seg === 'guardar'){
+    else if(b.dataset.seg === 'guardar' && segPuedeEditar()){
       const v = idc => document.getElementById(idc).value;
       const valor = Number(String(v('segAntValor')).replace(/[^\d]/g, '')) || null;
       const fila = {
@@ -9686,7 +9693,7 @@ function segAbrirFicha(id){
       renderCosteoEventosList();
     }
   };
-  setTimeout(() => document.getElementById('segContacto')?.focus(), 50);
+  setTimeout(() => (segPuedeEditar() ? document.getElementById('segContacto') : m.querySelector('[data-seg="cerrar"]'))?.focus(), 50);
 }
 async function segDescargar(){
   const formato = await elegirFormato('Seguimiento de eventos', EXP_OPC_CSV); if(!formato) return;
