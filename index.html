@@ -9699,6 +9699,7 @@ function segAbrirFicha(id){
     <div class="modal-sub">${escapeHtml([e.fecha ? fmtFecha(e.fecha) : 'Sin fecha', e.horario, r && r.name, toNum(e.invitados) ? toNum(e.invitados) + ' PAX' : ''].filter(Boolean).join(' · '))}</div>
     <div class="seg-datos"><div><span class="field-label">Valor cotizado</span><b>${t.total ? escapeHtml(fmtMoney(t.total)) : 'Sin cotización en la app'}</b></div><div><span class="field-label">Anticipo esperado (${toNum(e.anticipo_pct)} %)</span><b>${segValor(e) ? escapeHtml(fmtMoney(segValor(e) * toNum(e.anticipo_pct) / 100)) : "—"}</b></div></div>
     <div class="seg-campos">
+      <div class="field"><label class="field-label" for="segEstado">Estado del evento</label>${sel('segEstado', e.estado || '', [...(e.estado ? [] : [['', 'Sin estado']]), ...EVENTO_ESTADOS.map(k => [k.key, k.label])])}${e.estado_por ? `<span class="field-help">Último cambio: ${escapeHtml(e.estado_por)}${e.estado_at ? ' · ' + escapeHtml(new Date(e.estado_at).toLocaleDateString('es-CO')) : ''}</span>` : ''}</div>
       <div class="field full"><label class="field-label" for="segContacto">Contacto</label><input type="text" id="segContacto" maxlength="160" value="${escapeHtml(x.contacto || '')}" placeholder="Nombre y teléfono"></div>
       <div class="field"><label class="field-label" for="segTipo">Tipo de evento</label><input type="text" id="segTipo" maxlength="80" list="segTipos" value="${escapeHtml(x.tipo_evento || '')}"><datalist id="segTipos">${tipos.map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist></div>
       <div class="field"><label class="field-label" for="segMedio">Medio de llegada</label>${sel('segMedio', x.medio_llegada || '', [['', 'Sin definir'], ...Object.entries(SEG_MEDIOS)])}</div>
@@ -9750,6 +9751,14 @@ function segAbrirFicha(id){
       const { data, error } = await supa.from('eventos_seguimiento').upsert(fila, { onConflict: 'evento_id' }).select().single();
       if(error){ b.disabled = false; showToast('No se guardó: ' + error.message, 'danger'); return; }
       SEG.datos[id] = data;
+      // Estado del evento (vive en costeo_eventos; es el mismo de la Agenda y de los avisos a los restaurantes).
+      const nuevoEstado = v('segEstado') || null;
+      if(nuevoEstado && nuevoEstado !== e.estado){
+        const cambio = { estado: nuevoEstado, estado_por: profile.name || session.user.email, estado_at: new Date().toISOString() };
+        const r2 = await supa.from('costeo_eventos').update(cambio).eq('id', id).select('id');
+        if(r2.error || !(r2.data || []).length){ b.disabled = false; showToast('El seguimiento se guardó, pero el estado no: ' + (r2.error ? r2.error.message : 'sin permiso'), 'danger'); renderCosteoEventosList(); return; }
+        Object.assign(e, cambio);
+      }
       cerrar(); showToast('Seguimiento guardado', 'ok');
       renderCosteoEventosList();
     }
