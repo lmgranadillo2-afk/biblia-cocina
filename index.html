@@ -874,6 +874,42 @@ nav.tabs button{position:relative;}
 }
 /* Eventos: vista Agenda (grupos por semana/mes) y Calendario */
 .ev-vista{margin-bottom:var(--space-3);}
+.mer-top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-3); margin-bottom:var(--space-4);}
+.mer-mes{display:flex; align-items:center; gap:var(--space-2);}
+.mer-mes b{font:600 16px 'IBM Plex Mono',monospace; min-width:150px; text-align:center;}
+.mer-modo{min-width:280px;}
+.mer-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--space-3); margin-bottom:var(--space-4);}
+.mer-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2); text-align:left; font:inherit; color:inherit; cursor:pointer; transition:border-color .15s ease-out, box-shadow .15s ease-out;}
+.mer-card:hover{border-color:var(--border-strong);}
+.mer-card[aria-pressed="true"]{border-color:var(--accent); box-shadow:var(--focus-ring);}
+.mer-card:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.mer-nom{font-weight:700; font-size:16px;}
+.mer-queda{font:600 22px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.mer-de{font-size:13px; color:var(--text-muted);}
+.mer-meter{height:10px; border-radius:var(--radius-pill); background:var(--surface-3); overflow:hidden;}
+.mer-meter i{display:block; height:100%; border-radius:var(--radius-pill); transition:width .25s ease-out;}
+.mer-detalle{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:var(--space-5);}
+.mer-detalle h2{font:700 20px 'Playfair Display',serif; margin:0 0 var(--space-1);}
+@media (max-width:820px){ .mer-detalle{grid-template-columns:1fr;} }
+.mer-cat{display:flex; flex-direction:column; gap:6px; padding:var(--space-2) 0; border-bottom:1px solid var(--border);}
+.mer-fila{display:flex; justify-content:space-between; align-items:center; gap:var(--space-2); font-size:14px;}
+.mer-fila b{font:600 13px 'IBM Plex Mono',monospace; white-space:nowrap;}
+.mer-fila input{width:160px; font-family:'IBM Plex Mono',monospace; text-align:right;}
+.mer-gasto{display:flex; justify-content:space-between; gap:var(--space-2); padding:var(--space-2) 0; border-bottom:1px solid var(--border); font-size:14px;}
+.mer-gasto small{display:block; color:var(--text-muted); font-size:12.5px;}
+.mer-gasto b{font:600 14px 'IBM Plex Mono',monospace; white-space:nowrap;}
+.mer-gacc{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px;}
+.mer-desc{display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3);}
+.mer-fab{position:fixed; right:clamp(16px,4vw,40px); bottom:calc(24px + env(safe-area-inset-bottom)); z-index:20; min-height:56px; padding:0 22px; border-radius:var(--radius-pill); border:none; background:var(--accent); color:var(--accent-text); font:700 16px Inter,sans-serif; box-shadow:var(--shadow-2); cursor:pointer;}
+.mer-fab:focus-visible{outline:none; box-shadow:var(--focus-ring), var(--shadow-2);}
+@media (max-width:799px){ .mer-fab{bottom:calc(84px + env(safe-area-inset-bottom));} }
+.mer-hoja{max-width:520px;}
+.mer-monto{font:600 22px 'IBM Plex Mono',monospace; text-align:right; min-height:52px;}
+.mer-chips{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.mer-chips button{min-height:44px; padding:0 14px; border-radius:var(--radius-pill); border:1px solid var(--border-strong); background:var(--surface); font:500 14px Inter,sans-serif; color:var(--text); cursor:pointer;}
+.mer-chips button[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); font-weight:700;}
+.mer-prev{border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); font-size:14px; margin:var(--space-2) 0;}
+.mer-prev.ok{background:var(--ok-bg);} .mer-prev.warn{background:var(--warn-bg);} .mer-prev.danger{background:var(--danger-bg);} .mer-prev.neutral{background:var(--surface-2);}
 .seg-nota{font-size:13px; color:var(--text-muted); margin:var(--space-2) 0;}
 .seg-abrir{width:100%;}
 @media (min-width:1024px){ .seg-abrir{display:none;} }
@@ -1524,6 +1560,7 @@ nav.tabs button{position:relative;}
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-rrhh" style="display:none" title="Recursos humanos" aria-label="Recursos humanos"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg><span class="tab-label">RRHH</span></button>
+      <button id="tab-mercadeo" style="display:none" title="Mercadeo" aria-label="Mercadeo"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg><span class="tab-label">Mercadeo</span></button>
       <button id="tab-facturas" style="display:none" title="Facturas" aria-label="Facturas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h1"/><path d="M9 17h1"/><path d="M13 13h2"/><path d="M13 17h2"/></svg><span class="tab-label">Facturas</span></button>
       <button id="tab-admin" style="display:none" title="Admin" aria-label="Admin"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg><span class="tab-label">Admin</span></button>
       <button id="navMore" type="button" class="nav-more" title="Más" aria-label="Más"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg><span class="tab-label">Más</span></button>
@@ -1786,6 +1823,8 @@ nav.tabs button{position:relative;}
 
       <div id="rrhhDetalle" style="display:none; margin-top:20px; max-width:640px;"></div>
     </div>
+
+    <div id="view-mercadeo" class="view" style="padding:18px 20px 110px; overflow-y:auto;"><div id="merBox"></div></div>
 
     <div id="view-facturas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header"><h2>Facturas</h2></div>
@@ -2827,8 +2866,8 @@ async function onLoggedIn(sess){
   }
 
   let locations;
-  if(esRrhh() || esFacturas()){
-    // Recursos humanos / Facturas: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
+  if(esRrhh() || esFacturas() || esMercadeo()){
+    // Recursos humanos / Facturas / Mercadeo: todos los restaurantes (sin los puntos centrales Admin y Eventos), sin accesos por punto.
     const { data: todas, error: tErr } = await supa.from('locations').select('*').order('name');
     if(tErr){ showToast('No se pudieron cargar los puntos.'); return; }
     locations = (todas || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug));
@@ -2931,6 +2970,9 @@ async function superAdminEnterLocation(locId){
 
 function esRrhh(){ return !!(profile && profile.es_rrhh && !profile.is_super_admin); }
 function esFacturas(){ return !!(profile && profile.es_facturas && !profile.is_super_admin); }
+// Mercadeo: rol global (sql/mercadeo_presupuesto.sql). Solo ve la pestaña Mercadeo, sin accesos por punto.
+function esMercadeo(){ return !!(profile && profile.es_mercadeo && !profile.is_super_admin); }
+function puedeMercadeo(){ return !!(profile && (profile.is_super_admin || profile.es_mercadeo)); }
 
 /* ---------- RRHH: documentación de vinculación ---------- */
 async function rrhhCargarPuntos(){
@@ -3374,7 +3416,7 @@ async function areaCualquieraDe(locId){
 async function pickAreaForLocation(loc){
   let areas;
   if(esRrhh()) areas = await areasDeRrhh(loc.id);
-  else if(esFacturas()) areas = await areaCualquieraDe(loc.id);
+  else if(esFacturas() || esMercadeo()) areas = await areaCualquieraDe(loc.id);
   else {
     const { data, error } = await supa.from('user_areas').select('area_id, areas(*)').eq('user_id', session.user.id);
     if(error){
@@ -3444,10 +3486,11 @@ function enterArea(loc, area){
   document.getElementById('ctxLoc').textContent = loc.name;
   document.getElementById('userInitial').textContent = (profile.name || session.user.email || '?').trim().charAt(0).toUpperCase();
   const roleBadge = document.getElementById('whoRole');
-  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : profile.role === 'admin' ? 'Admin' : 'Cocina';
+  roleBadge.textContent = esRrhh() ? 'Recursos humanos' : esFacturas() ? 'Facturas' : esMercadeo() ? 'Mercadeo' : profile.role === 'admin' ? 'Admin' : 'Cocina';
   roleBadge.className = 'role-badge ' + profile.role;
   document.getElementById('tab-admin').style.display = profile.role === 'admin' ? '' : 'none';
   document.getElementById('tab-calculadora').style.display = (profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
+  document.getElementById('tab-mercadeo').style.display = puedeMercadeo() ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -3456,6 +3499,13 @@ function enterArea(loc, area){
     ['tab-chat', 'tab-admin', 'tab-calculadora'].forEach(id => { document.getElementById(id).style.display = 'none'; });
     HOR.subPedida = 'prenomina';
     applyAreaModuleVisibility(['horarios']);
+    return;
+  }
+  if(esMercadeo()){
+    ['tab-chat', 'tab-admin', 'tab-calculadora', 'tab-rrhh'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    applyAreaModuleVisibility([]);
+    document.getElementById('tab-mercadeo').style.display = '';
+    switchTab('mercadeo');
     return;
   }
   if(esFacturas()){
@@ -4228,8 +4278,9 @@ document.getElementById('tab-chat').addEventListener('click', ()=>switchTab('cha
 document.getElementById('tab-horarios').addEventListener('click', ()=>switchTab('horarios'));
 document.getElementById('tab-rrhh').addEventListener('click', ()=>switchTab('rrhh'));
 document.getElementById('tab-facturas').addEventListener('click', ()=>switchTab('facturas'));
+document.getElementById('tab-mercadeo').addEventListener('click', ()=>switchTab('mercadeo'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -4237,6 +4288,7 @@ function switchTab(name){
   vivoBarra(null); setTimeout(vivoTrack, 0);
   if(name==='admin'){ loadAdminHistory(); if(adminGrupo === 'inicio') adminPintarInicio(); adminActualizarConteos(); }
   if(name==='calculadora') abrirCalculadoraPrecios();
+  if(name==='mercadeo') merAbrir();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
@@ -4263,7 +4315,7 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','chat','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
   cocina: ['recetario','produccion','pedidos','chat'],
@@ -11445,6 +11497,10 @@ async function loadUsers(){
           <input type="checkbox" data-facturas-for="${u.id}" ${u.es_facturas?'checked':''}>
           Facturas
         </label>
+        <label class="chip-check" title="Maneja el presupuesto y los gastos de mercadeo de todos los restaurantes">
+          <input type="checkbox" data-mercadeo-for="${u.id}" ${u.es_mercadeo?'checked':''}>
+          Mercadeo
+        </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
         <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
@@ -11473,6 +11529,7 @@ async function loadUsers(){
       const newSuper = superCb.checked;
       const newRrhh = wrap.querySelector(`[data-rrhh-for="${id}"]`).checked;
       const newFacturas = wrap.querySelector(`[data-facturas-for="${id}"]`).checked;
+      const newMercadeo = wrap.querySelector(`[data-mercadeo-for="${id}"]`).checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
@@ -11483,7 +11540,7 @@ async function loadUsers(){
         superCb.checked = true;
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas }).eq('id', id);
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas, es_mercadeo: newMercadeo }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
       showToast('Usuario actualizado');
     });
@@ -13630,9 +13687,225 @@ function renderAreasAdminList(){
   });
 }
 
+/* ---------- Mercadeo: presupuesto mensual y gastos por restaurante (sql/mercadeo_presupuesto.sql) ----------
+   Tarjeta por restaurante con lo que le queda; detalle de categorías y gastos del que se toca; "Definir presupuesto"
+   aparte; "+ Anotar gasto" con 3 preguntas. Cada gasto va a un solo restaurante; soporte opcional; se puede pasar
+   del presupuesto (solo avisa). Lo usan super admin y profiles.es_mercadeo. */
+const MER_CATS = [['pauta', 'Pauta digital'], ['influencers', 'Influencers y contenido'], ['impresos', 'Impresos y POP'], ['activaciones', 'Activaciones y eventos']];
+const MER = { mes: null, rest: [], sel: null, modo: 'ver', pres: {}, gastos: [], listo: false };
+function merMesIso(d){ return horIso(new Date(d.getFullYear(), d.getMonth(), 1)); }
+function merFinIso(d){ return horIso(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
+function merMesTexto(d){ const t = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); }
+function merCatNombre(k){ return (MER_CATS.find(c => c[0] === k) || [k, k])[1]; }
+function merPres(loc, c){ return c ? (MER.pres[loc + '|' + c] || 0) : MER_CATS.reduce((t, [k]) => t + (MER.pres[loc + '|' + k] || 0), 0); }
+function merGas(loc, c){ return MER.gastos.filter(x => x.location_id === loc && (!c || x.categoria === c)).reduce((t, x) => t + Number(x.valor), 0); }
+function merNivel(g, p){
+  if(!p && !g) return ['neutral', 'Sin presupuesto'];
+  const q = p ? g / p : 2;
+  return q > 1 ? ['danger', 'Se pasó'] : q > 0.8 ? ['warn', 'Cuidado'] : ['ok', 'Va bien'];
+}
+function merMeter(g, p){
+  const q = p ? g / p : (g ? 1 : 0), [k] = merNivel(g, p);
+  return `<div class="mer-meter" title="${escapeHtml(fmtMoney(g) + ' de ' + fmtMoney(p))}"><i style="width:${Math.min(100, q * 100)}%; background:var(--${k === 'neutral' ? 'border-strong' : k})"></i></div>`;
+}
+async function merAbrir(){
+  if(!puedeMercadeo()) return;
+  if(!MER.mes){ const h = new Date(); MER.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
+  const box = document.getElementById('merBox');
+  if(!MER.listo){ merEventos(); MER.listo = true; }
+  if(!MER.rest.length){
+    box.innerHTML = '<div class="empty-note">Cargando…</div>';
+    const { data, error } = await supa.from('locations').select('id, name, slug, activo').order('name');
+    if(error){ box.innerHTML = '<div class="empty-note">No se pudieron cargar los restaurantes: ' + escapeHtml(error.message) + '</div>'; return; }
+    MER.rest = (data || []).filter(l => l.activo !== false && !['admin', 'eventos'].includes(l.slug));
+    if(!MER.sel && MER.rest[0]) MER.sel = MER.rest[0].id;
+  }
+  await merCargar();
+}
+async function merCargar(){
+  const ini = merMesIso(MER.mes), fin = merFinIso(MER.mes);
+  const [pr, ga] = await Promise.all([
+    supa.from('mercadeo_presupuestos').select('*').eq('mes', ini),
+    supa.from('mercadeo_gastos').select('*').gte('fecha', ini).lte('fecha', fin).order('fecha', { ascending: false }).order('created_at', { ascending: false })
+  ]);
+  const err = pr.error || ga.error;
+  if(err){ document.getElementById('merBox').innerHTML = '<div class="empty-note">No se pudo cargar: ' + escapeHtml(err.message) + '</div>'; return; }
+  MER.pres = {}; (pr.data || []).forEach(x => { MER.pres[x.location_id + '|' + x.categoria] = Number(x.valor) || 0; });
+  MER.gastos = ga.data || [];
+  merPintar();
+}
+function merPintar(){
+  const box = document.getElementById('merBox');
+  if(!MER.rest.length){ box.innerHTML = '<div class="empty-note">No hay restaurantes activos.</div>'; return; }
+  const r = MER.rest.find(x => x.id === MER.sel) || MER.rest[0]; MER.sel = r.id;
+  const def = MER.modo === 'def';
+  const cards = MER.rest.map(x => {
+    const pp = merPres(x.id), gg = merGas(x.id), [k, t] = merNivel(gg, pp);
+    return `<button type="button" class="mer-card" data-mer-rest="${x.id}" aria-pressed="${x.id === r.id}">
+      <span class="mer-nom">${escapeHtml(x.name)}</span>
+      <span><span class="mer-queda">${gg > pp ? '−' + escapeHtml(fmtMoney(gg - pp)) : escapeHtml(fmtMoney(pp - gg) || '$ 0')}</span><br><span class="mer-de">${gg > pp ? 'pasado del' : 'quedan de'} ${escapeHtml(fmtMoney(pp) || '$ 0')}</span></span>
+      ${merMeter(gg, pp)}<span class="badge ${k}">${t}</span></button>`;
+  }).join('');
+  const cats = MER_CATS.map(([k, n]) => {
+    const pp = merPres(r.id, k), gg = merGas(r.id, k);
+    return `<div class="mer-cat"><div class="mer-fila"><span>${escapeHtml(n)}</span>${def
+      ? `<input type="text" inputmode="numeric" data-mer-pres="${k}" aria-label="${escapeHtml('Presupuesto de ' + n)}" value="${pp ? escapeHtml(fmtMoney(pp)) : ''}" placeholder="$ 0">`
+      : `<b>${escapeHtml(fmtMoney(gg) || '$ 0')} de ${escapeHtml(fmtMoney(pp) || '$ 0')}</b>`}</div>${def ? '' : merMeter(gg, pp)}</div>`;
+  }).join('');
+  const gastos = MER.gastos.filter(x => x.location_id === r.id);
+  const lista = gastos.length ? gastos.map(x => `<div class="mer-gasto"><span>${escapeHtml(x.detalle || merCatNombre(x.categoria))}<small>${escapeHtml([merCatNombre(x.categoria), fmtFecha(x.fecha), x.creado_por].filter(Boolean).join(' · '))}</small>
+      <span class="mer-gacc">${x.soporte_path ? `<button type="button" class="btn btn-ghost btn-small" data-mer-sop="${escapeHtml(x.soporte_path)}">Ver soporte</button>` : '<span class="badge warn">Sin soporte</span>'}<button type="button" class="btn btn-ghost btn-small" data-mer-borrar="${x.id}">Borrar</button></span></span>
+      <b>${escapeHtml(fmtMoney(x.valor))}</b></div>`).join('') : '<p class="field-help">Sin gastos este mes.</p>';
+  const ant = new Date(MER.mes.getFullYear(), MER.mes.getMonth() - 1, 1);
+  box.innerHTML = `<div class="mer-top">
+      <div class="mer-mes" role="group" aria-label="Mes"><button type="button" class="btn btn-secondary" data-mer="ant" aria-label="Mes anterior">${HOR_ICO.izq}</button><b>${escapeHtml(merMesTexto(MER.mes))}</b><button type="button" class="btn btn-secondary" data-mer="sig" aria-label="Mes siguiente">${HOR_ICO.der}</button></div>
+      <div class="estado-seg mer-modo" role="group" aria-label="Modo"><button type="button" class="estado-op${def ? '' : ' active'}" data-mer-modo="ver" aria-pressed="${!def}">Ver gastos</button><button type="button" class="estado-op${def ? ' active' : ''}" data-mer-modo="def" aria-pressed="${def}">Definir presupuesto</button></div>
+    </div>
+    <div class="mer-cards">${cards}</div>
+    <div class="mer-detalle">
+      <div><h2>${escapeHtml(r.name)}</h2><p class="field-help">${def ? 'Escribe cuánto hay para cada cosa este mes. Total: <b>' + escapeHtml(fmtMoney(merPres(r.id)) || '$ 0') + '</b>' : 'Por categoría'}</p>${cats}
+        ${def ? `<button type="button" class="btn btn-secondary btn-small" data-mer="copiar">Copiar lo de ${escapeHtml(merMesTexto(ant).toLowerCase())} (todos los restaurantes, solo casillas vacías)</button>` : ''}</div>
+      <div><h2>Gastos del mes</h2>${lista}</div>
+    </div>
+    <div class="mer-desc"><button type="button" class="btn btn-ghost btn-small" data-mer="descargar">Descargar resumen del mes</button><button type="button" class="btn btn-ghost btn-small" data-mer="descargargastos">Descargar gastos del mes</button></div>
+    <button type="button" class="mer-fab" data-mer="gasto">+ Anotar gasto</button>`;
+}
+function merEventos(){
+  const box = document.getElementById('merBox');
+  box.addEventListener('click', async e => {
+    const card = e.target.closest('[data-mer-rest]'); if(card){ MER.sel = card.dataset.merRest; merPintar(); return; }
+    const md = e.target.closest('[data-mer-modo]'); if(md){ MER.modo = md.dataset.merModo; merPintar(); return; }
+    const sop = e.target.closest('[data-mer-sop]');
+    if(sop){
+      const { data, error } = await supa.storage.from('mercadeo-soportes').createSignedUrl(sop.dataset.merSop, 300);
+      if(error){ showToast('No se pudo abrir el soporte: ' + error.message, 'danger'); return; }
+      window.open(data.signedUrl, '_blank', 'noopener'); return;
+    }
+    const bor = e.target.closest('[data-mer-borrar]');
+    if(bor){
+      if(bor.dataset.confirmar !== '1'){ bor.dataset.confirmar = '1'; bor.textContent = '¿Borrar? Toca otra vez'; bor.classList.add('btn-danger-outline'); setTimeout(() => { if(bor.isConnected){ bor.dataset.confirmar = ''; bor.textContent = 'Borrar'; bor.classList.remove('btn-danger-outline'); } }, 4000); return; }
+      const g = MER.gastos.find(x => x.id === bor.dataset.merBorrar);
+      const { error } = await supa.from('mercadeo_gastos').delete().eq('id', bor.dataset.merBorrar);
+      if(error){ showToast('No se pudo borrar: ' + error.message, 'danger'); return; }
+      if(g && g.soporte_path) await supa.storage.from('mercadeo-soportes').remove([g.soporte_path]);
+      showToast('Gasto borrado', 'ok'); merCargar(); return;
+    }
+    const b = e.target.closest('[data-mer]'); if(!b) return;
+    const a = b.dataset.mer;
+    if(a === 'ant' || a === 'sig'){ MER.mes = new Date(MER.mes.getFullYear(), MER.mes.getMonth() + (a === 'ant' ? -1 : 1), 1); merCargar(); }
+    else if(a === 'gasto') merAbrirGasto();
+    else if(a === 'copiar') merCopiarMesAnterior(b);
+    else if(a === 'descargar') merDescargar(false);
+    else if(a === 'descargargastos') merDescargar(true);
+  });
+  box.addEventListener('change', async e => {
+    const inp = e.target.closest('[data-mer-pres]'); if(!inp) return;
+    const valor = Number(String(inp.value).replace(/[^\d]/g, '')) || 0;
+    const { error } = await supa.from('mercadeo_presupuestos').upsert({ location_id: MER.sel, mes: merMesIso(MER.mes), categoria: inp.dataset.merPres, valor }, { onConflict: 'location_id,mes,categoria' });
+    if(error){ showToast('No se guardó: ' + error.message, 'danger'); return; }
+    MER.pres[MER.sel + '|' + inp.dataset.merPres] = valor;
+    showToast('Presupuesto guardado', 'ok'); merPintar();
+  });
+}
+async function merCopiarMesAnterior(btn){
+  btn.disabled = true;
+  const ant = merMesIso(new Date(MER.mes.getFullYear(), MER.mes.getMonth() - 1, 1));
+  const { data, error } = await supa.from('mercadeo_presupuestos').select('location_id, categoria, valor').eq('mes', ant);
+  if(error){ btn.disabled = false; showToast('No se pudo copiar: ' + error.message, 'danger'); return; }
+  const filas = (data || []).filter(x => Number(x.valor) > 0 && !MER.pres[x.location_id + '|' + x.categoria])
+    .map(x => ({ location_id: x.location_id, mes: merMesIso(MER.mes), categoria: x.categoria, valor: Number(x.valor) }));
+  if(!filas.length){ btn.disabled = false; showToast('No hay nada que copiar: el mes anterior está vacío o ya llenaste esas casillas', 'warn'); return; }
+  const r = await supa.from('mercadeo_presupuestos').upsert(filas, { onConflict: 'location_id,mes,categoria' });
+  if(r.error){ btn.disabled = false; showToast('No se pudo copiar: ' + r.error.message, 'danger'); return; }
+  showToast(filas.length + ' casilla' + (filas.length === 1 ? '' : 's') + ' copiada' + (filas.length === 1 ? '' : 's'), 'ok'); merCargar();
+}
+function merAbrirGasto(){
+  const F = { r: MER.sel, c: 'pauta' };
+  const hoy = horHoy(), ini = merMesIso(MER.mes), fin = merFinIso(MER.mes);
+  let m = document.getElementById('merModal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'merModal'; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-box mer-hoja" role="dialog" aria-modal="true" aria-labelledby="merTit"><h3 id="merTit">Anotar gasto</h3>
+    <div class="field"><label class="field-label" for="merMonto">1. ¿Cuánto fue?</label><input type="text" inputmode="numeric" id="merMonto" class="mer-monto" placeholder="$ 0"></div>
+    <div class="field"><span class="field-label">2. ¿De qué restaurante?</span><div class="mer-chips" id="merRestChips"></div></div>
+    <div class="field"><span class="field-label">3. ¿En qué?</span><div class="mer-chips" id="merCatChips"></div></div>
+    <div class="field"><label class="field-label" for="merFecha">Fecha</label><input type="date" id="merFecha" value="${hoy >= ini && hoy <= fin ? hoy : ini}"></div>
+    <div class="field"><label class="field-label" for="merDetalle">Detalle y proveedor (opcional)</label><input type="text" id="merDetalle" maxlength="200" placeholder="Ej.: Meta Ads, campaña de fin de año"></div>
+    <div class="field"><label class="field-label" for="merSoporte">Soporte, foto o PDF (opcional)</label><input type="file" id="merSoporte" accept="image/*,application/pdf"></div>
+    <div class="mer-prev" id="merPrev" aria-live="polite"></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-merg="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-merg="guardar">Guardar</button></div></div>`;
+  const chips = () => {
+    document.getElementById('merRestChips').innerHTML = MER.rest.map(x => `<button type="button" data-merg-r="${x.id}" aria-pressed="${F.r === x.id}">${escapeHtml(x.name)}</button>`).join('');
+    document.getElementById('merCatChips').innerHTML = MER_CATS.map(([k, n]) => `<button type="button" data-merg-c="${k}" aria-pressed="${F.c === k}">${escapeHtml(n)}</button>`).join('');
+  };
+  const valor = () => Number(String(document.getElementById('merMonto').value).replace(/[^\d]/g, '')) || 0;
+  const prev = () => {
+    chips();
+    const v = valor(), r = MER.rest.find(x => x.id === F.r), pp = merPres(F.r, F.c), gg = merGas(F.r, F.c) + v, [k] = merNivel(gg, pp), box = document.getElementById('merPrev');
+    box.className = 'mer-prev ' + k;
+    box.innerHTML = !v ? 'Escribe el valor para ver cómo queda el presupuesto.'
+      : !pp ? `${escapeHtml(r.name)} no tiene presupuesto de ${escapeHtml(merCatNombre(F.c))} este mes. Igual se puede guardar.`
+      : `Con este gasto, <b>${escapeHtml(merCatNombre(F.c))}</b> de ${escapeHtml(r.name)} queda en <b>${escapeHtml(fmtMoney(gg))} de ${escapeHtml(fmtMoney(pp))}</b> (${Math.round(gg / pp * 100)} %).${gg > pp ? ' Se pasa del presupuesto: igual se puede guardar.' : ''}`;
+  };
+  prev();
+  m.classList.add('open');
+  const cerrar = () => { m.classList.remove('open'); m.onclick = null; document.removeEventListener('keydown', esc); };
+  const esc = ev => { if(ev.key === 'Escape') cerrar(); };
+  document.addEventListener('keydown', esc);
+  document.getElementById('merMonto').addEventListener('input', ev => { const v = valor(); ev.target.value = v ? fmtMoney(v) : ''; prev(); });
+  m.onclick = async ev => {
+    if(ev.target === m){ cerrar(); return; }
+    const rr = ev.target.closest('[data-merg-r]'); if(rr){ F.r = rr.dataset.mergR; prev(); return; }
+    const cc = ev.target.closest('[data-merg-c]'); if(cc){ F.c = cc.dataset.mergC; prev(); return; }
+    const b = ev.target.closest('[data-merg]'); if(!b) return;
+    if(b.dataset.merg === 'cerrar'){ cerrar(); return; }
+    const v = valor(), fecha = document.getElementById('merFecha').value;
+    if(!v){ showToast('Escribe cuánto fue', 'warn'); document.getElementById('merMonto').focus(); return; }
+    if(!fecha){ showToast('Elige la fecha', 'warn'); return; }
+    b.disabled = true;
+    let soporte_path = null;
+    const file = document.getElementById('merSoporte').files[0];
+    if(file){
+      const esPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      let blob = file, tipo = 'application/pdf', ext = 'pdf';
+      if(!esPdf){ try { blob = await chatComprimirFoto(file); tipo = 'image/jpeg'; ext = 'jpg'; } catch(err){ b.disabled = false; showToast('No se pudo leer la foto: ' + err.message, 'danger'); return; } }
+      if(blob.size > 10 * 1024 * 1024){ b.disabled = false; showToast('El soporte pesa más de 10 MB', 'warn'); return; }
+      const id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+      soporte_path = `${F.r}/${fecha.slice(0, 7)}/${id}.${ext}`;
+      const up = await supa.storage.from('mercadeo-soportes').upload(soporte_path, blob, { contentType: tipo });
+      if(up.error){ b.disabled = false; showToast('No se pudo subir el soporte: ' + up.error.message, 'danger'); return; }
+    }
+    const { error } = await supa.from('mercadeo_gastos').insert({ location_id: F.r, fecha, categoria: F.c, valor: v, detalle: document.getElementById('merDetalle').value.trim() || null, soporte_path });
+    if(error){
+      if(soporte_path) await supa.storage.from('mercadeo-soportes').remove([soporte_path]);
+      b.disabled = false; showToast('No se guardó: ' + error.message, 'danger'); return;
+    }
+    cerrar(); showToast('Gasto anotado', 'ok');
+    MER.sel = F.r;
+    if(fecha.slice(0, 7) !== merMesIso(MER.mes).slice(0, 7)) MER.mes = new Date(Number(fecha.slice(0, 4)), Number(fecha.slice(5, 7)) - 1, 1);
+    merCargar();
+  };
+  setTimeout(() => document.getElementById('merMonto')?.focus(), 50);
+}
+async function merDescargar(gastos){
+  const formato = await elegirFormato(gastos ? 'Gastos de mercadeo' : 'Presupuesto de mercadeo', EXP_OPC_CSV); if(!formato) return;
+  const nom = id => (MER.rest.find(x => x.id === id) || {}).name || '';
+  const mes = merMesTexto(MER.mes);
+  if(gastos){
+    const filas = MER.gastos.map(x => [nom(x.location_id), x.fecha, merCatNombre(x.categoria), x.detalle || '', Number(x.valor), x.soporte_path ? 'Sí' : 'No', x.creado_por || '']);
+    await descargarFilas({ formato, horizontal: true, hoja: 'Gastos', nombre: 'mercadeo_gastos_' + merMesIso(MER.mes).slice(0, 7), titulo: 'Gastos de mercadeo · ' + mes, subtitulo: filas.length + ' gastos',
+      cab: ['Restaurante', 'Fecha', 'Categoría', 'Detalle', 'Valor', 'Soporte', 'Registró'], filas });
+    return;
+  }
+  const filas = [];
+  MER.rest.forEach(r => MER_CATS.forEach(([k, n]) => { const pp = merPres(r.id, k), gg = merGas(r.id, k); filas.push([r.name, n, pp, gg, pp - gg, pp ? Math.round(gg / pp * 100) : '']); }));
+  await descargarFilas({ formato, horizontal: true, hoja: 'Presupuesto', nombre: 'mercadeo_presupuesto_' + merMesIso(MER.mes).slice(0, 7), titulo: 'Presupuesto de mercadeo · ' + mes, subtitulo: MER.rest.length + ' restaurantes',
+    cab: ['Restaurante', 'Categoría', 'Presupuesto', 'Gastado', 'Disponible', '% gastado'], filas });
+}
+
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
   if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
+  if(esMercadeo()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-mercadeo').style.display = ''; switchTab('mercadeo'); return; }
   if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-facturas').style.display = ''; switchTab('facturas'); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
   currentArea = area;
