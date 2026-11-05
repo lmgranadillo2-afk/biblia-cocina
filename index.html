@@ -9543,7 +9543,9 @@ let eventosVista = (()=>{ try { const v = localStorage.getItem('eventosVista'); 
    exclusividad, anticipo (valor, fecha, nota), contabilidad, reporte, bloqueo en reservas y factura.
    Los datos del evento salen de costeo_eventos; lo demás de eventos_seguimiento (los restaurantes no lo ven). */
 const SEG = { datos: {}, cargado: false, lista: [] };
-const SEG_MEDIOS = { referido: 'Referido', whatsapp: 'WhatsApp', corporativo: 'Corporativo', lider_comercial: 'Líder comercial' };
+const SEG_MEDIOS = { whatsapp_corporativo: 'WhatsApp corporativo', referido: 'Referido', lider_comercial: 'Líder comercial' };
+// Valor cotizado: el de la cotización; si el evento no tiene menú (ej. cargado de la planilla), el que se anotó a mano.
+function segValor(e){ const t = eventoCalcTotals(e).total; return t || toNum((SEG.datos[e.id] || {}).valor_manual) || 0; }
 // Ven: quienes están en los puntos Eventos o Admin (y el super admin). Editan: super admin y profiles.edita_seguimiento_eventos.
 function puedeSeguimiento(){ return !!profile && (!!profile.is_super_admin || esHub()); }
 function segPuedeEditar(){ return !!profile && (!!profile.is_super_admin || !!profile.edita_seguimiento_eventos); }
@@ -9583,15 +9585,16 @@ function segFila(e){
     <td>${e.fecha ? escapeHtml(fmtFecha(e.fecha)) : vac}</td>
     <td>${e.horario ? escapeHtml(e.horario) : vac}</td>
     <td>${r ? escapeHtml(r.name) : vac}</td>
-    <td class="seg-num">${escapeHtml(fmtMoney(t.total))}</td>
-    <td>${eventoEstadoBadge(e)}</td>
-    <td>${x.medio_llegada ? escapeHtml(SEG_MEDIOS[x.medio_llegada] || x.medio_llegada) : vac}</td>
+    <td class="seg-num">${segValor(e) ? escapeHtml(fmtMoney(segValor(e))) : vac}${!t.total && toNum(x.valor_manual) ? '<small>sin cotización</small>' : ''}</td>
+    <td>${eventoEstadoBadge(e)}${x.estado_detalle ? `<small>${escapeHtml(x.estado_detalle)}</small>` : ''}</td>
+    <td>${x.medio_llegada ? escapeHtml(SEG_MEDIOS[x.medio_llegada] || x.medio_llegada) : vac}${x.referido_por ? `<small>${escapeHtml(x.referido_por)}</small>` : ''}</td>
     <td>${sino(x.exclusividad)}</td>
     <td class="seg-num">${toNum(x.anticipo_valor) ? escapeHtml(fmtMoney(x.anticipo_valor)) : vac}${x.anticipo_nota ? `<small>${escapeHtml(x.anticipo_nota)}</small>` : ''}</td>
     <td>${x.anticipo_fecha ? escapeHtml(fmtFecha(x.anticipo_fecha)) : vac}</td>
     <td>${x.contabilidad_aprobado ? '<span class="badge ok">Aprobado</span>' : '<span class="badge neutral">No aprobado</span>'}</td>
     <td>${x.reporte_enviado ? '<span class="seg-si">Enviado</span>' + (x.reporte_fecha ? `<small>${escapeHtml(fmtFecha(x.reporte_fecha))}</small>` : '') : '<span class="seg-no">No</span>'}</td>
     <td>${sino(x.bloqueo_reservas)}</td>
+    <td>${sino(x.tabla_abonos)}</td>
     <td>${sino(x.factura)}</td>
   </tr>`;
 }
@@ -9610,8 +9613,8 @@ function segTablaHtml(list){
   return `<div class="seg-cab"><h2>Seguimiento de eventos</h2><button type="button" class="btn btn-secondary btn-small" id="segDescargar">Descargar</button></div>
     <div class="seg-tiles">${tiles.map(([c, n, t]) => `<div class="seg-tile" style="--c:var(--${c})"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
     ${list.length ? `<div class="seg-wrap" id="segTabla"><table class="seg-tabla">
-      <thead><tr class="seg-grupo"><th class="seg-prim"></th><th colspan="6">Evento</th><th colspan="4">Comercial</th><th colspan="3">Anticipo</th><th colspan="3">Después del evento</th></tr>
-      <tr><th class="seg-prim">Cliente / empresa</th><th>Contacto</th><th>Tipo de evento</th><th>PAX</th><th>Fecha</th><th>Horario</th><th>Venue</th><th>Valor cotizado</th><th>Estado</th><th>Medio de llegada</th><th>Exclusividad</th><th>Anticipo recibido</th><th>Fecha pago</th><th>Contabilidad</th><th>Reporte evento</th><th>Bloqueo en reservas</th><th>Factura</th></tr></thead>
+      <thead><tr class="seg-grupo"><th class="seg-prim"></th><th colspan="6">Evento</th><th colspan="4">Comercial</th><th colspan="3">Anticipo</th><th colspan="4">Después del evento</th></tr>
+      <tr><th class="seg-prim">Cliente / empresa</th><th>Contacto</th><th>Tipo de evento</th><th>PAX</th><th>Fecha</th><th>Horario</th><th>Venue</th><th>Valor cotizado</th><th>Estado</th><th>Medio de llegada</th><th>Exclusividad</th><th>Anticipo recibido</th><th>Fecha pago</th><th>Contabilidad</th><th>Reporte evento</th><th>Bloqueo en reservas</th><th>Tabla de abonos</th><th>Factura</th></tr></thead>
       <tbody>${list.map(segFila).join('')}</tbody></table></div>` : '<div class="empty-list" id="segTabla">No hay eventos con este filtro.</div>'}
     <p class="field-help">${segPuedeEditar() ? 'Toca un evento para llenar su seguimiento.' : 'Solo lectura: toca un evento para ver su ficha. Lo editan los super admin y el equipo de Eventos autorizado.'}</p>`;
 }
@@ -9642,11 +9645,14 @@ function segAbrirFicha(id){
   m.innerHTML = `<div class="modal-box seg-ficha" role="dialog" aria-modal="true" aria-labelledby="segTit">
     <h3 id="segTit">${escapeHtml(e.cliente || e.nombre || 'Evento')}</h3>
     <div class="modal-sub">${escapeHtml([e.fecha ? fmtFecha(e.fecha) : 'Sin fecha', e.horario, r && r.name, toNum(e.invitados) ? toNum(e.invitados) + ' PAX' : ''].filter(Boolean).join(' · '))}</div>
-    <div class="seg-datos"><div><span class="field-label">Valor cotizado</span><b>${escapeHtml(fmtMoney(t.total))}</b></div><div><span class="field-label">Anticipo esperado (${toNum(e.anticipo_pct)} %)</span><b>${escapeHtml(fmtMoney(t.anticipo))}</b></div></div>
+    <div class="seg-datos"><div><span class="field-label">Valor cotizado</span><b>${t.total ? escapeHtml(fmtMoney(t.total)) : 'Sin cotización en la app'}</b></div><div><span class="field-label">Anticipo esperado (${toNum(e.anticipo_pct)} %)</span><b>${segValor(e) ? escapeHtml(fmtMoney(segValor(e) * toNum(e.anticipo_pct) / 100)) : "—"}</b></div></div>
     <div class="seg-campos">
       <div class="field full"><label class="field-label" for="segContacto">Contacto</label><input type="text" id="segContacto" maxlength="160" value="${escapeHtml(x.contacto || '')}" placeholder="Nombre y teléfono"></div>
       <div class="field"><label class="field-label" for="segTipo">Tipo de evento</label><input type="text" id="segTipo" maxlength="80" list="segTipos" value="${escapeHtml(x.tipo_evento || '')}"><datalist id="segTipos">${tipos.map(v => `<option value="${escapeHtml(v)}">`).join('')}</datalist></div>
       <div class="field"><label class="field-label" for="segMedio">Medio de llegada</label>${sel('segMedio', x.medio_llegada || '', [['', 'Sin definir'], ...Object.entries(SEG_MEDIOS)])}</div>
+      <div class="field"><label class="field-label" for="segReferido">Referido por</label><input type="text" id="segReferido" maxlength="80" value="${escapeHtml(x.referido_por || '')}" placeholder="Ej.: Jairo"></div>
+      ${t.total ? '' : `<div class="field"><label class="field-label" for="segValorManual">Valor cotizado ($), sin cotización en la app</label><input type="text" inputmode="numeric" id="segValorManual" value="${toNum(x.valor_manual) ? escapeHtml(fmtMoney(x.valor_manual)) : ''}" placeholder="0"></div>`}
+      <div class="field full"><label class="field-label" for="segEstadoDet">Detalle del estado</label><input type="text" id="segEstadoDet" maxlength="200" value="${escapeHtml(x.estado_detalle || '')}" placeholder="Ej.: cotización enviada, pendiente anticipo"></div>
       <div class="field"><label class="field-label" for="segExcl">Exclusividad</label>${sn('segExcl', x.exclusividad)}</div>
       <div class="field"><label class="field-label" for="segAntValor">Anticipo recibido ($)</label><input type="text" inputmode="numeric" id="segAntValor" value="${toNum(x.anticipo_valor) ? escapeHtml(fmtMoney(x.anticipo_valor)) : ''}" placeholder="0"></div>
       <div class="field"><label class="field-label" for="segAntFecha">Fecha de pago del anticipo</label><input type="date" id="segAntFecha" value="${escapeHtml(x.anticipo_fecha || '')}"></div>
@@ -9655,6 +9661,7 @@ function segAbrirFicha(id){
       <div class="field"><label class="field-label" for="segRep">Reporte del evento</label>${sel('segRep', !!x.reporte_enviado, [['false', 'No enviado'], ['true', 'Enviado']])}</div>
       <div class="field"><label class="field-label" for="segRepFecha">Fecha del reporte</label><input type="date" id="segRepFecha" value="${escapeHtml(x.reporte_fecha || '')}"></div>
       <div class="field"><label class="field-label" for="segBloq">Bloqueo en reservas</label>${sn('segBloq', x.bloqueo_reservas)}</div>
+      <div class="field"><label class="field-label" for="segAbonos">Tabla de abonos</label>${sn('segAbonos', x.tabla_abonos)}</div>
       <div class="field"><label class="field-label" for="segFact">Factura</label>${sn('segFact', x.factura)}</div>
     </div>
     ${x.actualizado_por ? `<p class="field-help">Último cambio: ${escapeHtml(x.actualizado_por)}${x.updated_at ? ' · ' + escapeHtml(new Date(x.updated_at).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : ''}</p>` : ''}
@@ -9679,7 +9686,9 @@ function segAbrirFicha(id){
       const valor = Number(String(v('segAntValor')).replace(/[^\d]/g, '')) || null;
       const fila = {
         evento_id: id, contacto: v('segContacto').trim() || null, tipo_evento: v('segTipo').trim() || null,
-        medio_llegada: v('segMedio') || null, exclusividad: v('segExcl') === 'true',
+        medio_llegada: v('segMedio') || null, referido_por: v('segReferido').trim() || null, exclusividad: v('segExcl') === 'true',
+        estado_detalle: v('segEstadoDet').trim() || null, tabla_abonos: v('segAbonos') === 'true',
+        ...(document.getElementById('segValorManual') ? { valor_manual: Number(String(v('segValorManual')).replace(/[^\d]/g, '')) || null } : {}),
         anticipo_valor: valor, anticipo_fecha: v('segAntFecha') || null, anticipo_nota: v('segAntNota').trim() || null,
         contabilidad_aprobado: v('segConta') === 'true',
         reporte_enviado: v('segRep') === 'true', reporte_fecha: v('segRepFecha') || null,
@@ -9701,14 +9710,14 @@ async function segDescargar(){
   const filas = SEG.lista.map(e => {
     const x = SEG.datos[e.id] || {}, t = eventoCalcTotals(e), r = restauranteDe(e.restaurante_id);
     return [e.cliente || e.nombre || '', x.contacto || '', x.tipo_evento || '', toNum(e.invitados), e.fecha || '', e.horario || '', r ? r.name : '',
-      Math.round(t.total), (EVENTO_ESTADOS.find(k => k.key === e.estado) || {}).label || 'Sin estado', SEG_MEDIOS[x.medio_llegada] || '', sino(x.exclusividad),
+      Math.round(segValor(e)), (EVENTO_ESTADOS.find(k => k.key === e.estado) || {}).label || 'Sin estado', x.estado_detalle || '', SEG_MEDIOS[x.medio_llegada] || '', x.referido_por || '', sino(x.exclusividad),
       toNum(x.anticipo_valor) || 0, x.anticipo_fecha || '', x.anticipo_nota || '', x.contabilidad_aprobado ? 'Aprobado' : 'No aprobado',
-      x.reporte_enviado ? 'Enviado' : 'No', x.reporte_fecha || '', sino(x.bloqueo_reservas), sino(x.factura)];
+      x.reporte_enviado ? 'Enviado' : 'No', x.reporte_fecha || '', sino(x.bloqueo_reservas), sino(x.tabla_abonos), sino(x.factura)];
   });
   await descargarFilas({ formato, horizontal: true, hoja: 'Seguimiento', nombre: 'seguimiento_eventos_' + horHoy(),
     titulo: 'Seguimiento de eventos', subtitulo: filas.length + ' eventos',
-    cab: ['Cliente / empresa', 'Contacto', 'Tipo de evento', 'PAX', 'Fecha', 'Horario', 'Venue', 'Valor cotizado', 'Estado', 'Medio de llegada', 'Exclusividad',
-      'Anticipo recibido', 'Fecha pago anticipo', 'Nota anticipo', 'Contabilidad', 'Reporte evento', 'Fecha reporte', 'Bloqueo en reservas', 'Factura'], filas });
+    cab: ['Cliente / empresa', 'Contacto', 'Tipo de evento', 'PAX', 'Fecha', 'Horario', 'Venue', 'Valor cotizado', 'Estado', 'Detalle del estado', 'Medio de llegada', 'Referido por', 'Exclusividad',
+      'Anticipo recibido', 'Fecha pago anticipo', 'Nota anticipo', 'Contabilidad', 'Reporte evento', 'Fecha reporte', 'Bloqueo en reservas', 'Tabla de abonos', 'Factura'], filas });
 }
 let eventosPasadosAbiertos = false;
 let eventosCalMes = (()=>{ const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1); })();
