@@ -931,6 +931,8 @@ nav.tabs button{position:relative;}
 .shw-top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3);}
 .shw-acc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
 .shw-rango{font:600 15px 'IBM Plex Mono',monospace; min-width:220px; text-align:center;}
+.shw-dl-fechas{display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2); margin:var(--space-3) 0;}
+.shw-dl-fechas label{display:flex; flex-direction:column; gap:4px;}
 .shw-cat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); margin-bottom:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);}
 .shw-cat h3{font:700 18px 'Playfair Display',serif; margin:var(--space-2) 0 0;}
 .shw-catrow{display:grid; grid-template-columns:minmax(140px,1.4fr) minmax(110px,1fr) minmax(110px,1fr) auto; gap:var(--space-2); align-items:end;}
@@ -14617,20 +14619,62 @@ async function shwCopiarSemana(lunes){
   for(const t of tipos){ if(!(SHW.dias[t.fecha] || {}).tipo) await supa.from('shows_dias').upsert(t, { onConflict: 'location_id,fecha' }); }
   showToast(filas.length + ' show' + (filas.length === 1 ? '' : 's') + ' copiado' + (filas.length === 1 ? '' : 's'), 'ok'); shwCargar();
 }
-async function shwDescargar(){
-  const domingo = prenSumarDias(SHW.lunes, 6), rango = 'semana del ' + fmtFecha(SHW.lunes).slice(0, 5) + ' al ' + fmtFecha(domingo);
-  const fr = shwFranjas(), grupo = id => (SHW.grupos.find(x => x.id === id) || {}).nombre || '', filas = [];
-  for(let k = 0; k < 7; k++){
-    const iso = prenSumarDias(SHW.lunes, k), fecha = new Date(iso + 'T12:00'), dia = SHW.dias[iso] || {};
-    // Un día sin ningún show programado no sale en la descarga.
-    if(!fr.some(f => SHW.asig[iso + '|' + f.id])) continue;
-    filas.push([iso, fecha.toLocaleDateString('es-CO', { weekday: 'long' }), dia.tipo || '', ...fr.flatMap(f => { const a = SHW.asig[iso + '|' + f.id]; return [a ? grupo(a.grupo_id) : '', a ? Number(a.valor) || 0 : '']; }), dia.cancelado ? 'Sí' : 'No', shwTotalDia(iso)]);
-  }
-  if(!filas.length){ showToast('Esta semana no tiene shows programados', 'warn'); return; }
-  const formato = await elegirFormato('Shows · ' + rango, EXP_OPC_CSV); if(!formato) return;
-  await descargarFilas({ formato, horizontal: true, hoja: 'Shows', nombre: 'shows_' + SHW.lunes, titulo: 'Shows · Cantina Dos Santos · ' + rango,
-    subtitulo: filas.length + ' día' + (filas.length === 1 ? '' : 's') + ' con shows · total de la semana: ' + fmtMoney(filas.reduce((t, x) => t + x[x.length - 1], 0)),
+// Descarga por rango de fechas (por defecto la semana en pantalla). Los días sin ningún show no salen;
+// un día cancelado con shows sí sale, marcado y en $0.
+function shwDescargar(){
+  let m = document.getElementById('shwDlModal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'shwDlModal'; document.body.appendChild(m); }
+  const h = new Date(), mesIni = horIso(new Date(h.getFullYear(), h.getMonth(), 1));
+  const rapidos = [['Esta semana', SHW.lunes, prenSumarDias(SHW.lunes, 6)], ['Este mes', mesIni, horIso(new Date(h.getFullYear(), h.getMonth() + 1, 0))],
+    ['Mes pasado', horIso(new Date(h.getFullYear(), h.getMonth() - 1, 1)), horIso(new Date(h.getFullYear(), h.getMonth(), 0))]];
+  m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="shwDlTit"><h3 id="shwDlTit">Descargar shows</h3>
+    <p class="modal-sub">Elige el rango de fechas. Los días sin shows no salen en el archivo.</p>
+    <div class="infs-rapidos">${rapidos.map(([t, d, a]) => `<button type="button" data-shw-r="${d}|${a}">${t}</button>`).join('')}</div>
+    <div class="shw-dl-fechas"><label><span class="field-label">Desde</span><input type="date" id="shwDlDesde" value="${SHW.lunes}"></label><label><span class="field-label">Hasta</span><input type="date" id="shwDlHasta" value="${prenSumarDias(SHW.lunes, 6)}"></label></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-shw-dl="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-shw-dl="ok">Descargar</button></div></div>`;
+  m.classList.add('open');
+  const cerrar = () => { m.classList.remove('open'); m.onclick = null; };
+  m.onclick = async e => {
+    if(e.target === m){ cerrar(); return; }
+    const r = e.target.closest('[data-shw-r]');
+    if(r){ const [d, a] = r.dataset.shwR.split('|'); document.getElementById('shwDlDesde').value = d; document.getElementById('shwDlHasta').value = a; return; }
+    const b = e.target.closest('[data-shw-dl]'); if(!b) return;
+    if(b.dataset.shwDl === 'cerrar'){ cerrar(); return; }
+    let desde = document.getElementById('shwDlDesde').value, hasta = document.getElementById('shwDlHasta').value;
+    if(!desde || !hasta){ showToast('Elige las dos fechas', 'warn'); return; }
+    if(hasta < desde) [desde, hasta] = [hasta, desde];
+    b.disabled = true;
+    try { if(await shwDescargarRango(desde, hasta)) cerrar(); }
+    catch(err){ showToast('No se pudo descargar: ' + (err.message || err), 'danger'); }
+    b.disabled = false;
+  };
+}
+async function shwDescargarRango(desde, hasta){
+  const [a, d] = await Promise.all([
+    supa.from('shows_asignaciones').select('fecha, franja_id, grupo_id, valor').eq('location_id', SHW.loc).gte('fecha', desde).lte('fecha', hasta).order('fecha').limit(5000),
+    supa.from('shows_dias').select('fecha, tipo, cancelado').eq('location_id', SHW.loc).gte('fecha', desde).lte('fecha', hasta).limit(5000)
+  ]);
+  if(a.error || d.error) throw (a.error || d.error);
+  const asig = {}, dias = {};
+  (a.data || []).forEach(x => { asig[x.fecha + '|' + x.franja_id] = x; });
+  (d.data || []).forEach(x => { dias[x.fecha] = x; });
+  // Columnas: las franjas activas más las ya no activas que tengan shows en el rango.
+  const usadas = new Set((a.data || []).map(x => x.franja_id));
+  const fr = SHW.franjas.filter(f => f.activa || usadas.has(f.id)).sort((x, y) => String(x.hora).localeCompare(String(y.hora)));
+  const grupo = id => (SHW.grupos.find(x => x.id === id) || {}).nombre || '';
+  const fechas = [...new Set((a.data || []).map(x => x.fecha))].sort();
+  const filas = fechas.map(iso => {
+    const dia = dias[iso] || {}, canc = !!dia.cancelado;
+    const total = canc ? 0 : fr.reduce((t, f) => t + (Number((asig[iso + '|' + f.id] || {}).valor) || 0), 0);
+    return [iso, new Date(iso + 'T12:00').toLocaleDateString('es-CO', { weekday: 'long' }), dia.tipo || '', ...fr.flatMap(f => { const x = asig[iso + '|' + f.id]; return [x ? grupo(x.grupo_id) : '', x ? Number(x.valor) || 0 : '']; }), canc ? 'Sí' : 'No', total];
+  });
+  const rango = fmtFecha(desde) + ' al ' + fmtFecha(hasta);
+  if(!filas.length){ showToast('No hay shows programados del ' + rango, 'warn'); return false; }
+  const formato = await elegirFormato('Shows · ' + rango, EXP_OPC_CSV); if(!formato) return false;
+  await descargarFilas({ formato, horizontal: true, hoja: 'Shows', nombre: 'shows_' + desde + '_al_' + hasta, titulo: 'Shows · Cantina Dos Santos · del ' + rango,
+    subtitulo: filas.length + ' día' + (filas.length === 1 ? '' : 's') + ' con shows · total: ' + fmtMoney(filas.reduce((t, x) => t + x[x.length - 1], 0)),
     cab: ['Fecha', 'Día', 'Show', ...fr.flatMap(f => [shwHora(f.hora), 'Valor ' + shwHora(f.hora)]), 'Cancelado', 'Total del día'], filas });
+  return true;
 }
 function shwEventos(){
   const box = document.getElementById('shwBox'), num = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
