@@ -930,6 +930,7 @@ nav.tabs button{position:relative;}
 .infs-desc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
 .shw-top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3);}
 .shw-acc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.shw-rango{font:600 15px 'IBM Plex Mono',monospace; min-width:220px; text-align:center;}
 .shw-cat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); margin-bottom:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);}
 .shw-cat h3{font:700 18px 'Playfair Display',serif; margin:var(--space-2) 0 0;}
 .shw-catrow{display:grid; grid-template-columns:minmax(140px,1.4fr) minmax(110px,1fr) minmax(110px,1fr) auto; gap:var(--space-2); align-items:end;}
@@ -14513,7 +14514,7 @@ function infsEventos(){
    Una fila por día del mes con el tipo (Mariachis/Banda), una casilla por franja (grupo + valor) y el total del día;
    subtotal por semana (lunes a domingo) y del mes. Catálogo de grupos con precio entre semana (lun–jue) y fin de semana
    (vie–dom): al elegir el grupo el valor se llena solo y se puede cambiar. Un día cancelado queda en rojo y no suma. */
-const SHW = { loc: 'c98db3a9-7be7-4bf6-8b77-318e6ca3098b', mes: null, grupos: [], franjas: [], dias: {}, asig: {}, listo: false, cat: false };
+const SHW = { loc: 'c98db3a9-7be7-4bf6-8b77-318e6ca3098b', lunes: null, grupos: [], franjas: [], dias: {}, asig: {}, listo: false, cat: false };
 const SHW_TIPOS = ['Mariachis', 'Banda', 'Otro'];
 function shwFinde(iso){ const d = new Date(iso + 'T12:00').getDay(); return d === 5 || d === 6 || d === 0; }
 function shwHora(h){ const [hh, mm] = String(h).split(':').map(Number); return ((hh % 12) || 12) + ':' + String(mm).padStart(2, '0') + (hh < 12 ? ' a. m.' : ' p. m.'); }
@@ -14521,12 +14522,12 @@ function shwFranjas(){ return SHW.franjas.filter(f => f.activa).sort((a, b) => S
 function shwTotalDia(iso){ if((SHW.dias[iso] || {}).cancelado) return 0; return shwFranjas().reduce((t, f) => t + (Number((SHW.asig[iso + '|' + f.id] || {}).valor) || 0), 0); }
 async function shwAbrir(){
   if(!puedeShows()) return;
-  if(!SHW.mes){ const h = new Date(); SHW.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
+  if(!SHW.lunes) SHW.lunes = horIso(horLunesDe(new Date()));
   if(!SHW.listo){ shwEventos(); SHW.listo = true; }
   await shwCargar();
 }
 async function shwCargar(){
-  const ini = horIso(SHW.mes), fin = horIso(new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0));
+  const ini = SHW.lunes, fin = prenSumarDias(SHW.lunes, 6);
   const [g, f, d, a] = await Promise.all([
     supa.from('shows_grupos').select('*').eq('location_id', SHW.loc).order('orden').order('nombre'),
     supa.from('shows_franjas').select('*').eq('location_id', SHW.loc).order('hora'),
@@ -14542,33 +14543,30 @@ async function shwCargar(){
 }
 function shwPintar(){
   const box = document.getElementById('shwBox'), fr = shwFranjas(), grupo = id => SHW.grupos.find(x => x.id === id) || {};
-  const ult = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0).getDate();
-  let filas = '', sem = 0, mes = 0, nShows = 0, nCanc = 0, lunesSem = null;
-  const cierreSemana = (iso) => { filas += `<tr class="shw-sem"><td colspan="${fr.length + 3}">Semana del ${escapeHtml(fmtFecha(lunesSem).slice(0, 5))} al ${escapeHtml(fmtFecha(iso).slice(0, 5))} <button type="button" class="btn btn-ghost btn-small" data-shw-copiar="${lunesSem}">Copiar semana anterior</button></td><td class="shw-tot">${escapeHtml(fmtMoney(sem) || '$ 0')}</td></tr>`; sem = 0; };
-  for(let dd = 1; dd <= ult; dd++){
-    const fecha = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth(), dd), iso = horIso(fecha), dia = SHW.dias[iso] || {}, canc = !!dia.cancelado;
-    if(!lunesSem) lunesSem = horIso(horLunesDe(fecha));
+  let filas = '', sem = 0, nShows = 0, nCanc = 0;
+  for(let k = 0; k < 7; k++){
+    const iso = prenSumarDias(SHW.lunes, k), fecha = new Date(iso + 'T12:00'), dd = fecha.getDate(), dia = SHW.dias[iso] || {}, canc = !!dia.cancelado;
     const t = shwTotalDia(iso);
-    if(canc) nCanc++; else { sem += t; mes += t; nShows += fr.filter(f => SHW.asig[iso + '|' + f.id]).length; }
+    if(canc) nCanc++; else { sem += t; nShows += fr.filter(f => SHW.asig[iso + '|' + f.id]).length; }
     filas += `<tr class="${canc ? 'shw-cancel' : ''}"><td class="shw-dia">${fecha.getDate()}<small>${escapeHtml(fecha.toLocaleDateString('es-CO', { weekday: 'long' }))}</small></td>
       <td><select data-shw-tipo="${iso}" aria-label="Tipo de show del ${dd}"><option value="">—</option>${SHW_TIPOS.map(x => `<option${dia.tipo === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
       ${fr.map(f => { const a = SHW.asig[iso + '|' + f.id]; return `<td><button type="button" class="shw-slot${a ? ' lleno' : ''}" data-shw-slot="${iso}|${f.id}">${a ? escapeHtml(grupo(a.grupo_id).nombre || '?') + `<small>${escapeHtml(fmtMoney(a.valor))}</small>` : '+ Elegir'}</button></td>`; }).join('')}
       <td><button type="button" class="btn btn-ghost btn-small" data-shw-cancelar="${iso}">${canc ? 'Reactivar' : 'Cancelar día'}</button></td>
       <td class="shw-tot">${canc ? 'Cancelado' : escapeHtml(fmtMoney(t) || '$ 0')}</td></tr>`;
-    if(fecha.getDay() === 0 || dd === ult){ cierreSemana(iso); lunesSem = null; }
   }
+  const domingo = prenSumarDias(SHW.lunes, 6), rango = 'Semana del ' + fmtFecha(SHW.lunes).slice(0, 5) + ' al ' + fmtFecha(domingo);
   const cat = SHW.grupos.map(x => `<div class="shw-catrow${x.activo ? '' : ' inactivo'}"><input type="text" data-shw-g="${x.id}|nombre" value="${escapeHtml(x.nombre)}" aria-label="Nombre del grupo"><label><span class="field-label">Lun–jue</span><input type="text" inputmode="numeric" data-shw-g="${x.id}|precio_semana" value="${escapeHtml(fmtMoney(x.precio_semana))}"></label><label><span class="field-label">Vie–dom</span><input type="text" inputmode="numeric" data-shw-g="${x.id}|precio_finde" value="${escapeHtml(fmtMoney(x.precio_finde))}"></label><label class="cb"><input type="checkbox" data-shw-g="${x.id}|activo"${x.activo ? ' checked' : ''}>Activo</label></div>`).join('');
   box.innerHTML = `<div class="admin-header"><h2>Shows · Cantina Dos Santos</h2></div>
     <div class="shw-top">
-      <div class="mer-mes"><button type="button" class="btn btn-secondary" data-shw="ant" aria-label="Mes anterior">${HOR_ICO.izq}</button><b>${escapeHtml(merMesTexto(SHW.mes))}</b><button type="button" class="btn btn-secondary" data-shw="sig" aria-label="Mes siguiente">${HOR_ICO.der}</button></div>
-      <div class="shw-acc"><button type="button" class="btn btn-secondary" data-shw="catalogo">${SHW.cat ? 'Ocultar catálogo y franjas' : 'Catálogo y franjas'}</button><button type="button" class="btn btn-secondary" data-shw="descargar">Descargar</button></div>
+      <div class="mer-mes"><button type="button" class="btn btn-secondary" data-shw="ant" aria-label="Semana anterior">${HOR_ICO.izq}</button><b class="shw-rango">${escapeHtml(rango)}</b><button type="button" class="btn btn-secondary" data-shw="sig" aria-label="Semana siguiente">${HOR_ICO.der}</button></div>
+      <div class="shw-acc"><button type="button" class="btn btn-secondary" data-shw-copiar="${SHW.lunes}">Copiar semana anterior</button><button type="button" class="btn btn-secondary" data-shw="catalogo">${SHW.cat ? 'Ocultar catálogo y franjas' : 'Catálogo y franjas'}</button><button type="button" class="btn btn-secondary" data-shw="descargar">Descargar</button></div>
     </div>
-    <div class="seg-tiles"><div class="seg-tile" style="--c:var(--accent)"><b>${escapeHtml(fmtMoney(mes) || '$ 0')}</b><span>costo de shows del mes</span></div><div class="seg-tile" style="--c:var(--ok)"><b>${nShows}</b><span>shows programados</span></div><div class="seg-tile" style="--c:var(--danger)"><b>${nCanc}</b><span>día${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'}</span></div></div>
+    <div class="seg-tiles"><div class="seg-tile" style="--c:var(--accent)"><b>${escapeHtml(fmtMoney(sem) || '$ 0')}</b><span>costo de shows de la semana</span></div><div class="seg-tile" style="--c:var(--ok)"><b>${nShows}</b><span>shows programados</span></div><div class="seg-tile" style="--c:var(--danger)"><b>${nCanc}</b><span>día${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'}</span></div></div>
     ${SHW.cat ? `<section class="shw-cat"><h3>Catálogo de grupos</h3><p class="field-help">Precio entre semana (lunes a jueves) y fin de semana (viernes a domingo). Cambia y sal de la casilla para guardar. Desactivar no borra lo ya programado.</p>${cat}
       <div class="shw-nuevo"><input type="text" id="shwNuevoGrupo" placeholder="Nuevo grupo" maxlength="60"><input type="text" inputmode="numeric" id="shwNuevoSem" placeholder="Precio lun–jue"><input type="text" inputmode="numeric" id="shwNuevoFin" placeholder="Precio vie–dom"><button type="button" class="btn btn-accent" data-shw="grupo">Agregar</button></div>
       <h3>Franjas</h3><div class="shw-franjas">${SHW.franjas.map(f => `<label class="cb"><input type="checkbox" data-shw-franja="${f.id}"${f.activa ? ' checked' : ''}>${escapeHtml(shwHora(f.hora))}</label>`).join('')}<input type="time" id="shwNuevaFranja" aria-label="Nueva franja"><button type="button" class="btn btn-secondary btn-small" data-shw="franja">Agregar franja</button></div></section>` : ''}
     <div class="shw-wrap"><table class="shw-tabla"><thead><tr><th>Día</th><th>Show</th>${fr.map(f => `<th>${escapeHtml(shwHora(f.hora))}</th>`).join('')}<th></th><th class="shw-tot">Total del día</th></tr></thead><tbody>${filas}</tbody>
-      <tfoot><tr><td colspan="${fr.length + 3}">Total del mes</td><td class="shw-tot">${escapeHtml(fmtMoney(mes) || '$ 0')}</td></tr></tfoot></table></div>`;
+      <tfoot><tr><td colspan="${fr.length + 3}">Total de la semana</td><td class="shw-tot">${escapeHtml(fmtMoney(sem) || '$ 0')}</td></tr></tfoot></table></div>`;
 }
 function shwElegir(iso, franjaId){
   const actual = SHW.asig[iso + '|' + franjaId], finde = shwFinde(iso), activos = SHW.grupos.filter(g => g.activo);
@@ -14620,15 +14618,18 @@ async function shwCopiarSemana(lunes){
   showToast(filas.length + ' show' + (filas.length === 1 ? '' : 's') + ' copiado' + (filas.length === 1 ? '' : 's'), 'ok'); shwCargar();
 }
 async function shwDescargar(){
-  const formato = await elegirFormato('Shows · ' + merMesTexto(SHW.mes), EXP_OPC_CSV); if(!formato) return;
-  const fr = shwFranjas(), grupo = id => (SHW.grupos.find(x => x.id === id) || {}).nombre || '';
-  const ult = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0).getDate(), filas = [];
-  for(let dd = 1; dd <= ult; dd++){
-    const fecha = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth(), dd), iso = horIso(fecha), dia = SHW.dias[iso] || {};
+  const domingo = prenSumarDias(SHW.lunes, 6), rango = 'semana del ' + fmtFecha(SHW.lunes).slice(0, 5) + ' al ' + fmtFecha(domingo);
+  const fr = shwFranjas(), grupo = id => (SHW.grupos.find(x => x.id === id) || {}).nombre || '', filas = [];
+  for(let k = 0; k < 7; k++){
+    const iso = prenSumarDias(SHW.lunes, k), fecha = new Date(iso + 'T12:00'), dia = SHW.dias[iso] || {};
+    // Un día sin ningún show programado no sale en la descarga.
+    if(!fr.some(f => SHW.asig[iso + '|' + f.id])) continue;
     filas.push([iso, fecha.toLocaleDateString('es-CO', { weekday: 'long' }), dia.tipo || '', ...fr.flatMap(f => { const a = SHW.asig[iso + '|' + f.id]; return [a ? grupo(a.grupo_id) : '', a ? Number(a.valor) || 0 : '']; }), dia.cancelado ? 'Sí' : 'No', shwTotalDia(iso)]);
   }
-  await descargarFilas({ formato, horizontal: true, hoja: 'Shows', nombre: 'shows_' + horIso(SHW.mes).slice(0, 7), titulo: 'Shows · Cantina Dos Santos · ' + merMesTexto(SHW.mes),
-    subtitulo: 'Total del mes: ' + fmtMoney(filas.reduce((t, x) => t + x[x.length - 1], 0)),
+  if(!filas.length){ showToast('Esta semana no tiene shows programados', 'warn'); return; }
+  const formato = await elegirFormato('Shows · ' + rango, EXP_OPC_CSV); if(!formato) return;
+  await descargarFilas({ formato, horizontal: true, hoja: 'Shows', nombre: 'shows_' + SHW.lunes, titulo: 'Shows · Cantina Dos Santos · ' + rango,
+    subtitulo: filas.length + ' día' + (filas.length === 1 ? '' : 's') + ' con shows · total de la semana: ' + fmtMoney(filas.reduce((t, x) => t + x[x.length - 1], 0)),
     cab: ['Fecha', 'Día', 'Show', ...fr.flatMap(f => [shwHora(f.hora), 'Valor ' + shwHora(f.hora)]), 'Cancelado', 'Total del día'], filas });
 }
 function shwEventos(){
@@ -14645,7 +14646,7 @@ function shwEventos(){
     const cp = e.target.closest('[data-shw-copiar]'); if(cp){ cp.disabled = true; await shwCopiarSemana(cp.dataset.shwCopiar); return; }
     const b = e.target.closest('[data-shw]'); if(!b) return;
     const a = b.dataset.shw;
-    if(a === 'ant' || a === 'sig'){ SHW.mes = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + (a === 'ant' ? -1 : 1), 1); shwCargar(); }
+    if(a === 'ant' || a === 'sig'){ SHW.lunes = prenSumarDias(SHW.lunes, a === 'ant' ? -7 : 7); shwCargar(); }
     else if(a === 'catalogo'){ SHW.cat = !SHW.cat; shwPintar(); }
     else if(a === 'descargar') shwDescargar();
     else if(a === 'grupo'){
