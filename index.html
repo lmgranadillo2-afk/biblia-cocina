@@ -928,6 +928,35 @@ nav.tabs button{position:relative;}
 .infs-prev td{padding:8px 10px; border-top:1px solid var(--border); white-space:nowrap;}
 .infs-prev td.num{text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
 .infs-desc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.shw-top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3);}
+.shw-acc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.shw-cat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4); margin-bottom:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);}
+.shw-cat h3{font:700 18px 'Playfair Display',serif; margin:var(--space-2) 0 0;}
+.shw-catrow{display:grid; grid-template-columns:minmax(140px,1.4fr) minmax(110px,1fr) minmax(110px,1fr) auto; gap:var(--space-2); align-items:end;}
+.shw-catrow label{display:flex; flex-direction:column; gap:2px;}
+.shw-catrow label.cb{flex-direction:row; align-items:center; gap:6px; min-height:44px;}
+.shw-catrow input[type=text]{font-family:inherit;}
+.shw-catrow.inactivo input[type=text]{color:var(--text-dim);}
+.shw-nuevo{display:grid; grid-template-columns:minmax(140px,1.4fr) minmax(110px,1fr) minmax(110px,1fr) auto; gap:var(--space-2);}
+@media (max-width:700px){ .shw-catrow, .shw-nuevo{grid-template-columns:1fr 1fr;} }
+.shw-franjas{display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:center;}
+.shw-franjas label.cb{display:flex; align-items:center; gap:6px; min-height:44px;}
+.shw-wrap{overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+.shw-tabla{border-collapse:separate; border-spacing:0; width:100%; min-width:760px; font-size:13.5px;}
+.shw-tabla th{background:var(--surface-2); font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.8px; text-transform:uppercase; color:var(--text-muted); text-align:left; padding:9px 10px;}
+.shw-tabla td{border-top:1px solid var(--border); padding:5px 8px; vertical-align:middle;}
+.shw-tabla select{min-height:40px; font-size:13px;}
+.shw-dia{font-weight:700; white-space:nowrap;}
+.shw-dia small{display:block; font-weight:400; color:var(--text-muted); text-transform:capitalize;}
+.shw-slot{display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; min-height:40px; border-radius:var(--radius-sm); padding:0 8px; border:1px dashed var(--border-strong); background:transparent; color:var(--text-dim); font:500 13px Inter,sans-serif; cursor:pointer; text-align:left;}
+.shw-slot.lleno{border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-weight:600;}
+.shw-slot small{font:600 12px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.shw-slot:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.shw-tot{font:600 13px 'IBM Plex Mono',monospace; text-align:right !important; white-space:nowrap;}
+.shw-tabla tr.shw-cancel td{background:var(--danger-bg);}
+.shw-tabla tr.shw-cancel td.shw-tot{color:var(--danger);}
+.shw-tabla tr.shw-sem td{background:var(--accent-soft); font-weight:700;}
+.shw-tabla tfoot td{background:var(--surface-2); font-weight:700; border-top:2px solid var(--border-strong);}
 .mer-catlist{display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-3);}
 .mer-catrow{display:flex; gap:var(--space-2); align-items:center;}
 .mer-catrow input[type=text]{flex:1;}
@@ -1627,6 +1656,7 @@ nav.tabs button{position:relative;}
       <button id="tab-chat" title="Chat" aria-label="Chat"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span class="tab-label">Chat</span><span class="nav-badge" id="chatBadge" hidden></span></button>
       <button id="tab-calculadora" style="display:none" title="Calculadora" aria-label="Calculadora"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg><span class="tab-label">Calculadora</span></button>
       <button id="tab-rrhh" style="display:none" title="Recursos humanos" aria-label="Recursos humanos"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg><span class="tab-label">RRHH</span></button>
+      <button id="tab-shows" style="display:none" title="Shows" aria-label="Shows"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="tab-label">Shows</span></button>
       <button id="tab-informes" style="display:none" title="Informes" aria-label="Informes"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M11 16V8"/><path d="M15 16v-6"/><path d="M19 16V5"/></svg><span class="tab-label">Informes</span></button>
       <button id="tab-mercadeo" style="display:none" title="Mercadeo" aria-label="Mercadeo"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg><span class="tab-label">Mercadeo</span></button>
       <button id="tab-facturas" style="display:none" title="Facturas" aria-label="Facturas"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h1"/><path d="M9 17h1"/><path d="M13 13h2"/><path d="M13 17h2"/></svg><span class="tab-label">Facturas</span></button>
@@ -1895,6 +1925,8 @@ nav.tabs button{position:relative;}
     <div id="view-mercadeo" class="view" style="padding:18px 20px 110px; overflow-y:auto;"><div id="merBox"></div></div>
 
     <div id="view-informes" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="infsBox"></div></div>
+
+    <div id="view-shows" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="shwBox"></div></div>
 
     <div id="view-facturas" class="view" style="padding:18px 20px 60px; overflow-y:auto;">
       <div class="admin-header"><h2>Facturas</h2></div>
@@ -3046,6 +3078,8 @@ function puedeMercadeo(){ return !!(profile && (profile.is_super_admin || profil
 // Informes: rol global de solo lectura (sql/informes_perfil.sql). Solo ve la pestaña Informes.
 function esInformes(){ return !!(profile && profile.es_informes && !profile.is_super_admin); }
 function puedeInformes(){ return !!(profile && (profile.is_super_admin || profile.es_informes)); }
+// Shows: programación de shows de Cantina Dos Santos (sql/shows.sql). profiles.es_shows (gerencia@) y super admin.
+function puedeShows(){ return !!(profile && (profile.is_super_admin || profile.es_shows)); }
 
 /* ---------- RRHH: documentación de vinculación ---------- */
 async function rrhhCargarPuntos(){
@@ -3565,6 +3599,7 @@ function enterArea(loc, area){
   document.getElementById('tab-calculadora').style.display = (profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('tab-mercadeo').style.display = puedeMercadeo() ? '' : 'none';
   document.getElementById('tab-informes').style.display = puedeInformes() ? '' : 'none';
+  document.getElementById('tab-shows').style.display = puedeShows() ? '' : 'none';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -3579,6 +3614,8 @@ function enterArea(loc, area){
     ['tab-chat', 'tab-admin', 'tab-calculadora', 'tab-rrhh', 'tab-mercadeo'].forEach(id => { document.getElementById(id).style.display = 'none'; });
     applyAreaModuleVisibility([]);
     document.getElementById('tab-informes').style.display = '';
+    document.getElementById('tab-shows').style.display = puedeShows() ? '' : 'none';
+    layoutNav();
     switchTab('informes');
     return;
   }
@@ -4361,8 +4398,9 @@ document.getElementById('tab-rrhh').addEventListener('click', ()=>switchTab('rrh
 document.getElementById('tab-facturas').addEventListener('click', ()=>switchTab('facturas'));
 document.getElementById('tab-mercadeo').addEventListener('click', ()=>switchTab('mercadeo'));
 document.getElementById('tab-informes').addEventListener('click', ()=>switchTab('informes'));
+document.getElementById('tab-shows').addEventListener('click', ()=>switchTab('shows'));
 function switchTab(name){
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes'].forEach(n=>{
+  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes','shows'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
   });
@@ -4372,6 +4410,7 @@ function switchTab(name){
   if(name==='calculadora') abrirCalculadoraPrecios();
   if(name==='mercadeo') merAbrir();
   if(name==='informes') infsAbrir();
+  if(name==='shows') shwAbrir();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
@@ -4398,7 +4437,7 @@ function switchTab(name){
 }
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','informes','chat','admin'];
+const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','informes','shows','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
   cocina: ['recetario','produccion','pedidos','chat'],
@@ -11715,6 +11754,10 @@ async function loadUsers(){
           <input type="checkbox" data-informes-for="${u.id}" ${u.es_informes?'checked':''}>
           Informes
         </label>
+        <label class="chip-check" title="Maneja la programación de shows de Cantina Dos Santos">
+          <input type="checkbox" data-shows-for="${u.id}" ${u.es_shows?'checked':''}>
+          Shows
+        </label>
         <button class="btn btn-secondary btn-small" data-save-role="${u.id}">Guardar</button>
         <button class="btn btn-ghost btn-small" data-pass-abrir="${u.id}">Cambiar contraseña</button>
       </div>
@@ -11745,6 +11788,7 @@ async function loadUsers(){
       const newFacturas = wrap.querySelector(`[data-facturas-for="${id}"]`).checked;
       const newMercadeo = wrap.querySelector(`[data-mercadeo-for="${id}"]`).checked;
       const newInformes = wrap.querySelector(`[data-informes-for="${id}"]`).checked;
+      const newShows = wrap.querySelector(`[data-shows-for="${id}"]`).checked;
       if(id === session.user.id && newRole !== 'admin'){
         showToast('No puedes quitarte tu propio rol de admin desde aquí');
         select.value = 'admin';
@@ -11755,7 +11799,7 @@ async function loadUsers(){
         superCb.checked = true;
         return;
       }
-      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas, es_mercadeo: newMercadeo, es_informes: newInformes }).eq('id', id);
+      const { error } = await supa.from('profiles').update({ role: newRole, is_super_admin: newSuper, es_rrhh: newRrhh, es_facturas: newFacturas, es_mercadeo: newMercadeo, es_informes: newInformes, es_shows: newShows }).eq('id', id);
       if(error){ showToast('Error al actualizar: ' + error.message); return; }
       showToast('Usuario actualizado');
     });
@@ -14465,10 +14509,189 @@ function infsEventos(){
   box.addEventListener('input', e => { if(e.target.id === 'infsBuscar'){ INFS.q = e.target.value; const pos = e.target.selectionStart; infsPintar(); const b = document.getElementById('infsBuscar'); b.focus(); b.setSelectionRange(pos, pos); } });
 }
 
+/* ---------- Shows: programación de shows de Cantina Dos Santos (sql/shows.sql) ----------
+   Una fila por día del mes con el tipo (Mariachis/Banda), una casilla por franja (grupo + valor) y el total del día;
+   subtotal por semana (lunes a domingo) y del mes. Catálogo de grupos con precio entre semana (lun–jue) y fin de semana
+   (vie–dom): al elegir el grupo el valor se llena solo y se puede cambiar. Un día cancelado queda en rojo y no suma. */
+const SHW = { loc: 'c98db3a9-7be7-4bf6-8b77-318e6ca3098b', mes: null, grupos: [], franjas: [], dias: {}, asig: {}, listo: false, cat: false };
+const SHW_TIPOS = ['Mariachis', 'Banda', 'Otro'];
+function shwFinde(iso){ const d = new Date(iso + 'T12:00').getDay(); return d === 5 || d === 6 || d === 0; }
+function shwHora(h){ const [hh, mm] = String(h).split(':').map(Number); return ((hh % 12) || 12) + ':' + String(mm).padStart(2, '0') + (hh < 12 ? ' a. m.' : ' p. m.'); }
+function shwFranjas(){ return SHW.franjas.filter(f => f.activa).sort((a, b) => String(a.hora).localeCompare(String(b.hora))); }
+function shwTotalDia(iso){ if((SHW.dias[iso] || {}).cancelado) return 0; return shwFranjas().reduce((t, f) => t + (Number((SHW.asig[iso + '|' + f.id] || {}).valor) || 0), 0); }
+async function shwAbrir(){
+  if(!puedeShows()) return;
+  if(!SHW.mes){ const h = new Date(); SHW.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
+  if(!SHW.listo){ shwEventos(); SHW.listo = true; }
+  await shwCargar();
+}
+async function shwCargar(){
+  const ini = horIso(SHW.mes), fin = horIso(new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0));
+  const [g, f, d, a] = await Promise.all([
+    supa.from('shows_grupos').select('*').eq('location_id', SHW.loc).order('orden').order('nombre'),
+    supa.from('shows_franjas').select('*').eq('location_id', SHW.loc).order('hora'),
+    supa.from('shows_dias').select('*').eq('location_id', SHW.loc).gte('fecha', ini).lte('fecha', fin),
+    supa.from('shows_asignaciones').select('*').eq('location_id', SHW.loc).gte('fecha', ini).lte('fecha', fin)
+  ]);
+  const err = g.error || f.error || d.error || a.error;
+  if(err){ document.getElementById('shwBox').innerHTML = '<div class="empty-note">No se pudo cargar: ' + escapeHtml(err.message) + '</div>'; return; }
+  SHW.grupos = g.data || []; SHW.franjas = f.data || [];
+  SHW.dias = {}; (d.data || []).forEach(x => { SHW.dias[x.fecha] = x; });
+  SHW.asig = {}; (a.data || []).forEach(x => { SHW.asig[x.fecha + '|' + x.franja_id] = x; });
+  shwPintar();
+}
+function shwPintar(){
+  const box = document.getElementById('shwBox'), fr = shwFranjas(), grupo = id => SHW.grupos.find(x => x.id === id) || {};
+  const ult = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0).getDate();
+  let filas = '', sem = 0, mes = 0, nShows = 0, nCanc = 0, lunesSem = null;
+  const cierreSemana = (iso) => { filas += `<tr class="shw-sem"><td colspan="${fr.length + 3}">Semana del ${escapeHtml(fmtFecha(lunesSem).slice(0, 5))} al ${escapeHtml(fmtFecha(iso).slice(0, 5))} <button type="button" class="btn btn-ghost btn-small" data-shw-copiar="${lunesSem}">Copiar semana anterior</button></td><td class="shw-tot">${escapeHtml(fmtMoney(sem) || '$ 0')}</td></tr>`; sem = 0; };
+  for(let dd = 1; dd <= ult; dd++){
+    const fecha = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth(), dd), iso = horIso(fecha), dia = SHW.dias[iso] || {}, canc = !!dia.cancelado;
+    if(!lunesSem) lunesSem = horIso(horLunesDe(fecha));
+    const t = shwTotalDia(iso);
+    if(canc) nCanc++; else { sem += t; mes += t; nShows += fr.filter(f => SHW.asig[iso + '|' + f.id]).length; }
+    filas += `<tr class="${canc ? 'shw-cancel' : ''}"><td class="shw-dia">${fecha.getDate()}<small>${escapeHtml(fecha.toLocaleDateString('es-CO', { weekday: 'long' }))}</small></td>
+      <td><select data-shw-tipo="${iso}" aria-label="Tipo de show del ${dd}"><option value="">—</option>${SHW_TIPOS.map(x => `<option${dia.tipo === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
+      ${fr.map(f => { const a = SHW.asig[iso + '|' + f.id]; return `<td><button type="button" class="shw-slot${a ? ' lleno' : ''}" data-shw-slot="${iso}|${f.id}">${a ? escapeHtml(grupo(a.grupo_id).nombre || '?') + `<small>${escapeHtml(fmtMoney(a.valor))}</small>` : '+ Elegir'}</button></td>`; }).join('')}
+      <td><button type="button" class="btn btn-ghost btn-small" data-shw-cancelar="${iso}">${canc ? 'Reactivar' : 'Cancelar día'}</button></td>
+      <td class="shw-tot">${canc ? 'Cancelado' : escapeHtml(fmtMoney(t) || '$ 0')}</td></tr>`;
+    if(fecha.getDay() === 0 || dd === ult){ cierreSemana(iso); lunesSem = null; }
+  }
+  const cat = SHW.grupos.map(x => `<div class="shw-catrow${x.activo ? '' : ' inactivo'}"><input type="text" data-shw-g="${x.id}|nombre" value="${escapeHtml(x.nombre)}" aria-label="Nombre del grupo"><label><span class="field-label">Lun–jue</span><input type="text" inputmode="numeric" data-shw-g="${x.id}|precio_semana" value="${escapeHtml(fmtMoney(x.precio_semana))}"></label><label><span class="field-label">Vie–dom</span><input type="text" inputmode="numeric" data-shw-g="${x.id}|precio_finde" value="${escapeHtml(fmtMoney(x.precio_finde))}"></label><label class="cb"><input type="checkbox" data-shw-g="${x.id}|activo"${x.activo ? ' checked' : ''}>Activo</label></div>`).join('');
+  box.innerHTML = `<div class="admin-header"><h2>Shows · Cantina Dos Santos</h2></div>
+    <div class="shw-top">
+      <div class="mer-mes"><button type="button" class="btn btn-secondary" data-shw="ant" aria-label="Mes anterior">${HOR_ICO.izq}</button><b>${escapeHtml(merMesTexto(SHW.mes))}</b><button type="button" class="btn btn-secondary" data-shw="sig" aria-label="Mes siguiente">${HOR_ICO.der}</button></div>
+      <div class="shw-acc"><button type="button" class="btn btn-secondary" data-shw="catalogo">${SHW.cat ? 'Ocultar catálogo y franjas' : 'Catálogo y franjas'}</button><button type="button" class="btn btn-secondary" data-shw="descargar">Descargar</button></div>
+    </div>
+    <div class="seg-tiles"><div class="seg-tile" style="--c:var(--accent)"><b>${escapeHtml(fmtMoney(mes) || '$ 0')}</b><span>costo de shows del mes</span></div><div class="seg-tile" style="--c:var(--ok)"><b>${nShows}</b><span>shows programados</span></div><div class="seg-tile" style="--c:var(--danger)"><b>${nCanc}</b><span>día${nCanc === 1 ? '' : 's'} cancelado${nCanc === 1 ? '' : 's'}</span></div></div>
+    ${SHW.cat ? `<section class="shw-cat"><h3>Catálogo de grupos</h3><p class="field-help">Precio entre semana (lunes a jueves) y fin de semana (viernes a domingo). Cambia y sal de la casilla para guardar. Desactivar no borra lo ya programado.</p>${cat}
+      <div class="shw-nuevo"><input type="text" id="shwNuevoGrupo" placeholder="Nuevo grupo" maxlength="60"><input type="text" inputmode="numeric" id="shwNuevoSem" placeholder="Precio lun–jue"><input type="text" inputmode="numeric" id="shwNuevoFin" placeholder="Precio vie–dom"><button type="button" class="btn btn-accent" data-shw="grupo">Agregar</button></div>
+      <h3>Franjas</h3><div class="shw-franjas">${SHW.franjas.map(f => `<label class="cb"><input type="checkbox" data-shw-franja="${f.id}"${f.activa ? ' checked' : ''}>${escapeHtml(shwHora(f.hora))}</label>`).join('')}<input type="time" id="shwNuevaFranja" aria-label="Nueva franja"><button type="button" class="btn btn-secondary btn-small" data-shw="franja">Agregar franja</button></div></section>` : ''}
+    <div class="shw-wrap"><table class="shw-tabla"><thead><tr><th>Día</th><th>Show</th>${fr.map(f => `<th>${escapeHtml(shwHora(f.hora))}</th>`).join('')}<th></th><th class="shw-tot">Total del día</th></tr></thead><tbody>${filas}</tbody>
+      <tfoot><tr><td colspan="${fr.length + 3}">Total del mes</td><td class="shw-tot">${escapeHtml(fmtMoney(mes) || '$ 0')}</td></tr></tfoot></table></div>`;
+}
+function shwElegir(iso, franjaId){
+  const actual = SHW.asig[iso + '|' + franjaId], finde = shwFinde(iso), activos = SHW.grupos.filter(g => g.activo);
+  const f = SHW.franjas.find(x => x.id === franjaId) || {};
+  let sel = actual ? actual.grupo_id : null;
+  let m = document.getElementById('shwModal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'shwModal'; document.body.appendChild(m); }
+  const precio = id => { const g = SHW.grupos.find(x => x.id === id); return g ? Number(finde ? g.precio_finde : g.precio_semana) || 0 : 0; };
+  m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="shwTit"><h3 id="shwTit">${escapeHtml(new Date(iso + 'T12:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }))} · ${escapeHtml(shwHora(f.hora || '00:00'))}</h3>
+    <p class="modal-sub">${finde ? 'Fin de semana: precio de viernes a domingo.' : 'Entre semana: precio de lunes a jueves.'}</p>
+    <div class="field"><span class="field-label">Grupo</span><div class="mer-chips" id="shwChips">${activos.map(g => `<button type="button" data-shw-g-sel="${g.id}" aria-pressed="${g.id === sel}">${escapeHtml(g.nombre)}</button>`).join('')}</div></div>
+    <div class="field"><label class="field-label" for="shwValor">Valor</label><input type="text" inputmode="numeric" id="shwValor" class="mer-monto" value="${actual ? escapeHtml(fmtMoney(actual.valor)) : ''}" placeholder="$ 0"></div>
+    <div class="modal-actions">${actual ? '<button type="button" class="btn btn-danger-outline" data-shw-m="quitar">Quitar</button>' : ''}<button type="button" class="btn btn-ghost" data-shw-m="cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-shw-m="guardar">Guardar</button></div></div>`;
+  m.classList.add('open');
+  const cerrar = () => { m.classList.remove('open'); m.onclick = null; };
+  const valor = () => Number(String(document.getElementById('shwValor').value).replace(/[^\d]/g, '')) || 0;
+  document.getElementById('shwValor').oninput = e => { const v = valor(); e.target.value = v ? fmtMoney(v) : ''; };
+  m.onclick = async e => {
+    if(e.target === m){ cerrar(); return; }
+    const g = e.target.closest('[data-shw-g-sel]');
+    if(g){ sel = g.dataset.shwGSel; m.querySelectorAll('[data-shw-g-sel]').forEach(b => b.setAttribute('aria-pressed', b === g)); document.getElementById('shwValor').value = fmtMoney(precio(sel)); return; }
+    const b = e.target.closest('[data-shw-m]'); if(!b) return;
+    if(b.dataset.shwM === 'cerrar'){ cerrar(); return; }
+    b.disabled = true;
+    let r;
+    if(b.dataset.shwM === 'quitar') r = await supa.from('shows_asignaciones').delete().eq('location_id', SHW.loc).eq('fecha', iso).eq('franja_id', franjaId);
+    else {
+      if(!sel){ b.disabled = false; showToast('Elige el grupo', 'warn'); return; }
+      r = await supa.from('shows_asignaciones').upsert({ location_id: SHW.loc, fecha: iso, franja_id: franjaId, grupo_id: sel, valor: valor() }, { onConflict: 'location_id,fecha,franja_id' });
+    }
+    if(r.error){ b.disabled = false; showToast('No se guardó: ' + r.error.message, 'danger'); return; }
+    cerrar(); shwCargar();
+  };
+}
+async function shwCopiarSemana(lunes){
+  const prev = prenSumarDias(lunes, -7), finPrev = prenSumarDias(lunes, -1), fin = prenSumarDias(lunes, 6);
+  const [a, d, ya] = await Promise.all([
+    supa.from('shows_asignaciones').select('fecha, franja_id, grupo_id, valor').eq('location_id', SHW.loc).gte('fecha', prev).lte('fecha', finPrev),
+    supa.from('shows_dias').select('fecha, tipo').eq('location_id', SHW.loc).gte('fecha', prev).lte('fecha', finPrev),
+    supa.from('shows_asignaciones').select('fecha, franja_id').eq('location_id', SHW.loc).gte('fecha', lunes).lte('fecha', fin)
+  ]);
+  if(a.error || d.error || ya.error){ showToast('No se pudo copiar', 'danger'); return; }
+  const ocupadas = new Set((ya.data || []).map(x => x.fecha + '|' + x.franja_id));
+  const filas = (a.data || []).map(x => ({ location_id: SHW.loc, fecha: prenSumarDias(x.fecha, 7), franja_id: x.franja_id, grupo_id: x.grupo_id, valor: x.valor })).filter(x => !ocupadas.has(x.fecha + '|' + x.franja_id));
+  const tipos = (d.data || []).filter(x => x.tipo).map(x => ({ location_id: SHW.loc, fecha: prenSumarDias(x.fecha, 7), tipo: x.tipo }));
+  if(!filas.length && !tipos.length){ showToast('La semana anterior está vacía o esta semana ya tiene esas casillas', 'warn'); return; }
+  if(filas.length){ const r = await supa.from('shows_asignaciones').insert(filas); if(r.error){ showToast('No se pudo copiar: ' + r.error.message, 'danger'); return; } }
+  for(const t of tipos){ if(!(SHW.dias[t.fecha] || {}).tipo) await supa.from('shows_dias').upsert(t, { onConflict: 'location_id,fecha' }); }
+  showToast(filas.length + ' show' + (filas.length === 1 ? '' : 's') + ' copiado' + (filas.length === 1 ? '' : 's'), 'ok'); shwCargar();
+}
+async function shwDescargar(){
+  const formato = await elegirFormato('Shows · ' + merMesTexto(SHW.mes), EXP_OPC_CSV); if(!formato) return;
+  const fr = shwFranjas(), grupo = id => (SHW.grupos.find(x => x.id === id) || {}).nombre || '';
+  const ult = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + 1, 0).getDate(), filas = [];
+  for(let dd = 1; dd <= ult; dd++){
+    const fecha = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth(), dd), iso = horIso(fecha), dia = SHW.dias[iso] || {};
+    filas.push([iso, fecha.toLocaleDateString('es-CO', { weekday: 'long' }), dia.tipo || '', ...fr.flatMap(f => { const a = SHW.asig[iso + '|' + f.id]; return [a ? grupo(a.grupo_id) : '', a ? Number(a.valor) || 0 : '']; }), dia.cancelado ? 'Sí' : 'No', shwTotalDia(iso)]);
+  }
+  await descargarFilas({ formato, horizontal: true, hoja: 'Shows', nombre: 'shows_' + horIso(SHW.mes).slice(0, 7), titulo: 'Shows · Cantina Dos Santos · ' + merMesTexto(SHW.mes),
+    subtitulo: 'Total del mes: ' + fmtMoney(filas.reduce((t, x) => t + x[x.length - 1], 0)),
+    cab: ['Fecha', 'Día', 'Show', ...fr.flatMap(f => [shwHora(f.hora), 'Valor ' + shwHora(f.hora)]), 'Cancelado', 'Total del día'], filas });
+}
+function shwEventos(){
+  const box = document.getElementById('shwBox'), num = v => Number(String(v).replace(/[^\d]/g, '')) || 0;
+  box.addEventListener('click', async e => {
+    const sl = e.target.closest('[data-shw-slot]'); if(sl){ const [iso, fid] = sl.dataset.shwSlot.split('|'); shwElegir(iso, fid); return; }
+    const ca = e.target.closest('[data-shw-cancelar]');
+    if(ca){
+      const iso = ca.dataset.shwCancelar, canc = !(SHW.dias[iso] || {}).cancelado;
+      const r = await supa.from('shows_dias').upsert({ location_id: SHW.loc, fecha: iso, cancelado: canc, tipo: (SHW.dias[iso] || {}).tipo || null }, { onConflict: 'location_id,fecha' });
+      if(r.error){ showToast('No se guardó: ' + r.error.message, 'danger'); return; }
+      showToast(canc ? 'Día cancelado: no suma al total' : 'Día reactivado', 'ok'); shwCargar(); return;
+    }
+    const cp = e.target.closest('[data-shw-copiar]'); if(cp){ cp.disabled = true; await shwCopiarSemana(cp.dataset.shwCopiar); return; }
+    const b = e.target.closest('[data-shw]'); if(!b) return;
+    const a = b.dataset.shw;
+    if(a === 'ant' || a === 'sig'){ SHW.mes = new Date(SHW.mes.getFullYear(), SHW.mes.getMonth() + (a === 'ant' ? -1 : 1), 1); shwCargar(); }
+    else if(a === 'catalogo'){ SHW.cat = !SHW.cat; shwPintar(); }
+    else if(a === 'descargar') shwDescargar();
+    else if(a === 'grupo'){
+      const nombre = document.getElementById('shwNuevoGrupo').value.trim();
+      if(!nombre){ showToast('Escribe el nombre del grupo', 'warn'); return; }
+      const r = await supa.from('shows_grupos').insert({ location_id: SHW.loc, nombre, precio_semana: num(document.getElementById('shwNuevoSem').value), precio_finde: num(document.getElementById('shwNuevoFin').value), orden: SHW.grupos.length + 1 });
+      if(r.error){ showToast(/duplicate|unique/i.test(r.error.message) ? 'Ya existe un grupo con ese nombre' : 'No se guardó: ' + r.error.message, 'danger'); return; }
+      showToast('Grupo agregado', 'ok'); shwCargar();
+    }
+    else if(a === 'franja'){
+      const h = document.getElementById('shwNuevaFranja').value; if(!h){ showToast('Elige la hora', 'warn'); return; }
+      const r = await supa.from('shows_franjas').insert({ location_id: SHW.loc, hora: h });
+      if(r.error){ showToast(/duplicate|unique/i.test(r.error.message) ? 'Esa franja ya existe' : 'No se guardó: ' + r.error.message, 'danger'); return; }
+      showToast('Franja agregada', 'ok'); shwCargar();
+    }
+  });
+  box.addEventListener('change', async e => {
+    const t = e.target.closest('[data-shw-tipo]');
+    if(t){
+      const iso = t.dataset.shwTipo;
+      const r = await supa.from('shows_dias').upsert({ location_id: SHW.loc, fecha: iso, tipo: t.value || null, cancelado: !!(SHW.dias[iso] || {}).cancelado }, { onConflict: 'location_id,fecha' });
+      if(r.error){ showToast('No se guardó: ' + r.error.message, 'danger'); return; }
+      SHW.dias[iso] = Object.assign(SHW.dias[iso] || {}, { tipo: t.value || null }); return;
+    }
+    const g = e.target.closest('[data-shw-g]');
+    if(g){
+      const [id, campo] = g.dataset.shwG.split('|');
+      const v = campo === 'activo' ? g.checked : campo === 'nombre' ? g.value.trim() : num(g.value);
+      if(campo === 'nombre' && !v){ showToast('El nombre no puede quedar vacío', 'warn'); shwPintar(); return; }
+      const r = await supa.from('shows_grupos').update({ [campo]: v }).eq('id', id);
+      if(r.error){ showToast(/duplicate|unique/i.test(r.error.message) ? 'Ya existe un grupo con ese nombre' : 'No se guardó: ' + r.error.message, 'danger'); shwPintar(); return; }
+      Object.assign(SHW.grupos.find(x => x.id === id), { [campo]: v }); showToast('Catálogo actualizado', 'ok'); shwPintar(); return;
+    }
+    const f = e.target.closest('[data-shw-franja]');
+    if(f){
+      const r = await supa.from('shows_franjas').update({ activa: f.checked }).eq('id', f.dataset.shwFranja);
+      if(r.error){ showToast('No se guardó: ' + r.error.message, 'danger'); return; }
+      showToast(f.checked ? 'Franja activada' : 'Franja quitada (lo ya programado se conserva)', 'ok'); shwCargar();
+    }
+  });
+}
+
 /* ---------- Cambiar de área sin salir del punto ---------- */
 async function switchToArea(area){
   if(esRrhh()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility(['horarios']); return; }
-  if(esInformes()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-informes').style.display = ''; switchTab('informes'); return; }
+  if(esInformes()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-informes').style.display = ''; document.getElementById('tab-shows').style.display = puedeShows() ? '' : 'none'; layoutNav(); switchTab('informes'); return; }
   if(esMercadeo()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-mercadeo').style.display = ''; switchTab('mercadeo'); return; }
   if(esFacturas()){ currentArea = area; document.getElementById('whoArea').textContent = area.name; applyAreaModuleVisibility([]); document.getElementById('tab-facturas').style.display = ''; switchTab('facturas'); return; }
   await supa.from('user_areas').insert({ user_id: session.user.id, area_id: area.id }).select();
