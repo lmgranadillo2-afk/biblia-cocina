@@ -972,6 +972,16 @@ nav.tabs button{position:relative;}
 .mer-prev{border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); font-size:14px; margin:var(--space-2) 0;}
 .mer-prev.ok{background:var(--ok-bg);} .mer-prev.warn{background:var(--warn-bg);} .mer-prev.danger{background:var(--danger-bg);} .mer-prev.neutral{background:var(--surface-2);}
 .seg-nota{font-size:13px; color:var(--text-muted); margin:var(--space-2) 0;}
+.recv-modo{margin:var(--space-3) 0;}
+.estado-op.recv-nollego.active{background:var(--danger-bg); border-color:var(--danger); color:var(--danger);}
+.recv-items{display:flex; flex-direction:column; gap:var(--space-2); max-height:40vh; overflow-y:auto; margin-bottom:var(--space-3);}
+.recv-item{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-2); border-bottom:1px solid var(--border); padding-bottom:6px;}
+.recv-item label.cb{display:flex; align-items:center; gap:8px; min-height:44px; font-size:14px;}
+.recv-item small{color:var(--text-muted); font-family:'IBM Plex Mono',monospace;}
+.recv-llego{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);}
+.recv-llego input{width:90px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+.kc-note.no-llego{border-left:3px solid var(--danger); background:var(--danger-bg);}
+.kc-note.incompleto{border-left:3px solid var(--warn); background:var(--warn-bg);}
 .seg-abrir{width:100%;}
 @media (min-width:1024px){ .seg-abrir{display:none;} }
 .seg-cab{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-3);}
@@ -2412,9 +2422,16 @@ nav.tabs button{position:relative;}
 
 <div class="modal-overlay" id="receiveModal">
   <div class="modal-box">
-    <h3>Marcar como recibido</h3>
+    <h3>Recepción del pedido</h3>
     <div class="modal-sub" id="receiveMeta"></div>
-    <div class="field"><label class="field-label">Nota (opcional)</label><textarea id="receiveNota" placeholder="Ej: llegó incompleto, faltó la crema de leche..."></textarea></div>
+    <div class="estado-seg recv-modo" role="group" aria-label="¿Cómo llegó el pedido?">
+      <button type="button" class="estado-op confirmado active" data-recv-modo="completo" aria-pressed="true">Llegó completo</button>
+      <button type="button" class="estado-op pendiente" data-recv-modo="incompleto" aria-pressed="false">Llegó incompleto</button>
+      <button type="button" class="estado-op recv-nollego" data-recv-modo="nollego" aria-pressed="false">No llegó</button>
+    </div>
+    <div id="receiveItems" class="recv-items" hidden></div>
+    <div class="field"><label class="field-label" for="receiveNota" id="receiveNotaLabel">Nota (opcional)</label><textarea id="receiveNota" placeholder="Ej: llegó tarde, el empaque venía roto..."></textarea></div>
+    <p class="field-help" id="receiveAyuda"></p>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="receiveCancel">Cancelar</button>
       <button class="btn btn-ok" id="receiveConfirm">Confirmar recibido</button>
@@ -12636,18 +12653,22 @@ function ultimoSeguimiento(o){
 
 // Bloque de recepción de la tarjeta (enviado → por recibir / recibido).
 function recepcionPedidoHtml(o, mode){
-  if(o.status !== 'aprobado' || !o.enviado) return '';
+  const origen = o.pedido_origen_codigo ? `<div class="kc-note recepcion"><b>Faltante de ${escapeHtml(o.pedido_origen_codigo)}</b>Lo que no llegó en ese pedido.</div>` : '';
+  if(o.status === 'aprobado' && !o.enviado && o.no_llego_at) return origen + `<div class="kc-note recepcion no-llego"><b>No llegó · ${fmtFechaHora(o.no_llego_at)}${o.no_llego_por ? ' · ' + escapeHtml(o.no_llego_por) : ''}</b>${escapeHtml(o.no_llego_motivo || '')}. Vuelve a enviarlo al proveedor.</div>`;
+  if(o.status !== 'aprobado' || !o.enviado) return origen;
   const enviado = `<span class="badge neutral">Enviado · ${fmtFechaHora(o.enviado_at)}</span>`;
   if(o.recibido){
     const quien = o.recibido_por && o.recibido_por !== 'Histórico' ? ' · ' + escapeHtml(o.recibido_por) : '';
-    return `${o.recibido_nota ? `<div class="kc-note recepcion"><b>Nota de recepción</b>${escapeHtml(o.recibido_nota)}</div>` : ''}
-      <div class="kc-actions"><span class="badge ok">Recibido · ${fmtFechaHora(o.recibido_at)}${quien}</span>
+    const faltan = o.incompleto ? (o.order_items || []).filter(i => i.cantidad_recibida != null && Number(i.cantidad_recibida) < Number(i.cantidad)) : [];
+    return `${origen}${o.recibido_nota ? `<div class="kc-note recepcion"><b>Nota de recepción</b>${escapeHtml(o.recibido_nota)}</div>` : ''}
+      ${o.incompleto ? `<div class="kc-note recepcion incompleto"><b>Llegó incompleto</b>${faltan.map(i => escapeHtml(i.ingredient_name + ': llegó ' + fmtQty(i.cantidad_recibida) + ' de ' + fmtQty(i.cantidad) + ' ' + (i.unidad || ''))).join(' · ')}</div>` : ''}
+      <div class="kc-actions"><span class="badge ${o.incompleto ? 'warn' : 'ok'}">${o.incompleto ? 'Recibido incompleto' : 'Recibido'} · ${fmtFechaHora(o.recibido_at)}${quien}</span>
       ${mode === 'admin' ? `<button class="btn btn-secondary btn-small" data-unreceive-id="${o.id}">Desmarcar</button>` : ''}</div>`;
   }
   const seg = ultimoSeguimiento(o);
   const segHtml = seg ? `<div class="kc-note recepcion"><b>Seguimiento · ${escapeHtml(seg.creado_por_nombre || '')} · ${fmtFechaHora(seg.created_at)}</b>${escapeHtml(seg.nota)}</div>` : '';
-  return `${segHtml}<div class="kc-actions">${enviado}${mode === 'admin' ? `<button class="btn btn-secondary btn-small" data-unsend-id="${o.id}" title="Vuelve a quedar aprobado y sin enviar">Desmarcar enviado</button>` : ''}</div>
-    <div class="kc-actions"><button class="btn btn-secondary btn-small" data-follow-id="${o.id}">Seguimiento</button><button class="btn btn-ok btn-small" data-receive-id="${o.id}">Marcar recibido</button></div>`;
+  return `${origen}${segHtml}<div class="kc-actions">${enviado}${mode === 'admin' ? `<button class="btn btn-secondary btn-small" data-unsend-id="${o.id}" title="Vuelve a quedar aprobado y sin enviar">Desmarcar enviado</button>` : ''}</div>
+    <div class="kc-actions"><button class="btn btn-secondary btn-small" data-follow-id="${o.id}">Seguimiento</button><button class="btn btn-ok btn-small" data-receive-id="${o.id}">Recepción: llegó / no llegó</button></div>`;
 }
 
 // Tarjetas del kanban que se abren al tocarlas: también con Enter o Espacio desde el teclado
@@ -12926,11 +12947,35 @@ document.getElementById('followSave').addEventListener('click', async ()=>{
 let recepcionPedido = null;
 
 function abrirRecepcion(o, mode){
-  recepcionPedido = { id: o.id, mode };
+  recepcionPedido = { id: o.id, mode, items: o.order_items || [], modo: 'completo' };
   document.getElementById('receiveMeta').textContent = [o.codigo, o.proveedor, 'enviado ' + fmtFechaHora(o.enviado_at)].filter(Boolean).join(' · ');
   document.getElementById('receiveNota').value = '';
+  recepcionModo('completo');
   document.getElementById('receiveModal').classList.add('open');
 }
+// Llegó completo / Llegó incompleto (se marcan los faltantes y se crea un pedido con ellos) / No llegó (vuelve a por enviar).
+function recepcionModo(modo){
+  recepcionPedido.modo = modo;
+  document.querySelectorAll('[data-recv-modo]').forEach(b => { const on = b.dataset.recvModo === modo; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); });
+  const items = document.getElementById('receiveItems');
+  items.hidden = modo !== 'incompleto';
+  if(modo === 'incompleto') items.innerHTML = '<span class="field-label">Marca lo que faltó y cuánto llegó</span>' + recepcionPedido.items.map(i => `<div class="recv-item"><label class="cb"><input type="checkbox" data-recv-falta="${i.id}">${escapeHtml(i.ingredient_name)} <small>${escapeHtml(fmtQty(i.cantidad) + ' ' + (i.unidad || ''))}</small></label>
+      <label class="recv-llego"><span>Llegó</span><input type="number" min="0" step="any" inputmode="decimal" data-recv-llego="${i.id}" value="0" disabled aria-label="${escapeHtml('Cuánto llegó de ' + i.ingredient_name)}"></label></div>`).join('');
+  document.getElementById('receiveNotaLabel').textContent = modo === 'nollego' ? 'Motivo (obligatorio)' : 'Nota (opcional)';
+  document.getElementById('receiveNota').placeholder = modo === 'nollego' ? 'Ej: el proveedor no vino, no había producto…' : 'Ej: llegó tarde, el empaque venía roto…';
+  document.getElementById('receiveAyuda').textContent = modo === 'incompleto' ? 'El pedido queda recibido (incompleto) y se crea solo un pedido nuevo con lo que faltó, aprobado y por enviar al mismo proveedor. Se avisa a los admin del área.'
+    : modo === 'nollego' ? 'El pedido vuelve a "Por enviar" para mandarlo otra vez al proveedor, queda anotado en el historial y se avisa a los admin del área.' : '';
+  const b = document.getElementById('receiveConfirm');
+  b.textContent = modo === 'nollego' ? 'Confirmar que no llegó' : modo === 'incompleto' ? 'Confirmar incompleto' : 'Confirmar recibido';
+  b.className = 'btn ' + (modo === 'nollego' ? 'btn-danger' : modo === 'incompleto' ? 'btn-accent' : 'btn-ok');
+}
+document.getElementById('receiveModal').addEventListener('click', e => {
+  const m = e.target.closest('[data-recv-modo]'); if(m && recepcionPedido) recepcionModo(m.dataset.recvModo);
+});
+document.getElementById('receiveModal').addEventListener('change', e => {
+  const c = e.target.closest('[data-recv-falta]'); if(!c) return;
+  const inp = document.querySelector(`[data-recv-llego="${c.dataset.recvFalta}"]`); inp.disabled = !c.checked; if(!c.checked) inp.value = '0';
+});
 
 document.getElementById('receiveCancel').addEventListener('click', ()=>{
   document.getElementById('receiveModal').classList.remove('open');
@@ -12939,14 +12984,27 @@ document.getElementById('receiveCancel').addEventListener('click', ()=>{
 
 document.getElementById('receiveConfirm').addEventListener('click', async ()=>{
   if(!recepcionPedido) return;
-  const btn = document.getElementById('receiveConfirm');
-  btn.disabled = true;
-  const { error } = await supa.rpc('marcar_pedido_recibido', {
-    p_order_id: recepcionPedido.id, p_nota: document.getElementById('receiveNota').value.trim() || null
-  });
+  const btn = document.getElementById('receiveConfirm'), nota = document.getElementById('receiveNota').value.trim(), modo = recepcionPedido.modo;
+  let error, msg;
+  if(modo === 'nollego'){
+    if(!nota){ showToast('Escribe por qué no llegó', 'warn'); document.getElementById('receiveNota').focus(); return; }
+    btn.disabled = true;
+    const r = await supa.rpc('pedido_no_llego', { p_order_id: recepcionPedido.id, p_motivo: nota });
+    error = r.error; msg = 'El pedido vuelve a "Por enviar"' + (r.data ? ' · se avisó a ' + r.data + ' admin' + (r.data === 1 ? '' : 's') : '');
+  } else if(modo === 'incompleto'){
+    const items = [...document.querySelectorAll('[data-recv-falta]:checked')].map(c => ({ id: c.dataset.recvFalta, recibida: Number(String(document.querySelector(`[data-recv-llego="${c.dataset.recvFalta}"]`).value).replace(',', '.')) || 0 }));
+    if(!items.length){ showToast('Marca qué insumos faltaron', 'warn'); return; }
+    btn.disabled = true;
+    const r = await supa.rpc('pedido_llego_incompleto', { p_order_id: recepcionPedido.id, p_items: items, p_nota: nota || null });
+    error = r.error; msg = 'Recibido incompleto · se creó el pedido ' + (r.data || '') + ' con lo que faltó';
+  } else {
+    btn.disabled = true;
+    const r = await supa.rpc('marcar_pedido_recibido', { p_order_id: recepcionPedido.id, p_nota: nota || null });
+    error = r.error; msg = 'Pedido marcado como recibido';
+  }
   btn.disabled = false;
-  if(error){ showToast('No se pudo marcar como recibido: ' + error.message, 'danger'); return; }
-  showToast('Pedido marcado como recibido', 'ok');
+  if(error){ showToast('No se pudo guardar: ' + error.message, 'danger'); return; }
+  showToast(msg, 'ok');
   document.getElementById('receiveModal').classList.remove('open');
   const mode = recepcionPedido.mode;
   recepcionPedido = null;
