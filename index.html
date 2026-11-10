@@ -3509,6 +3509,7 @@ function facturasPintarLista(){
       ${f.notas ? `<div class="kc-meta">${escapeHtml(f.notas)}</div>` : ''}
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button class="btn btn-ghost btn-small" data-fac-ver="${f.id}">Ver</button>
+        <button class="btn btn-ghost btn-small" data-fac-bajar="${f.id}">Descargar imagen</button>
         <button class="btn btn-ghost btn-small" data-fac-borrar="${f.id}">Eliminar</button>
       </div>
     </div>
@@ -3518,6 +3519,20 @@ function facturasPintarLista(){
     if(!f) return;
     const { data } = await supa.storage.from('facturas').createSignedUrl(f.foto_path, 300);
     if(data) window.open(data.signedUrl, '_blank');
+  }));
+  // Descarga la foto (o PDF) con un nombre que se entiende: factura_<proveedor>_<fecha>_<número>.
+  wrap.querySelectorAll('[data-fac-bajar]').forEach(b => b.addEventListener('click', async () => {
+    const f = FACTURAS_LISTA.find(x => x.id === b.dataset.facBajar);
+    if(!f || !f.foto_path) return;
+    const ext = (f.foto_path.split('.').pop() || 'jpg').toLowerCase();
+    const limpio = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    const nombre = ['factura', limpio(f.proveedor) || 'sin_proveedor', f.fecha_factura, limpio(f.numero_factura)].filter(Boolean).join('_') + '.' + ext;
+    b.disabled = true;
+    const { data, error } = await supa.storage.from('facturas').createSignedUrl(f.foto_path, 300, { download: nombre });
+    b.disabled = false;
+    if(error || !data){ showToast('No se pudo descargar: ' + (error ? error.message : 'sin archivo'), 'danger'); return; }
+    const a = document.createElement('a'); a.href = data.signedUrl; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    showToast('Descargando ' + nombre, 'ok');
   }));
   wrap.querySelectorAll('[data-fac-borrar]').forEach(b => b.addEventListener('click', async () => {
     const f = FACTURAS_LISTA.find(x => x.id === b.dataset.facBorrar);
