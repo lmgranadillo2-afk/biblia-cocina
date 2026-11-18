@@ -578,7 +578,12 @@ async function informeVentas(loc: { id: string; slug: string; name: string }, in
   const lineasVistas = new Set<string>();
   const camposVenta = new Set<string>();
 
+  const meseroProd = new Map<string, { mesero: string; nombre: string; categoria: string; cantidad: number; ventas: number }>();
+  let meseroActual = "Sin mesero";
   const sumarProducto = (p: any, cat: string, neto: number, cant: number, c: number) => {
+    const mk = meseroActual + "|" + String(p.id ?? p.name);
+    const mp = meseroProd.get(mk) ?? { mesero: meseroActual, nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0 };
+    mp.cantidad += cant; mp.ventas += neto; meseroProd.set(mk, mp);
     const key = String(p.id ?? p.name);
     const pr = productos.get(key) ?? { nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0, costo: 0 };
     pr.cantidad += cant; pr.ventas += neto; pr.costo += c; productos.set(key, pr);
@@ -607,6 +612,7 @@ async function informeVentas(loc: { id: string; slug: string; name: string }, in
     h.ventas += neto; if (neto > 0) h.ordenes.add(orden); horas.set(hk, h);
     let mn = nombreMesero(t);
     if (!mn) { mn = "Sin mesero"; sinMesero++; }
+    meseroActual = mn;
     const m = meseros.get(mn) ?? { ventas: 0, ordenes: new Set<string>(), clientes: new Map<string, number>(), propinas: 0 };
     m.ventas += neto; m.propinas += propina; if (neto > 0) { m.ordenes.add(orden); sumarOrden(m.clientes, orden, clientes); }
     meseros.set(mn, m);
@@ -641,6 +647,7 @@ async function informeVentas(loc: { id: string; slug: string; name: string }, in
     horas: [...horas.values()].map((h) => ({ dow: h.dow, hora: h.hora, ventas: r0(h.ventas), ordenes: h.ordenes.size })),
     meseros: [...meseros.entries()].map(([mesero, m]) => ({ mesero, ventas: r0(m.ventas), ordenes: m.ordenes.size, clientes: sumaMap(m.clientes), propinas: r0(m.propinas) })).sort((a, b) => b.ventas - a.ventas),
     // Diagnóstico: nombres de los campos que manda Toteat en cada venta (sin valores) y cuántas no traen mesero ni fecha.
+    mesero_productos: [...meseroProd.values()].map((x) => ({ ...x, cantidad: Math.round(x.cantidad * 1000) / 1000, ventas: r0(x.ventas) })).filter((x) => x.cantidad || x.ventas),
     campos_venta: [...camposVenta].sort(), sin_mesero: sinMesero, sin_fecha: sinFecha,
   };
 }

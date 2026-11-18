@@ -14511,6 +14511,20 @@ const INFS_CAT = [
       if(filas.length) filas.push(['TOTAL', r.ventas_netas, 100, r.ordenes, r.clientes, r.ordenes ? Math.round(r.ventas_netas / r.ordenes) : 0, r.propinas || '']);
       return { cab: ['Mesero', 'Venta neta', '% de las ventas', 'Órdenes', 'Personas', 'Ticket por orden', 'Propinas'], filas };
   } },
+  { id: 'vtmeseroprod', grupo: 'Ventas (Toteat)', t: 'Productos por mesero', d: 'Toteat: qué vendió cada mesero, producto por producto, con cantidad, venta neta y su peso en lo que vendió ese mesero.', sensible: true, sinArea: true, async cargar(){
+      const v = await infsVentas();
+      if(!v.mesero_productos) throw new Error('falta actualizar la función de Toteat en Supabase (dynamic-endpoint) con el código nuevo');
+      if(v.meseros.length === 1 && v.meseros[0].mesero === 'Sin mesero') throw new Error('Toteat no mandó el mesero en las ventas. Campos que llegan: ' + (v.campos_venta || []).join(', '));
+      const totM = {}; v.meseros.forEach(m => { totM[m.mesero] = m.ventas; });
+      // Meseros en el orden de lo que más vendieron; dentro de cada uno, productos de más a menos venta, y su subtotal.
+      const filas = [];
+      v.meseros.forEach(m => {
+        const l = v.mesero_productos.filter(x => x.mesero === m.mesero).sort((a, b) => b.ventas - a.ventas);
+        l.forEach(x => filas.push([m.mesero, x.nombre, x.categoria, x.cantidad, x.ventas, infsPct(x.ventas, totM[m.mesero])]));
+        if(l.length) filas.push([m.mesero, 'SUBTOTAL ' + m.mesero, '', Math.round(l.reduce((a, x) => a + x.cantidad, 0) * 1000) / 1000, m.ventas, 100]);
+      });
+      return { cab: ['Mesero', 'Producto', 'Categoría', 'Cantidad', 'Venta neta', '% de lo que vendió el mesero'], filas };
+  } },
   { id: 'foodcost', grupo: 'Mercadeo y costos', t: 'Food cost', d: 'Informes mensuales de food cost por restaurante: ventas netas, costo y porcentaje teórico y real.', sensible: true, sinArea: true, async cargar(){
       const f = INFS.f, mIni = (f.desde || '2000-01-01').slice(0, 7) + '-01', mFin = (f.hasta || horHoy()).slice(0, 7) + '-01';
       const fc = await infsTodas(() => { let q = supa.from('foodcost_informes').select('location_id, mes, datos, origen, generado').gte('mes', mIni).lte('mes', mFin); if(f.loc) q = q.eq('location_id', f.loc); return q.order('mes'); });
