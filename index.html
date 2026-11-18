@@ -14347,6 +14347,28 @@ function infsEstadoPedido(o){
 async function infsPedidos(){
   return infsTodas(() => infsFiltrar(supa.from('orders').select('id, codigo, fecha, proveedor, status, enviado, recibido, urgente, location_id, area_id, creado_por_nombre, order_items(ingredient_code, ingredient_name, cantidad, unidad)'), 'fecha').order('fecha').order('codigo'));
 }
+// Ventas de Toteat (acción "ventas" de la función de Toteat): una sola consulta por restaurante y rango, la usan los 4 informes.
+// Toteat permite 3 consultas por minuto y 15 días por consulta; la función parte el rango y el máximo es un mes.
+const INFS_DOW = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+async function infsVentas(){
+  const f = INFS.f;
+  if(!f.loc) throw new Error('elige el restaurante en "Punto" (Toteat se consulta de a un restaurante)');
+  if(!f.desde || !f.hasta) throw new Error('elige las fechas');
+  const clave = f.loc + '|' + f.desde + '|' + f.hasta;
+  INFS.ventas = INFS.ventas || {};
+  if(!INFS.ventas[clave]){
+    INFS.ventas[clave] = supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: f.loc, accion: 'ventas', ini: f.desde.replace(/-/g, ''), end: f.hasta.replace(/-/g, '') } })
+      .then(({ data, error }) => {
+        if(error || !data || data.ok === false) throw new Error((data && data.error) || (error && error.message) || 'Toteat no respondió');
+        if(data.tipo !== 'ventas') throw new Error('falta actualizar la función de Toteat en Supabase (dynamic-endpoint) con el código nuevo');
+        return data;
+      });
+    INFS.ventas[clave].catch(() => { delete INFS.ventas[clave]; });
+  }
+  return INFS.ventas[clave];
+}
+const infsPct = (v, t) => t ? Math.round(v / t * 1000) / 10 : 0;
+const infsHoraTxt = h => ((h % 12) || 12) + (h < 12 ? ' a. m.' : ' p. m.');
 const INFS_CAT = [
   { id: 'pedidos', grupo: 'Operación', t: 'Pedidos', d: 'Cada línea: punto, área, código, fecha, proveedor, insumo, cantidad y estado.', async cargar(){
       const ped = await infsPedidos(), filas = [];
@@ -14460,6 +14482,34 @@ const INFS_CAT = [
       return { cab: ['Restaurante', 'Categoría', 'Producto', 'Precio', 'Costo', 'Margen', 'Food cost %'],
         filas: it.map(x => { const pr = Number(x.precio) || 0, co = x.costo != null ? Number(x.costo) : null; return [infsLoc(x.location_id), x.categoria || '', x.nombre || '', pr, co != null ? co : '', co != null ? pr - co : '', co != null && pr ? Math.round(co / pr * 1000) / 10 : '']; })
           .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]) || a[2].localeCompare(b[2])) };
+  } },
+  { id: 'vtprod', grupo: 'Ventas (Toteat)', t: 'Ventas por producto', d: 'Toteat: lo que más y menos se vendió, con cantidad, venta neta, costo, margen y food cost. Un restaurante, hasta un mes.', sensible: true, sinArea: true, async cargar(){
+      const v = await infsVentas(), tot = v.resumen.ventas_netas;
+      const filas = v.productos.map((x, i) => [i + 1, x.nombre, x.categoria, x.cantidad, x.ventas, infsPct(x.ventas, tot), x.costo || '', x.costo ? x.ventas - x.costo : '', x.costo && x.ventas ? infsPct(x.costo, x.ventas) : '']);
+      if(filas.length) filas.push(['', 'TOTAL', '', '', tot, 100, v.resumen.costo || '', v.resumen.costo ? tot - v.resumen.costo : '', v.resumen.costo ? infsPct(v.resumen.costo, tot) : '']);
+      return { cab: ['#', 'Producto', 'Categoría', 'Cantidad', 'Venta neta', '% de las ventas', 'Costo', 'Margen', 'Food cost %'], filas };
+  } },
+  { id: 'vtdia', grupo: 'Ventas (Toteat)', t: 'Ventas por día', d: 'Toteat: venta neta, órdenes, personas y ticket promedio de cada día. Lo cerrado antes de las 6 a. m. cuenta para el día anterior.', sinArea: true, async cargar(){
+      const v = await infsVentas(), r = v.resumen;
+      const filas = v.dias.map(x => [x.fecha, INFS_DOW[(new Date(x.fecha + 'T12:00').getDay() + 6) % 7], x.ventas, x.ordenes, x.clientes, x.ordenes ? Math.round(x.ventas / x.ordenes) : 0, x.clientes ? Math.round(x.ventas / x.clientes) : '']);
+      if(filas.length) filas.push(['TOTAL', '', r.ventas_netas, r.ordenes, r.clientes, r.ordenes ? Math.round(r.ventas_netas / r.ordenes) : 0, r.clientes ? Math.round(r.ventas_netas / r.clientes) : '']);
+      return { cab: ['Fecha', 'Día', 'Venta neta', 'Órdenes', 'Personas', 'Ticket por orden', 'Ticket por persona'], filas };
+  } },
+  { id: 'vthora', grupo: 'Ventas (Toteat)', t: 'Ventas por hora y día de la semana', d: 'Toteat: venta neta por hora de cierre de la cuenta, de lunes a domingo, para ver los turnos más fuertes.', sinArea: true, async cargar(){
+      const v = await infsVentas(), m = {};
+      v.horas.forEach(h => { (m[h.hora] = m[h.hora] || Array(7).fill(0))[h.dow - 1] += h.ventas; });
+      // Orden del día de operación: de las 6 a. m. a las 5 a. m.
+      const horas = Object.keys(m).map(Number).sort((a, b) => ((a + 18) % 24) - ((b + 18) % 24));
+      const filas = horas.map(h => [infsHoraTxt(h), ...m[h], m[h].reduce((a, b) => a + b, 0)]);
+      if(filas.length){ const t = INFS_DOW.map((_, i) => horas.reduce((a, h) => a + m[h][i], 0)); filas.push(['TOTAL', ...t, t.reduce((a, b) => a + b, 0)]); }
+      return { cab: ['Hora', ...INFS_DOW, 'Total'], filas };
+  } },
+  { id: 'vtmesero', grupo: 'Ventas (Toteat)', t: 'Ventas por mesero', d: 'Toteat: venta neta, órdenes, personas, ticket promedio y propinas de cada mesero.', sensible: true, sinArea: true, async cargar(){
+      const v = await infsVentas(), r = v.resumen;
+      if(v.meseros.length === 1 && v.meseros[0].mesero === 'Sin mesero') throw new Error('Toteat no mandó el mesero en las ventas. Campos que llegan: ' + (v.campos_venta || []).join(', '));
+      const filas = v.meseros.map(x => [x.mesero, x.ventas, infsPct(x.ventas, r.ventas_netas), x.ordenes, x.clientes, x.ordenes ? Math.round(x.ventas / x.ordenes) : 0, x.propinas || '']);
+      if(filas.length) filas.push(['TOTAL', r.ventas_netas, 100, r.ordenes, r.clientes, r.ordenes ? Math.round(r.ventas_netas / r.ordenes) : 0, r.propinas || '']);
+      return { cab: ['Mesero', 'Venta neta', '% de las ventas', 'Órdenes', 'Personas', 'Ticket por orden', 'Propinas'], filas };
   } },
   { id: 'foodcost', grupo: 'Mercadeo y costos', t: 'Food cost', d: 'Informes mensuales de food cost por restaurante: ventas netas, costo y porcentaje teórico y real.', sensible: true, sinArea: true, async cargar(){
       const f = INFS.f, mIni = (f.desde || '2000-01-01').slice(0, 7) + '-01', mFin = (f.hasta || horHoy()).slice(0, 7) + '-01';

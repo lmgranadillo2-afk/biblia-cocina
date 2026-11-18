@@ -529,6 +529,122 @@ async function registrar(svc: SupabaseClient, locationId: string, origen: string
   });
 }
 
+// Informe de ventas de un período (hasta un mes; se consulta por tramos de 14 días):
+// por producto, por día de operación, por día de la semana y hora, y por mesero.
+// Venta neta de cada pago = total − impuestos, repartida entre sus productos según lo pagado (igual que el food cost).
+// Día de operación: lo que se cierra antes de las 6 a. m. cuenta para el día anterior.
+const HORA_CORTE = 6;
+function fechaHoraCol(s: unknown): { fecha: string; hora: number } | null {
+  const txt = String(s ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}/.test(txt)) return null;
+  let d: Date;
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(txt)) d = new Date(new Date(txt).getTime() - 5 * 3600 * 1000); // con zona: a hora de Colombia
+  else d = new Date(txt.replace(" ", "T").slice(0, 19) + "Z"); // sin zona: ya viene en hora local
+  if (isNaN(d.getTime())) return null;
+  const hora = d.getUTCHours();
+  if (hora < HORA_CORTE) d = new Date(d.getTime() - 86400000);
+  return { fecha: d.toISOString().slice(0, 10), hora };
+}
+function nombreMesero(t: any): string {
+  const cand = [t.waiterName, t.waiter?.name, t.waiter, t.waiter_name, t.userName, t.user?.name, t.sellerName, t.seller?.name];
+  for (const c of cand) if (typeof c === "string" && c.trim()) return c.trim();
+  return "";
+}
+const primerNumero = (...v: unknown[]) => { for (const x of v) { const n = Number(x); if (x != null && x !== "" && !isNaN(n)) return n; } return 0; };
+
+async function informeVentas(loc: { id: string; slug: string; name: string }, ini: string, end: string) {
+  const { cred, faltan, prefijo } = credenciales(loc.slug);
+  if (faltan.length) throw new ErrorSync(`${loc.name} no tiene Toteat configurado (faltan ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}).`);
+  if (!/^\d{8}$/.test(ini) || !/^\d{8}$/.test(end) || end < ini) throw new ErrorSync("Fechas inválidas.");
+  if (sumarDia(ini, 31) <= end) throw new ErrorSync("El período máximo es un mes.");
+
+  // Un día más al final: lo cerrado en la madrugada siguiente es del último día de operación.
+  const ventas: any[] = [];
+  for (const [a, b] of tramos(ini, sumarDia(end, 1), 14)) ventas.push(...((await toteatGet(cred, "sales", { ini: a, end: b })).data ?? []));
+  const iniIso = `${ini.slice(0, 4)}-${ini.slice(4, 6)}-${ini.slice(6, 8)}`, endIso = `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(6, 8)}`;
+
+  const porPago = new Map<string, any>();
+  for (const t of ventas) if (t.paymentId != null) porPago.set(String(t.paymentId), t);
+  const netoDe = (t: any) => (Number(t.total) || 0) - (Number(t.taxes) || 0);
+  const pagadoDe = (t: any) => (t.products ?? []).reduce((a: number, p: any) => a + (Number(p.payed) || 0), 0);
+  const costoLinea = (p: any) => Number(p.totalCost ?? p["totalCost*"]) || (Number(p.unitCost ?? p["unitCost*"]) || 0) * (Number(p.quantity) || 0);
+
+  const productos = new Map<string, { nombre: string; categoria: string; cantidad: number; ventas: number; costo: number }>();
+  const dias = new Map<string, { ventas: number; ordenes: Set<string>; clientes: Map<string, number> }>();
+  const horas = new Map<string, { dow: number; hora: number; ventas: number; ordenes: Set<string> }>();
+  const meseros = new Map<string, { ventas: number; ordenes: Set<string>; clientes: Map<string, number>; propinas: number }>();
+  const ordenesTot = new Set<string>(), clientesTot = new Map<string, number>();
+  let ventasNetas = 0, costo = 0, propinas = 0, sinFecha = 0, sinMesero = 0, pagos = 0;
+  const lineasVistas = new Set<string>();
+  const camposVenta = new Set<string>();
+
+  const sumarProducto = (p: any, cat: string, neto: number, cant: number, c: number) => {
+    const key = String(p.id ?? p.name);
+    const pr = productos.get(key) ?? { nombre: String(p.name ?? ""), categoria: cat, cantidad: 0, ventas: 0, costo: 0 };
+    pr.cantidad += cant; pr.ventas += neto; pr.costo += c; productos.set(key, pr);
+    costo += c;
+  };
+  const sumarOrden = (m: Map<string, number>, orden: string, clientes: number) => m.set(orden, Math.max(m.get(orden) ?? 0, clientes));
+
+  for (const t of ventas) {
+    const fh = fechaHoraCol(t.dateClosed ?? t.dateOpen);
+    if (!fh) { sinFecha++; continue; }
+    if (fh.fecha < iniIso || fh.fecha > endIso) continue;
+    pagos++;
+    Object.keys(t).forEach((k) => camposVenta.add(k));
+    const neto = netoDe(t), orden = String(t.orderId ?? t.paymentId ?? `pago-${pagos}`);
+    const clientes = primerNumero(t.numberClients, t.clients, t.guests, t.covers);
+    const propina = primerNumero(t.tip, t.tips, t.tipAmount);
+    ventasNetas += neto; propinas += propina;
+    if (neto > 0) { ordenesTot.add(orden); sumarOrden(clientesTot, orden, clientes); }
+
+    const d = dias.get(fh.fecha) ?? { ventas: 0, ordenes: new Set<string>(), clientes: new Map<string, number>() };
+    d.ventas += neto; if (neto > 0) { d.ordenes.add(orden); sumarOrden(d.clientes, orden, clientes); }
+    dias.set(fh.fecha, d);
+    const dow = ((new Date(fh.fecha + "T12:00:00Z").getUTCDay() + 6) % 7) + 1; // 1 = lunes … 7 = domingo
+    const hk = `${dow}|${fh.hora}`;
+    const h = horas.get(hk) ?? { dow, hora: fh.hora, ventas: 0, ordenes: new Set<string>() };
+    h.ventas += neto; if (neto > 0) h.ordenes.add(orden); horas.set(hk, h);
+    let mn = nombreMesero(t);
+    if (!mn) { mn = "Sin mesero"; sinMesero++; }
+    const m = meseros.get(mn) ?? { ventas: 0, ordenes: new Set<string>(), clientes: new Map<string, number>(), propinas: 0 };
+    m.ventas += neto; m.propinas += propina; if (neto > 0) { m.ordenes.add(orden); sumarOrden(m.clientes, orden, clientes); }
+    meseros.set(mn, m);
+
+    const prods = t.products ?? [], pagado = pagadoDe(t);
+    if (!prods.length) {
+      const refId = t.referencedPayment && typeof t.referencedPayment === "object" ? t.referencedPayment.paymentId : t.referencedPayment;
+      const ref = refId ? porPago.get(String(refId)) : null;
+      if (ref && pagadoDe(ref) && (ref.products ?? []).length) {
+        const pagadoRef = pagadoDe(ref), netoRef = netoDe(ref);
+        const fr = netoRef ? Math.max(-1, Math.min(1, neto / netoRef)) : 0;
+        for (const p of ref.products) sumarProducto(p, String(p.hierarchyName ?? "Sin categoría"), neto * (Number(p.payed) || 0) / pagadoRef, (Number(p.quantity) || 0) * fr, costoLinea(p) * fr);
+      } else if (neto) sumarProducto({ id: "ajustes", name: "Ajustes sin detalle de productos" }, "AJUSTES SIN DETALLE", neto, 0, 0);
+      continue;
+    }
+    if (!pagado && neto) sumarProducto({ id: "ajustes", name: "Ajustes sin detalle de productos" }, "AJUSTES SIN DETALLE", neto, 0, 0);
+    for (const p of prods) {
+      const linea = p.lineId != null ? `${t.orderId}:${p.lineId}` : null;
+      const repetida = linea !== null && lineasVistas.has(linea);
+      if (linea !== null) lineasVistas.add(linea);
+      sumarProducto(p, String(p.hierarchyName ?? "Sin categoría"), pagado ? neto * (Number(p.payed) || 0) / pagado : 0, repetida ? 0 : Number(p.quantity) || 0, repetida ? 0 : costoLinea(p));
+    }
+  }
+
+  const r0 = (n: number) => Math.round(n);
+  const sumaMap = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  return {
+    ok: true, tipo: "ventas", restaurante: loc.name, periodo: `${ini}-${end}`, hora_corte: HORA_CORTE,
+    resumen: { ventas_netas: r0(ventasNetas), costo: r0(costo), pagos, ordenes: ordenesTot.size, clientes: sumaMap(clientesTot), propinas: r0(propinas) },
+    productos: [...productos.values()].map((p) => ({ ...p, cantidad: Math.round(p.cantidad * 1000) / 1000, ventas: r0(p.ventas), costo: r0(p.costo) })).sort((a, b) => b.ventas - a.ventas),
+    dias: [...dias.entries()].map(([fecha, d]) => ({ fecha, ventas: r0(d.ventas), ordenes: d.ordenes.size, clientes: sumaMap(d.clientes) })).sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    horas: [...horas.values()].map((h) => ({ dow: h.dow, hora: h.hora, ventas: r0(h.ventas), ordenes: h.ordenes.size })),
+    meseros: [...meseros.entries()].map(([mesero, m]) => ({ mesero, ventas: r0(m.ventas), ordenes: m.ordenes.size, clientes: sumaMap(m.clientes), propinas: r0(m.propinas) })).sort((a, b) => b.ventas - a.ventas),
+    // Diagnóstico: nombres de los campos que manda Toteat en cada venta (sin valores) y cuántas no traen mesero ni fecha.
+    campos_venta: [...camposVenta].sort(), sin_mesero: sinMesero, sin_fecha: sinFecha,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = Deno.env.get("SUPABASE_URL")!;
@@ -583,7 +699,12 @@ Deno.serve(async (req) => {
     const { location_id, aplicar, accion } = payload;
     const { data: loc } = await userClient.from("locations").select("id, slug, name").eq("id", location_id).maybeSingle();
     if (!loc) return json({ ok: false, error: "No tenés acceso a ese restaurante." }, 403);
-    const { data: prof } = await userClient.from("profiles").select("role, is_super_admin").eq("id", user.id).maybeSingle();
+    const { data: prof } = await userClient.from("profiles").select("role, is_super_admin, es_informes").eq("id", user.id).maybeSingle();
+    // Informe de ventas: también lo pide el perfil Informes (Gerencia, solo lectura).
+    if (accion === "ventas" && prof && (prof.is_super_admin || prof.role === "admin" || prof.es_informes)) {
+      try { return json(await informeVentas(loc, String(payload.ini ?? ""), String(payload.end ?? ""))); }
+      catch (e) { if (e instanceof ErrorSync) return json({ ok: false, error: e.message }, e.status); throw e; }
+    }
     if (!prof || (prof.role !== "admin" && !prof.is_super_admin)) return json({ ok: false, error: "Solo un admin puede sincronizar con Toteat." }, 403);
 
     try {
