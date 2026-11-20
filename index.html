@@ -3787,6 +3787,7 @@ let eventosSinEstado = [];
 async function avisarEventosSinEstado(){
   if(avisoEventosMostrado || !session) return;
   avisoEventosMostrado = true;
+  if(!eventosPuedeEditar()) return;   // quien solo ve eventos no define su estado
   let q = supa.from('costeo_eventos').select('id, nombre, cliente, fecha').is('estado', null);
   q = profile.is_super_admin ? q.or(`created_by.eq.${session.user.id},created_by.is.null`) : q.eq('created_by', session.user.id);
   const { data, error } = await q.order('fecha', {ascending:true, nullsFirst:false});
@@ -7890,7 +7891,7 @@ function switchCosteoSub(name){
   search.parentElement.style.display = cfg.sinLista ? 'none' : '';
   const newBtn = document.getElementById('costeoNewBtn');
   newBtn.textContent = cfg.nuevo;
-  newBtn.style.display = (cfg.sinLista || (cfg.soloAdmin && !isAdminRole())) ? 'none' : '';
+  newBtn.style.display = (cfg.sinLista || (cfg.soloAdmin && !isAdminRole()) || (name === 'eventos' && !eventosPuedeEditar())) ? 'none' : '';
   clearCosteoDrafts();
   document.getElementById('costeoDetailPane').classList.remove('open');
   document.getElementById('costeoDetailBody').innerHTML = '';
@@ -7918,7 +7919,7 @@ document.getElementById('costeoDetailBack').addEventListener('click', ()=>{
 });
 document.getElementById('costeoNewBtn').addEventListener('click', ()=>{
   if(costeoSub === 'cargos') openCosteoCargo(null);
-  else if(costeoSub === 'eventos') openCosteoEvento(null);
+  else if(costeoSub === 'eventos'){ if(eventosPuedeEditar()) openCosteoEvento(null); }
   else if(costeoSub === 'carta') openCosteoCarta(null);
   else openCosteoPlato(null);
 });
@@ -9720,7 +9721,7 @@ function renderCosteoEventosList(){
     ${eventosVistas().map(([k, t]) => `<button type="button" class="estado-op${eventosVista === k ? ' active' : ''}" data-ev-vista="${k}" aria-pressed="${eventosVista === k}">${t}</button>`).join('')}
   </div>`;
   if(COSTEO_EVENTOS.length === 0){
-    wrap.innerHTML = `<div class="empty-list">Todavía no hay eventos. Tocá "+ Nuevo evento".</div>`;
+    wrap.innerHTML = `<div class="empty-list">Todavía no hay eventos.${eventosPuedeEditar() ? ' Tocá "+ Nuevo evento".' : ''}</div>`;
   } else if(eventosVista === 'seguimiento'){
     wrap.innerHTML = vista + chips + segListaHtml(list);
     wrap.querySelector('#segAbrir').addEventListener('click', () => document.getElementById('costeoDetailPane').classList.add('open'));
@@ -9765,6 +9766,9 @@ function segValor(e){ const t = eventoCalcTotals(e).total; return t || toNum((SE
 // Ven: quienes están en los puntos Eventos o Admin (y el super admin). Editan: super admin y profiles.edita_seguimiento_eventos.
 function puedeSeguimiento(){ return !!profile && (!!profile.is_super_admin || esHub()); }
 function segPuedeEditar(){ return !!profile && (!!profile.is_super_admin || !!profile.edita_seguimiento_eventos); }
+// Eventos (crear, editar, estado, borrar): solo super admin y el usuario de Eventos (edita_seguimiento_eventos);
+// los demás solo ven (decisión de Miguel 20 nov; la RLS lo exige con sql/eventos_solo_lectura.sql).
+function eventosPuedeEditar(){ return segPuedeEditar(); }
 function eventosVistas(){ return [['agenda', 'Agenda'], ['calendario', 'Calendario'], ...(puedeSeguimiento() ? [['seguimiento', 'Seguimiento']] : [])]; }
 async function segCargar(){
   const datos = {}; let desde = 0;
@@ -10636,6 +10640,25 @@ function renderCosteoEventoForm(){
   }
 
   updateEventoPreview();
+  eventoFormSoloLectura();
+}
+
+// Quien no puede editar eventos ve el mismo formulario bloqueado: puede revisar el menú y la cotización
+// y descargarla, pero no cambia, guarda ni borra nada.
+function eventoFormSoloLectura(){
+  if(eventosPuedeEditar()) return;
+  const body = document.getElementById('costeoDetailBody');
+  const libres = new Set(['evCancel', 'evDocDescargar', 'evDocCompleto', 'evExpPng', 'evExpPdf', 'evExpTxt']);
+  body.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+  body.querySelectorAll('button').forEach(b => { if(!libres.has(b.id)) b.disabled = true; });
+  ['evSave', 'evDelete'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = 'none'; });
+  const cerrar = document.getElementById('evCancel');
+  if(cerrar) cerrar.textContent = 'Cerrar';
+  const titulo = body.querySelector('.detail-title');
+  if(titulo){
+    titulo.textContent = 'Ver evento';
+    titulo.insertAdjacentHTML('afterend', '<div class="empty-note" style="margin-bottom:12px;">Solo lectura: los eventos los crean y editan el super admin y el equipo de Eventos.</div>');
+  }
 }
 
 /* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
