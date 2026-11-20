@@ -1078,6 +1078,46 @@ nav.tabs button{position:relative;}
 .ev-estado-list{max-height:50vh; overflow-y:auto; margin-bottom:var(--space-3);}
 .ev-estado-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);}
 .ev-estado-row:last-child{border-bottom:none;}
+/* Lista de montaje del evento */
+.ml-tabs{margin-bottom:var(--space-4);}
+.ml-tabs .estado-op.active{background:var(--surface); border-color:var(--border-strong); color:var(--text);}
+.ml-resumen{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:var(--space-2); margin:var(--space-3) 0;}
+.ml-tile{display:flex; flex-direction:column; gap:4px; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+.ml-lbl{font:600 11px/1.3 'IBM Plex Mono',monospace; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted);}
+.ml-tile b{font:600 18px/1.2 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.ml-tile b.ml-warn{color:var(--warn);}
+.ml-sub{font-size:12px; color:var(--text-muted);}
+.ml-barra{height:8px; background:var(--surface-2); border-radius:999px; overflow:hidden;}
+.ml-barra i{display:block; height:100%; background:var(--ok); border-radius:999px;}
+.ml-filtros, .ml-acciones{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:var(--space-3);}
+.ml-panel{padding:var(--space-4); margin-bottom:var(--space-3); background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow-1);}
+.ml-panel textarea{width:100%; box-sizing:border-box;}
+.ml-plantilla{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);}
+.ml-plantilla > div:first-child{display:flex; flex-direction:column; gap:2px;}
+.ml-plantilla span{font-size:12px; color:var(--text-muted);}
+.ml-grupo{margin-bottom:var(--space-3); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;}
+.ml-grupo-cab{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 14px; background:var(--surface-2);}
+.ml-grupo-cab h4{margin:0; font:700 17px/1.2 'Playfair Display',serif;}
+.ml-grupo-cab span{font:600 12px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ml-item{display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--surface-2);}
+.ml-item.listo{background:color-mix(in srgb, var(--ok-bg) 40%, var(--surface));}
+.ml-check{flex:none; width:44px; height:44px; display:flex; align-items:center; justify-content:center; padding:0; border:2px solid var(--border-strong); border-radius:var(--radius-md); background:var(--surface); color:var(--surface); cursor:pointer;}
+.ml-item.listo .ml-check{background:var(--ok); border-color:var(--ok);}
+.ml-check:focus-visible{outline:none; box-shadow:var(--focus-ring);}
+.ml-check:disabled{opacity:.6;}
+.ml-main{flex:999 1 220px; min-width:0; display:flex; flex-direction:column; gap:4px;}
+.ml-nombre{font-weight:600; font-size:15px;}
+.ml-item.listo .ml-nombre{color:var(--text-muted); text-decoration:line-through;}
+.ml-cant{font:600 13px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ml-meta{display:flex; flex-wrap:wrap; gap:6px;}
+.ml-estado{flex:none; font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.5px; color:var(--warn);}
+.ml-item.listo .ml-estado{color:var(--ok);}
+.ml-nota{font-size:13px; font-weight:600; color:var(--warn);}
+.ml-edit{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+.ml-edit input[type="text"], .ml-edit input[type="number"], .ml-edit select{min-height:40px; box-sizing:border-box;}
+.ml-chk{display:inline-flex; align-items:center; gap:6px; font-size:14px; min-height:40px;}
+.ml-mov{display:flex; flex-direction:column; gap:4px; font-size:13px;}
+.ml-mov span{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); margin-right:6px;}
 .ev-estado-row div{min-width:0;}
 .ev-estado-row b{display:block; font-size:14px;}
 .ev-estado-row span{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-muted);}
@@ -7880,6 +7920,7 @@ function clearCosteoDrafts(){
   costeoCargoDraft = null; currentCosteoCargoId = null;
   costeoEventoDraft = null; currentCosteoEventoId = null;
   costeoCartaDraft = null; currentCosteoCartaId = null;
+  mlCerrar();
 }
 function switchCosteoSub(name){
   costeoSub = name;
@@ -8931,6 +8972,10 @@ function renderCosteoCartaForm(){
 let COSTEO_EVENTOS = [];
 let currentCosteoEventoId = null;
 let costeoEventoDraft = null;
+// Pestaña del detalle de un evento guardado: 'cotizacion' o 'lista' (lista de montaje).
+let EV_TAB = 'cotizacion';
+// Lista de montaje del evento abierto (sql/eventos_lista_montaje.sql).
+const ML = { eventoId: null, items: [], costos: {}, canal: null, filtro: 'todo', cat: '', editando: false, panel: '', notaDe: null, plantillas: null, cargando: false, pendiente: false };
 const EVENTO_OTROS_RAPIDOS = ['Menaje', 'Experiencia', 'DJ'];
 const EVENTO_TIEMPOS_BASE = ['Entrada', 'Fuerte', 'Postre'];
 // Grupos de bebidas: se agregan con un botón y funcionan igual que un tiempo (opciones al precio más alto).
@@ -10158,6 +10203,9 @@ function eventosCalendarioHtml(list){
 function openCosteoEvento(id){
   currentCosteoEventoId = id;
   const e = id ? COSTEO_EVENTOS.find(x=>x.id===id) : null;
+  // Un evento sin menú (ej. provisional) abre directo en su lista de montaje.
+  EV_TAB = e && evSinMenu(e) ? 'lista' : 'cotizacion';
+  if(!e || ML.eventoId !== e.id) mlCerrar();
   costeoEventoDraft = e ? {
     id: e.id, nombre: e.nombre, cliente: e.cliente || '', fecha: e.fecha || '', invitados: e.invitados || 0, notas: e.notas || '', horario: e.horario || '',
     estado: e.estado || null, estadoOriginal: e.estado || null,
@@ -10225,6 +10273,7 @@ function updateEventoPreview(){
 function renderCosteoEventoForm(){
   const d = costeoEventoDraft;
   const editing = !!d.id;
+  if(editing && EV_TAB === 'lista'){ mlPintar(); return; }
   const nInput = (cls, idx, val, extra) => `<input type="number" class="${cls}" data-idx="${idx}" value="${val}" ${extra||''}>`;
 
   // El precio de cada línea se puede editar solo para este evento; si difiere de la carta se avisa.
@@ -10325,6 +10374,7 @@ function renderCosteoEventoForm(){
     </div>`;
 
   document.getElementById('costeoDetailBody').innerHTML = `
+    ${evTabsHtml(d)}
     <div class="detail-title">${editing ? 'Editar evento' : 'Nuevo evento'}</div>
     <div class="obs-form">
       <div class="field"><label class="field-label">Estado</label>
@@ -10570,6 +10620,7 @@ function renderCosteoEventoForm(){
   });
 
   const closeForm = async (reload)=>{
+    mlCerrar();
     costeoEventoDraft = null;
     currentCosteoEventoId = null;
     if(reload) await loadCosteoEventos();
@@ -10640,6 +10691,7 @@ function renderCosteoEventoForm(){
   }
 
   updateEventoPreview();
+  evTabsBind();
   eventoFormSoloLectura();
 }
 
@@ -10650,7 +10702,7 @@ function eventoFormSoloLectura(){
   const body = document.getElementById('costeoDetailBody');
   const libres = new Set(['evCancel', 'evDocDescargar', 'evDocCompleto', 'evExpPng', 'evExpPdf', 'evExpTxt']);
   body.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
-  body.querySelectorAll('button').forEach(b => { if(!libres.has(b.id)) b.disabled = true; });
+  body.querySelectorAll('button').forEach(b => { if(!libres.has(b.id) && !b.dataset.evTab) b.disabled = true; });
   ['evSave', 'evDelete'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = 'none'; });
   const cerrar = document.getElementById('evCancel');
   if(cerrar) cerrar.textContent = 'Cerrar';
@@ -10659,6 +10711,423 @@ function eventoFormSoloLectura(){
     titulo.textContent = 'Ver evento';
     titulo.insertAdjacentHTML('afterend', '<div class="empty-note" style="margin-bottom:12px;">Solo lectura: los eventos los crean y editan el super admin y el equipo de Eventos.</div>');
   }
+}
+
+/* ---------- LISTA DE MONTAJE DEL EVENTO (sql/eventos_lista_montaje.sql, decisiones de Miguel 20 nov) ----------
+   Equipos, utensilios e insumos para ir marcando "listo". Agregan, editan y quitan ítems: super admin y Eventos
+   (eventosPuedeEditar). Marcan listo y dejan nota: todos los que ven el evento, con las RPC evento_lista_marcar /
+   evento_lista_nota. El costo de alquiler va en evento_lista_costos (solo admin) y no suma a la cotización.
+   Plantillas en evento_lista_plantillas. Tiempo real por evento. */
+const ML_CATS = ['Equipos', 'Utensilios', 'Insumos'];
+const ML_RESP_BASE = ['Cocina', 'Barra', 'Servicio', 'Eventos', 'Compras'];
+const ML_CHECK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7"/></svg>';
+
+function evSinMenu(e){ return !(e.items || []).length && !(e.tiempos || []).some(t => (t.opciones || []).length); }
+function evTabsHtml(d){
+  if(!d || !d.id) return '';
+  const b = (k, t) => `<button type="button" class="estado-op${EV_TAB === k ? ' active' : ''}" data-ev-tab="${k}" role="tab" aria-selected="${EV_TAB === k}">${t}</button>`;
+  return `<div class="estado-seg ml-tabs" role="tablist" aria-label="Secciones del evento">${b('cotizacion', 'Cotización')}${b('lista', 'Lista de montaje')}</div>`;
+}
+function evTabsBind(){
+  document.querySelectorAll('#costeoDetailBody [data-ev-tab]').forEach(b => b.addEventListener('click', () => {
+    if(EV_TAB === b.dataset.evTab) return;
+    EV_TAB = b.dataset.evTab;
+    renderCosteoEventoForm();
+  }));
+}
+function mlVeCostos(){ return isAdminRole() || !!(profile && profile.is_super_admin) || eventosPuedeEditar(); }
+function mlCerrar(){
+  if(ML.canal){ supa.removeChannel(ML.canal); ML.canal = null; }
+  ML.eventoId = null; ML.items = []; ML.costos = {}; ML.panel = ''; ML.notaDe = null; ML.editando = false; ML.pendiente = false;
+}
+function mlCosto(id){ return Number(ML.costos[id]) || 0; }
+function mlHora(iso){ return iso ? new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''; }
+function mlCategorias(){
+  const extra = [...new Set(ML.items.map(i => i.categoria).filter(c => c && !ML_CATS.includes(c)))];
+  return ML_CATS.concat(extra);
+}
+async function mlCargar(){
+  const id = ML.eventoId;
+  ML.cargando = true;
+  const r = await supa.from('evento_lista').select('*').eq('evento_id', id).order('orden').order('created_at');
+  if(ML.eventoId !== id) return;
+  if(r.error) showToast('No se pudo cargar la lista: ' + r.error.message, 'danger');
+  ML.items = r.data || [];
+  ML.costos = {};
+  if(mlVeCostos()){
+    const c = await supa.from('evento_lista_costos').select('item_id, costo').eq('evento_id', id);
+    if(ML.eventoId !== id) return;
+    (c.data || []).forEach(x => { ML.costos[x.item_id] = Number(x.costo) || 0; });
+  }
+  ML.cargando = false;
+}
+function mlSuscribir(id){
+  if(ML.canal){ supa.removeChannel(ML.canal); ML.canal = null; }
+  ML.canal = supa.channel('lista-montaje-' + id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'evento_lista', filter: 'evento_id=eq.' + id }, p => {
+      if(ML.eventoId !== id) return;
+      if(p.eventType === 'DELETE'){ const oid = p.old && p.old.id; ML.items = ML.items.filter(x => x.id !== oid); }
+      else if(p.new){ const k = ML.items.findIndex(x => x.id === p.new.id); if(k >= 0) ML.items[k] = p.new; else ML.items.push(p.new); }
+      mlRepintarSiVisible();
+    }).subscribe();
+}
+function mlRepintarSiVisible(){
+  const d = costeoEventoDraft;
+  if(!d || d.id !== ML.eventoId || EV_TAB !== 'lista') return;
+  const a = document.activeElement;
+  // Si alguien está escribiendo en la lista, no se le borra lo que escribe: se repinta al salir del campo.
+  if(a && a.closest && a.closest('#mlRoot') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ ML.pendiente = true; return; }
+  mlPintar();
+}
+// Una cosa por renglón. "Utensilios:" cambia la categoría. Cantidad al final ("x8", "8") o columnas de Excel
+// (Qué <tab> Cantidad <tab> Responsable).
+function mlParsear(texto){
+  let cat = 'Equipos';
+  const out = [];
+  String(texto || '').split(/\r?\n/).forEach(raw => {
+    const l = raw.replace(/^[\s•\-*·]+/, '').trim();
+    if(!l) return;
+    if(/:$/.test(l) && !l.includes('\t')){
+      const c = l.slice(0, -1).trim(), n = c.toLowerCase();
+      cat = n.startsWith('equip') ? 'Equipos' : n.startsWith('utens') ? 'Utensilios' : n.startsWith('insum') ? 'Insumos' : c.charAt(0).toUpperCase() + c.slice(1);
+      return;
+    }
+    if(l.includes('\t')){
+      const c = l.split('\t').map(x => x.trim());
+      if(c[0]) out.push({ categoria: cat, nombre: c[0], cantidad: c[1] || '', responsable: c[2] || '' });
+      return;
+    }
+    const m = l.match(/^(.*?)[\s\-–:]+(?:x\s*)?(\d+(?:[.,]\d+)?)\s*(?:und|unds|unidades|uds)?\.?$/i);
+    out.push({ categoria: cat, nombre: m && m[1].trim() ? m[1].trim() : l, cantidad: m && m[1].trim() ? m[2] : '', responsable: '' });
+  });
+  return out;
+}
+
+function mlPintar(){
+  const d = costeoEventoDraft;
+  const body = document.getElementById('costeoDetailBody');
+  if(!d || !d.id) return;
+  if(ML.eventoId !== d.id){
+    mlCerrar();
+    ML.eventoId = d.id; ML.filtro = 'todo'; ML.cat = ''; ML.plantillas = null; ML.cargando = true;
+    mlSuscribir(d.id);
+    mlCargar().then(() => { if(ML.eventoId === d.id) mlRepintarSiVisible(); });
+  }
+  ML.pendiente = false;
+  const puede = eventosPuedeEditar(), costos = mlVeCostos();
+  const ev = COSTEO_EVENTOS.find(x => x.id === d.id) || d;
+  const items = ML.items;
+  const total = items.length, listos = items.filter(i => i.listo_at).length;
+  const pct = total ? Math.round(listos * 100 / total) : 0;
+  const alq = items.filter(i => i.alquiler);
+  const totalAlq = alq.reduce((a, i) => a + mlCosto(i.id), 0);
+  const notas = items.filter(i => i.nota).length;
+  const cats = mlCategorias();
+  const responsables = [...new Set(ML_RESP_BASE.concat(items.map(i => i.responsable).filter(Boolean)))];
+  const visibles = items.filter(i => (ML.filtro === 'todo' || (ML.filtro === 'pend' ? !i.listo_at : !!i.listo_at)) && (!ML.cat || i.categoria === ML.cat));
+  const chip = (attr, val, actual, txt, n) => `<button type="button" class="aud-chip${actual === val ? ' active' : ''}" ${attr}="${escapeHtml(val)}" aria-pressed="${actual === val}">${escapeHtml(txt)}${n !== undefined ? `<span>${n}</span>` : ''}</button>`;
+  const datos = [fmtFecha(ev.fecha), ev.horario, ev.invitados ? ev.invitados + ' invitados' : '', (restauranteDe(ev.restaurante_id) || {}).name].filter(Boolean).join(' · ');
+
+  const filaHtml = i => {
+    const on = !!i.listo_at;
+    const costoTxt = costos && i.alquiler ? (mlCosto(i.id) ? ' · ' + fmtMoney(mlCosto(i.id)) : ' · sin costo') : '';
+    const vista = `
+      <div class="ml-nombre">${escapeHtml(i.nombre)}${i.cantidad ? ` <span class="ml-cant">× ${escapeHtml(i.cantidad)}</span>` : ''}</div>
+      <div class="ml-meta">
+        ${i.responsable ? `<span class="badge neutral">${escapeHtml(i.responsable)}</span>` : ''}
+        ${i.alquiler ? `<span class="badge info">Alquiler${i.proveedor ? ' · ' + escapeHtml(i.proveedor) : ''}${costoTxt}</span>` : ''}
+      </div>`;
+    const edicion = `
+      <div class="ml-edit">
+        <input type="text" data-ml-campo="nombre" data-id="${i.id}" value="${escapeHtml(i.nombre)}" aria-label="Qué" style="flex:999 1 180px;">
+        <input type="text" data-ml-campo="cantidad" data-id="${i.id}" value="${escapeHtml(i.cantidad || '')}" aria-label="Cantidad" placeholder="Cant." style="width:70px;">
+        <select data-ml-campo="categoria" data-id="${i.id}" aria-label="Categoría">${cats.map(c => `<option ${c === i.categoria ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
+        <input type="text" data-ml-campo="responsable" data-id="${i.id}" value="${escapeHtml(i.responsable || '')}" list="mlResponsables" aria-label="Responsable" placeholder="Responsable" style="width:130px;">
+        <label class="ml-chk"><input type="checkbox" data-ml-campo="alquiler" data-id="${i.id}" ${i.alquiler ? 'checked' : ''}> Alquiler</label>
+        ${i.alquiler ? `<input type="text" data-ml-campo="proveedor" data-id="${i.id}" value="${escapeHtml(i.proveedor || '')}" aria-label="Proveedor" placeholder="Proveedor" style="width:140px;">
+        <input type="number" data-ml-campo="costo" data-id="${i.id}" value="${mlCosto(i.id) || ''}" aria-label="Costo del alquiler" placeholder="Costo" style="width:120px;">` : ''}
+        <button type="button" class="btn btn-ghost btn-small" data-ml="quitar" data-id="${i.id}">Quitar</button>
+      </div>`;
+    const notaForm = ML.notaDe === i.id ? `
+      <div class="ml-edit">
+        <input type="text" id="mlNotaTxt" maxlength="300" value="${escapeHtml(i.nota || '')}" placeholder="Ej.: llegaron 6 de 8" aria-label="Nota" style="flex:1 1 200px;">
+        <button type="button" class="btn btn-accent btn-small" data-ml="nota-guardar" data-id="${i.id}">Guardar nota</button>
+        ${i.nota ? `<button type="button" class="btn btn-ghost btn-small" data-ml="nota-borrar" data-id="${i.id}">Quitar nota</button>` : ''}
+      </div>` : '';
+    return `<div class="ml-item${on ? ' listo' : ''}">
+      <button type="button" class="ml-check" data-ml="toggle" data-id="${i.id}" aria-pressed="${on}" aria-label="${on ? 'Desmarcar' : 'Marcar listo'}: ${escapeHtml(i.nombre)}">${on ? ML_CHECK : ''}</button>
+      <div class="ml-main">
+        ${ML.editando && puede ? edicion : vista}
+        ${i.nota ? `<div class="ml-nota">Nota de ${escapeHtml(i.nota_por || '')}: ${escapeHtml(i.nota)}</div>` : ''}
+        ${notaForm}
+      </div>
+      <div class="ml-estado">${on ? 'Listo · ' + escapeHtml(i.listo_por || '') + ' · ' + mlHora(i.listo_at) : 'Pendiente'}</div>
+      <button type="button" class="btn btn-ghost btn-small" data-ml="nota" data-id="${i.id}" aria-label="Nota en ${escapeHtml(i.nombre)}">Nota</button>
+    </div>`;
+  };
+
+  const grupos = cats.map(c => {
+    const todos = items.filter(i => i.categoria === c), vis = visibles.filter(i => i.categoria === c);
+    if(!vis.length) return '';
+    return `<div class="ml-grupo">
+      <div class="ml-grupo-cab"><h4>${escapeHtml(c)}</h4><span>${todos.filter(i => i.listo_at).length} de ${todos.length} listos</span></div>
+      ${vis.map(filaHtml).join('')}
+    </div>`;
+  }).join('');
+
+  const pegados = ML.panel === 'pegar' ? mlParsear(ML.pegarTexto || '') : [];
+  let panel = '';
+  if(ML.panel === 'pegar') panel = `<div class="ml-panel">
+      <div class="section-label" style="margin-top:0;">Pegar la lista que ya tienes</div>
+      <p class="field-help">Una cosa por renglón; la cantidad al final («x8» o «8») se separa sola. Un renglón que termina en dos puntos («Utensilios:») cambia la categoría. Desde Excel puedes copiar las columnas Qué, Cantidad y Responsable.</p>
+      <textarea id="mlPegarTxt" rows="8" placeholder="Equipos:&#10;Carpa 10x10 x1&#10;Utensilios:&#10;Chafing dish x8">${escapeHtml(ML.pegarTexto || '')}</textarea>
+      <p class="field-help" id="mlPegarRes">${pegados.length ? `Se van a agregar ${pegados.length}.` : 'Pega aquí tu lista.'}</p>
+      <div class="ml-acciones"><button type="button" class="btn btn-secondary" data-ml="panel-cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-ml="pegar-ok">Agregar a la lista</button></div>
+    </div>`;
+  else if(ML.panel === 'nuevo') panel = `<div class="ml-panel">
+      <div class="section-label" style="margin-top:0;">Agregar ítem</div>
+      <div class="ml-edit">
+        <input type="text" id="mlNNombre" placeholder="Qué (ej.: Planta eléctrica 15 kVA)" aria-label="Qué" style="flex:999 1 220px;">
+        <input type="text" id="mlNCant" placeholder="Cant." aria-label="Cantidad" style="width:70px;">
+        <select id="mlNCat" aria-label="Categoría">${cats.map(c => `<option ${c === (ML.cat || 'Equipos') ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
+        <input type="text" id="mlNResp" list="mlResponsables" placeholder="Responsable" aria-label="Responsable" style="width:140px;">
+        <label class="ml-chk"><input type="checkbox" id="mlNAlq"> Alquiler</label>
+        <input type="text" id="mlNProv" placeholder="Proveedor" aria-label="Proveedor" style="width:140px;">
+        <input type="number" id="mlNCosto" placeholder="Costo" aria-label="Costo del alquiler" style="width:120px;">
+      </div>
+      <div class="ml-acciones" style="margin-top:10px;"><button type="button" class="btn btn-secondary" data-ml="panel-cerrar">Cancelar</button><button type="button" class="btn btn-accent" data-ml="nuevo-ok">Agregar</button></div>
+    </div>`;
+  else if(ML.panel === 'plantillas') panel = `<div class="ml-panel">
+      <div class="section-label" style="margin-top:0;">Plantillas</div>
+      ${ML.plantillas === null ? '<div class="empty-note">Cargando...</div>' : ML.plantillas.length ? ML.plantillas.map(p => `
+        <div class="ml-plantilla">
+          <div><b>${escapeHtml(p.nombre)}</b><span>${(p.items || []).length} ítems · ${fmtFecha(String(p.created_at).slice(0, 10))}</span></div>
+          <div class="ml-acciones" style="margin:0;"><button type="button" class="btn btn-secondary btn-small" data-ml="pl-usar" data-id="${p.id}">Agregar a esta lista</button><button type="button" class="btn btn-ghost btn-small" data-ml="pl-borrar" data-id="${p.id}">Borrar</button></div>
+        </div>`).join('') : '<div class="empty-note">Todavía no hay plantillas.</div>'}
+      <div class="ml-edit" style="margin-top:12px;">
+        <input type="text" id="mlPlNombre" placeholder="Nombre (ej.: Matrimonio en finca 120 pax)" aria-label="Nombre de la plantilla" style="flex:1 1 220px;">
+        <button type="button" class="btn btn-accent btn-small" data-ml="pl-guardar" ${total ? '' : 'disabled'}>Guardar esta lista como plantilla</button>
+      </div>
+      <div class="ml-acciones" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-small" data-ml="panel-cerrar">Cerrar</button></div>
+    </div>`;
+
+  const movs = items.flatMap(i => [
+    i.listo_at ? { at: i.listo_at, t: `${i.listo_por || ''} marcó listo: ${i.nombre}` } : null,
+    i.nota_at ? { at: i.nota_at, t: `${i.nota_por || ''} dejó nota en ${i.nombre}` } : null
+  ].filter(Boolean)).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 8);
+
+  body.innerHTML = `
+    ${evTabsHtml(d)}
+    <div id="mlRoot">
+      <div class="detail-title">${escapeHtml(ev.nombre || 'Evento')}</div>
+      <div class="field-help" style="margin-bottom:6px;">${escapeHtml(datos)}</div>
+      ${ML.cargando ? '<div class="empty-note">Cargando la lista...</div>' : `
+      <div class="ml-resumen">
+        <div class="ml-tile"><span class="ml-lbl">Avance</span><b>${listos} de ${total} listos</b><div class="ml-barra"><i style="width:${pct}%"></i></div></div>
+        ${costos ? `<div class="ml-tile"><span class="ml-lbl">Alquileres</span><b>${fmtMoney(totalAlq)}</b><span class="ml-sub">${alq.length} alquilados · ${alq.filter(i => !mlCosto(i.id)).length} sin costo · no suma a la cotización</span></div>` : ''}
+        <div class="ml-tile"><span class="ml-lbl">Con nota</span><b class="${notas ? 'ml-warn' : ''}">${notas}</b><span class="ml-sub">Algo falta o hay que revisar</span></div>
+      </div>
+      <div class="ml-filtros">
+        ${chip('data-ml-filtro', 'todo', ML.filtro, 'Todo', total)}${chip('data-ml-filtro', 'pend', ML.filtro, 'Pendientes', total - listos)}${chip('data-ml-filtro', 'listo', ML.filtro, 'Listos', listos)}
+        ${chip('data-ml-cat', '', ML.cat, 'Todas')}${cats.map(c => chip('data-ml-cat', c, ML.cat, c)).join('')}
+      </div>
+      <div class="ml-acciones">
+        ${puede ? `<button type="button" class="btn btn-secondary btn-small" data-ml="panel" data-p="pegar">Pegar lista</button>
+        <button type="button" class="btn btn-secondary btn-small" data-ml="panel" data-p="nuevo">+ Agregar ítem</button>
+        <button type="button" class="btn btn-secondary btn-small" data-ml="panel" data-p="plantillas">Plantillas</button>
+        ${total ? `<button type="button" class="btn ${ML.editando ? 'btn-accent' : 'btn-secondary'} btn-small" data-ml="editar">${ML.editando ? 'Terminar de editar' : 'Editar lista'}</button>` : ''}` : ''}
+        ${total ? `<button type="button" class="btn btn-ghost btn-small" data-ml="descargar">Descargar</button>
+        <button type="button" class="btn btn-ghost btn-small" data-ml="whatsapp">Pendientes por WhatsApp</button>` : ''}
+      </div>
+      ${panel}
+      ${total ? (grupos || '<div class="empty-list">Nada con este filtro.</div>') : `<div class="empty-list">Esta lista está vacía.${puede ? ' Usa «Pegar lista» para cargar la que ya tienes.' : ''}</div>`}
+      ${movs.length ? `<div class="section-label">Últimos movimientos</div><div class="ml-mov">${movs.map(m => `<div><span>${mlHora(m.at)}</span> ${escapeHtml(m.t)}</div>`).join('')}</div>` : ''}
+      <p class="field-help" style="margin-top:12px;">Agregan, editan y quitan ítems el super admin y el equipo de Eventos. Marcan «listo» y dejan notas todos los que ven el evento; los demás lo ven al instante.</p>`}
+      <datalist id="mlResponsables">${responsables.map(r => `<option value="${escapeHtml(r)}"></option>`).join('')}</datalist>
+      <button type="button" class="btn btn-ghost btn-block" data-ml="cerrar" style="margin-top:10px;">Cerrar</button>
+    </div>`;
+  evTabsBind();
+  const root = document.getElementById('mlRoot');
+  root.addEventListener('click', mlClick);
+  root.addEventListener('change', mlCambio);
+  root.addEventListener('focusout', () => setTimeout(() => { if(ML.pendiente) mlRepintarSiVisible(); }, 0));
+  const pt = document.getElementById('mlPegarTxt');
+  if(pt) pt.addEventListener('input', () => {
+    ML.pegarTexto = pt.value;
+    const n = mlParsear(pt.value).length;
+    document.getElementById('mlPegarRes').textContent = n ? `Se van a agregar ${n}.` : 'Pega aquí tu lista.';
+  });
+  const nt = document.getElementById('mlNotaTxt');
+  if(nt) nt.focus();
+}
+
+async function mlClick(ev){
+  const f = ev.target.closest('[data-ml-filtro]'), c = ev.target.closest('[data-ml-cat]');
+  if(f){ ML.filtro = f.dataset.mlFiltro; mlPintar(); return; }
+  if(c){ ML.cat = c.dataset.mlCat; mlPintar(); return; }
+  const b = ev.target.closest('[data-ml]');
+  if(!b) return;
+  const act = b.dataset.ml, id = b.dataset.id;
+  const item = id ? ML.items.find(x => x.id === id) : null;
+  const ponerItem = row => { const k = ML.items.findIndex(x => x.id === row.id); if(k >= 0) ML.items[k] = row; else ML.items.push(row); };
+  if(act === 'cerrar'){
+    clearCosteoDrafts(); renderCosteoList();
+    document.getElementById('costeoDetailPane').classList.remove('open');
+    return;
+  }
+  if(act === 'toggle' && item){
+    b.disabled = true;
+    const { data, error } = await supa.rpc('evento_lista_marcar', { p_item: id, p_listo: !item.listo_at });
+    if(error){ b.disabled = false; showToast('No se pudo marcar: ' + error.message, 'danger'); return; }
+    ponerItem(data); mlPintar(); return;
+  }
+  if(act === 'nota'){ ML.notaDe = ML.notaDe === id ? null : id; mlPintar(); return; }
+  if((act === 'nota-guardar' || act === 'nota-borrar') && item){
+    const texto = act === 'nota-borrar' ? '' : document.getElementById('mlNotaTxt').value;
+    b.disabled = true;
+    const { data, error } = await supa.rpc('evento_lista_nota', { p_item: id, p_nota: texto });
+    if(error){ b.disabled = false; showToast('No se guardó la nota: ' + error.message, 'danger'); return; }
+    ponerItem(data); ML.notaDe = null; mlPintar(); return;
+  }
+  if(act === 'descargar'){ mlDescargar(); return; }
+  if(act === 'whatsapp'){ window.open('https://wa.me/?text=' + encodeURIComponent(mlMensajePendientes()), '_blank'); return; }
+  if(!eventosPuedeEditar()) return;
+  if(act === 'panel'){
+    ML.panel = ML.panel === b.dataset.p ? '' : b.dataset.p;
+    if(ML.panel === 'plantillas' && ML.plantillas === null) mlCargarPlantillas();
+    mlPintar(); return;
+  }
+  if(act === 'panel-cerrar'){ ML.panel = ''; ML.pegarTexto = ''; mlPintar(); return; }
+  if(act === 'editar'){ ML.editando = !ML.editando; mlPintar(); return; }
+  if(act === 'quitar' && item){
+    if(!confirm(`¿Quitar «${item.nombre}» de la lista?`)) return;
+    const { error } = await supa.from('evento_lista').delete().eq('id', id);
+    if(error){ showToast('No se pudo quitar: ' + error.message, 'danger'); return; }
+    ML.items = ML.items.filter(x => x.id !== id); mlPintar(); return;
+  }
+  if(act === 'pegar-ok'){
+    const filas = mlParsear(ML.pegarTexto || '');
+    if(!filas.length){ showToast('Pega primero la lista', 'warn'); return; }
+    b.disabled = true;
+    const ok = await mlInsertar(filas);
+    if(!ok){ b.disabled = false; return; }
+    ML.panel = ''; ML.pegarTexto = '';
+    showToast(`Se agregaron ${filas.length} ítems`, 'ok'); mlPintar(); return;
+  }
+  if(act === 'nuevo-ok'){
+    const v = k => document.getElementById(k).value.trim();
+    if(!v('mlNNombre')){ showToast('Escribe qué es', 'warn'); return; }
+    b.disabled = true;
+    const ok = await mlInsertar([{ categoria: v('mlNCat') || 'Equipos', nombre: v('mlNNombre'), cantidad: v('mlNCant'), responsable: v('mlNResp'),
+      alquiler: document.getElementById('mlNAlq').checked, proveedor: v('mlNProv'), costo: toNum(v('mlNCosto')) || 0 }]);
+    if(!ok){ b.disabled = false; return; }
+    ML.panel = ''; showToast('Ítem agregado', 'ok'); mlPintar(); return;
+  }
+  if(act === 'pl-guardar'){
+    const nombre = document.getElementById('mlPlNombre').value.trim();
+    if(!nombre){ showToast('Ponle un nombre a la plantilla', 'warn'); return; }
+    const itemsPl = ML.items.map(i => ({ categoria: i.categoria, nombre: i.nombre, cantidad: i.cantidad, responsable: i.responsable, alquiler: i.alquiler, proveedor: i.proveedor, costo: mlCosto(i.id) || 0 }));
+    b.disabled = true;
+    const { error } = await supa.from('evento_lista_plantillas').insert({ nombre, items: itemsPl });
+    if(error){ b.disabled = false; showToast('No se guardó la plantilla: ' + error.message, 'danger'); return; }
+    showToast('Plantilla guardada', 'ok'); ML.plantillas = null; mlCargarPlantillas(); mlPintar(); return;
+  }
+  if(act === 'pl-usar'){
+    const p = (ML.plantillas || []).find(x => x.id === id);
+    if(!p || !(p.items || []).length) return;
+    b.disabled = true;
+    const ok = await mlInsertar(p.items);
+    if(!ok){ b.disabled = false; return; }
+    ML.panel = ''; showToast(`Se agregaron ${p.items.length} ítems de «${p.nombre}»`, 'ok'); mlPintar(); return;
+  }
+  if(act === 'pl-borrar'){
+    const p = (ML.plantillas || []).find(x => x.id === id);
+    if(!p || !confirm(`¿Borrar la plantilla «${p.nombre}»? Las listas que ya la usaron no cambian.`)) return;
+    const { error } = await supa.from('evento_lista_plantillas').delete().eq('id', id);
+    if(error){ showToast('No se pudo borrar: ' + error.message, 'danger'); return; }
+    ML.plantillas = ML.plantillas.filter(x => x.id !== id); mlPintar(); return;
+  }
+}
+
+// Edición en línea (modo "Editar lista"): cada campo se guarda al salir de él.
+async function mlCambio(ev){
+  const el = ev.target.closest('[data-ml-campo]');
+  if(!el || !eventosPuedeEditar()) return;
+  const id = el.dataset.id, campo = el.dataset.mlCampo;
+  const item = ML.items.find(x => x.id === id);
+  if(!item) return;
+  if(campo === 'costo'){
+    const costo = toNum(el.value) || 0;
+    const { error } = await supa.from('evento_lista_costos').upsert({ item_id: id, evento_id: item.evento_id, costo }, { onConflict: 'item_id' });
+    if(error){ showToast('No se guardó el costo: ' + error.message, 'danger'); return; }
+    ML.costos[id] = costo; mlPintar(); return;
+  }
+  let valor = campo === 'alquiler' ? el.checked : el.value.trim();
+  if(campo === 'nombre' && !valor){ showToast('El ítem necesita un nombre', 'warn'); el.value = item.nombre; return; }
+  if(campo !== 'alquiler' && campo !== 'nombre' && valor === '') valor = null;
+  const { data, error } = await supa.from('evento_lista').update({ [campo]: valor }).eq('id', id).select().single();
+  if(error){ showToast('No se guardó: ' + error.message, 'danger'); return; }
+  const k = ML.items.findIndex(x => x.id === id); if(k >= 0) ML.items[k] = data;
+  if(campo === 'alquiler' || campo === 'categoria') mlPintar();
+}
+
+async function mlInsertar(filas){
+  const eventoId = ML.eventoId;
+  let orden = ML.items.reduce((m, i) => Math.max(m, i.orden || 0), 0);
+  const nuevos = filas.map(f => ({
+    evento_id: eventoId, categoria: f.categoria || 'Equipos', nombre: String(f.nombre).slice(0, 200),
+    cantidad: f.cantidad ? String(f.cantidad) : null, responsable: f.responsable || null,
+    alquiler: !!f.alquiler, proveedor: f.proveedor || null, orden: ++orden
+  }));
+  const { data, error } = await supa.from('evento_lista').insert(nuevos).select();
+  if(error){ showToast('No se pudo agregar: ' + error.message, 'danger'); return false; }
+  (data || []).forEach(row => { if(!ML.items.some(x => x.id === row.id)) ML.items.push(row); });
+  // Costos de alquiler (solo los que traen costo). Se emparejan por orden, que es único en este lote.
+  const costos = (data || []).map(row => { const f = filas[nuevos.findIndex(n => n.orden === row.orden)]; return f && Number(f.costo) ? { item_id: row.id, evento_id: eventoId, costo: Number(f.costo) } : null; }).filter(Boolean);
+  if(costos.length){
+    const r = await supa.from('evento_lista_costos').upsert(costos, { onConflict: 'item_id' });
+    if(r.error) showToast('Los ítems quedaron, pero los costos no: ' + r.error.message, 'warn');
+    else costos.forEach(c => { ML.costos[c.item_id] = c.costo; });
+  }
+  return true;
+}
+
+async function mlCargarPlantillas(){
+  const { data, error } = await supa.from('evento_lista_plantillas').select('*').order('created_at', { ascending: false });
+  ML.plantillas = error ? [] : (data || []);
+  if(error) showToast('No se pudieron cargar las plantillas: ' + error.message, 'danger');
+  if(ML.panel === 'plantillas') mlRepintarSiVisible();
+}
+
+function mlMensajePendientes(){
+  const ev = COSTEO_EVENTOS.find(x => x.id === ML.eventoId) || costeoEventoDraft || {};
+  const pend = ML.items.filter(i => !i.listo_at);
+  const lineas = [`*Lista de montaje · ${ev.nombre || 'Evento'}*`, [fmtFecha(ev.fecha), ev.horario].filter(Boolean).join(' · '), '',
+    pend.length ? `Faltan ${pend.length} de ${ML.items.length}:` : '¡Todo está listo!'];
+  mlCategorias().forEach(c => {
+    const g = pend.filter(i => i.categoria === c);
+    if(!g.length) return;
+    lineas.push('', `*${c}*`);
+    g.forEach(i => lineas.push(`• ${i.nombre}${i.cantidad ? ' × ' + i.cantidad : ''}${i.responsable ? ' (' + i.responsable + ')' : ''}${i.nota ? ' — ' + i.nota : ''}`));
+  });
+  return lineas.filter((l, k) => k !== 1 || l).join('\n');
+}
+
+async function mlDescargar(){
+  const formato = await elegirFormato('Descargar lista de montaje', EXP_OPC);
+  if(!formato) return;
+  const ev = COSTEO_EVENTOS.find(x => x.id === ML.eventoId) || costeoEventoDraft || {};
+  const costos = mlVeCostos();
+  const orden = mlCategorias();
+  const items = ML.items.slice().sort((a, b) => orden.indexOf(a.categoria) - orden.indexOf(b.categoria) || (a.orden || 0) - (b.orden || 0));
+  const columnas = [{ t: 'Categoría', w: 14 }, { t: 'Qué', w: 34 }, { t: 'Cantidad', w: 10 }, { t: 'Responsable', w: 16 }, { t: 'Alquiler', w: 22 }]
+    .concat(costos ? [{ t: 'Costo alquiler', tipo: 'num', total: true, w: 14 }] : [])
+    .concat([{ t: 'Estado', w: 26 }, { t: 'Nota', w: 30 }]);
+  const filas = items.map(i => [i.categoria, i.nombre, i.cantidad || '', i.responsable || '', i.alquiler ? (i.proveedor || 'Sí') : '']
+    .concat(costos ? [i.alquiler ? mlCosto(i.id) : ''] : [])
+    .concat([i.listo_at ? 'Listo · ' + (i.listo_por || '') + ' · ' + mlHora(i.listo_at) : 'Pendiente', i.nota ? (i.nota_por ? i.nota_por + ': ' : '') + i.nota : '']));
+  await exportarTabla({ formato, titulo: 'Lista de montaje · ' + (ev.nombre || 'Evento'), subtitulo: [fmtFecha(ev.fecha), ev.horario, ev.invitados ? ev.invitados + ' invitados' : ''].filter(Boolean).join(' · '),
+    nombre: 'Lista de montaje ' + (ev.nombre || ''), hoja: 'Lista', horizontal: true, columnas, filas });
 }
 
 /* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
