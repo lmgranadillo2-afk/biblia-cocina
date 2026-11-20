@@ -10734,6 +10734,13 @@ function monPuedeEditar(){ return eventosPuedeEditar(); }
 function mlVeCostos(){ return isAdminRole() || !!(profile && profile.is_super_admin) || monPuedeEditar(); }
 function monActual(){ return ML.lista.find(m => m.id === ML.montajeId) || null; }
 function monPuntoNombre(m){ return (m && m.locations && m.locations.name) || ((restauranteDe(m && m.location_id) || {}).name) || ''; }
+// Un día ("12 dic") o varios ("12 dic al 14 dic · 3 días").
+function monFechas(m){
+  if(!m || !m.fecha) return '';
+  if(!m.fecha_fin || m.fecha_fin === m.fecha) return fmtFecha(m.fecha);
+  const dias = Math.round((new Date(m.fecha_fin + 'T12:00') - new Date(m.fecha + 'T12:00')) / 86400000) + 1;
+  return fmtFecha(m.fecha) + ' al ' + fmtFecha(m.fecha_fin) + ' · ' + dias + ' días';
+}
 function mlCosto(id){ return Number(ML.costos[id]) || 0; }
 function mlHora(iso){ return iso ? new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''; }
 function mlCategorias(){
@@ -10866,7 +10873,8 @@ function monFormInfoHtml(m){
       <select id="monPunto"><option value="">Elige el punto...</option>${locs.map(l => `<option value="${l.id}" ${l.id === locSel ? 'selected' : ''}>${escapeHtml(l.name)}</option>`).join('')}</select>
       <div class="field-help">Lo ven y marcan todos los de ese punto.</div></div>
     <div class="ml-edit">
-      <div class="field" style="flex:1 1 150px;"><label class="field-label" for="monFecha">Fecha</label><input type="date" id="monFecha" value="${m && m.fecha ? m.fecha : ''}"></div>
+      <div class="field" style="flex:1 1 150px;"><label class="field-label" for="monFecha">Desde</label><input type="date" lang="es-CO" id="monFecha" value="${m && m.fecha ? m.fecha : ''}"></div>
+      <div class="field" style="flex:1 1 150px;"><label class="field-label" for="monFechaFin">Hasta <span class="ev-dim">(si es más de un día)</span></label><input type="date" lang="es-CO" id="monFechaFin" value="${m && m.fecha_fin ? m.fecha_fin : ''}"></div>
       <div class="field" style="flex:2 1 220px;"><label class="field-label" for="monLugar">Lugar</label><input type="text" id="monLugar" value="${escapeHtml(m && m.lugar || '')}" placeholder="Dónde es"></div>
     </div>
     <div class="field"><label class="field-label" for="monNotas">Notas</label><textarea id="monNotas" rows="2">${escapeHtml(m && m.notas || '')}</textarea></div>
@@ -10882,7 +10890,7 @@ function monListaHtml(){
   const otrosPuntos = ML.lista.some(m => currentLocation && m.location_id !== currentLocation.id);
   const tarjeta = m => {
     const a = ML.avance[m.id] || { t: 0, l: 0 }, pct = a.t ? Math.round(a.l * 100 / a.t) : 0;
-    const datos = [fmtFecha(m.fecha), m.lugar, ML.soloPunto ? '' : monPuntoNombre(m)].filter(Boolean).join(' · ');
+    const datos = [monFechas(m), m.lugar, ML.soloPunto ? '' : monPuntoNombre(m)].filter(Boolean).join(' · ');
     return `<button type="button" class="mon-card" data-mon="abrir" data-id="${m.id}">
       <span class="mon-card-nombre">${escapeHtml(m.nombre)}</span>
       <span class="mon-card-datos">${escapeHtml(datos || 'Sin fecha')}</span>
@@ -10921,7 +10929,7 @@ function monDetalleHtml(){
   const responsables = [...new Set(ML_RESP_BASE.concat(items.map(i => i.responsable).filter(Boolean)))];
   const visibles = items.filter(i => (ML.filtro === 'todo' || (ML.filtro === 'pend' ? !i.listo_at : !!i.listo_at)) && (!ML.cat || i.categoria === ML.cat));
   const chip = (attr, val, actual, txt, n) => `<button type="button" class="aud-chip${actual === val ? ' active' : ''}" ${attr}="${escapeHtml(val)}" aria-pressed="${actual === val}">${escapeHtml(txt)}${n !== undefined ? `<span>${n}</span>` : ''}</button>`;
-  const datos = [fmtFecha(m.fecha), m.lugar, monPuntoNombre(m)].filter(Boolean).join(' · ');
+  const datos = [monFechas(m), m.lugar, monPuntoNombre(m)].filter(Boolean).join(' · ');
 
   const filaHtml = i => {
     const on = !!i.listo_at;
@@ -11148,6 +11156,7 @@ async function monAccion(b){
     nombre: document.getElementById('monNombre').value.trim(),
     location_id: document.getElementById('monPunto').value || null,
     fecha: document.getElementById('monFecha').value || null,
+    fecha_fin: document.getElementById('monFechaFin').value || null,
     lugar: document.getElementById('monLugar').value.trim() || null,
     notas: document.getElementById('monNotas').value.trim() || null
   });
@@ -11159,6 +11168,9 @@ async function monAccion(b){
     const datos = leer();
     if(!datos.nombre){ showToast('Ponle un nombre al montaje', 'warn'); return; }
     if(!datos.location_id){ showToast('Elige el punto del montaje', 'warn'); return; }
+    if(datos.fecha_fin && !datos.fecha){ datos.fecha = datos.fecha_fin; }
+    if(datos.fecha_fin && datos.fecha_fin < datos.fecha){ showToast('La fecha «Hasta» no puede ser antes de «Desde»', 'warn'); return; }
+    if(datos.fecha_fin === datos.fecha) datos.fecha_fin = null;
     b.disabled = true;
     const q = act === 'nuevo-crear'
       ? supa.from('montajes').insert(datos).select('*, locations(name)').single()
@@ -11243,7 +11255,7 @@ function mlMensajePendientes(){
   const m = monActual() || {};
   const pend = ML.items.filter(i => !i.listo_at);
   const lineas = [`*Montaje · ${m.nombre || ''}*`];
-  const datos = [fmtFecha(m.fecha), m.lugar].filter(Boolean).join(' · ');
+  const datos = [monFechas(m), m.lugar].filter(Boolean).join(' · ');
   if(datos) lineas.push(datos);
   lineas.push('', pend.length ? `Faltan ${pend.length} de ${ML.items.length}:` : '¡Todo está listo!');
   mlCategorias().forEach(c => {
@@ -11268,7 +11280,7 @@ async function mlDescargar(){
   const filas = items.map(i => [i.categoria, i.nombre, i.cantidad || '', i.responsable || '', i.alquiler ? (i.proveedor || 'Sí') : '']
     .concat(costos ? [i.alquiler ? mlCosto(i.id) : ''] : [])
     .concat([i.listo_at ? 'Listo · ' + (i.listo_por || '') + ' · ' + mlHora(i.listo_at) : 'Pendiente', i.nota ? (i.nota_por ? i.nota_por + ': ' : '') + i.nota : '']));
-  await exportarTabla({ formato, titulo: 'Montaje · ' + (m.nombre || ''), subtitulo: [fmtFecha(m.fecha), m.lugar, monPuntoNombre(m)].filter(Boolean).join(' · '),
+  await exportarTabla({ formato, titulo: 'Montaje · ' + (m.nombre || ''), subtitulo: [monFechas(m), m.lugar, monPuntoNombre(m)].filter(Boolean).join(' · '),
     nombre: 'Montaje ' + (m.nombre || ''), hoja: 'Lista', horizontal: true, columnas, filas });
 }
 
