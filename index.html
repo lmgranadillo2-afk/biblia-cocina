@@ -1796,6 +1796,42 @@ nav.tabs button{position:relative;}
 .btn{border-radius:12px;}
 .btn-small{border-radius:10px;}
 @media(prefers-reduced-motion: reduce){ .kanban-card.pendiente, .ini-card{transition:none;} }
+/* ===== DISEÑO v3 · resto de pantallas (Recetario, Inventario, Horarios, Costos, Eventos, Admin, ventanas) ===== */
+/* Tarjetas, tablas y paneles con el mismo radio y sombra */
+.rec-card, .order-entry, .user-row, .gi-row, .sched-day, .day-detail-box, .weekly-summary, .ev-sum, .ev-table-wrap, .admin-filters,
+.location-card, .inv-rows, .hor-grid-wrap, .seg-wrap, .seg-tile{border-radius:12px; box-shadow:var(--shadow-1);}
+.inv-rows, .hor-grid-wrap, .seg-wrap, .ev-table-wrap, .day-detail-box{border-radius:var(--radius-card);}
+/* Listas de Recetario, Costos y Eventos: panel izquierdo apenas más claro y tarjetas que responden al mouse */
+@media(min-width:800px){
+  .rec-list-pane{background:color-mix(in srgb, var(--surface) 45%, var(--bg)); border-right-color:color-mix(in srgb, var(--border) 70%, transparent);}
+  .rec-list-pane .rec-search{background:transparent; backdrop-filter:blur(6px);}
+  .detail-title{font-size:34px;}
+}
+.rec-card{padding:12px 16px; border-color:color-mix(in srgb, var(--border) 80%, transparent); transition:transform .15s ease-out, box-shadow .15s ease-out, background-color .15s ease-out, border-color .15s ease-out;}
+@media(hover:hover){ .rec-card:hover{transform:translateY(-1px); box-shadow:var(--shadow-2); border-color:var(--border-strong);} }
+.rec-card.selected{box-shadow:0 0 0 2px var(--accent), var(--shadow-1);}
+/* Subpestañas y grupos (Costos, Admin, Horarios…): control segmentado */
+.admin-subtabs, .admin-grupos{background:color-mix(in srgb, var(--surface-2) 85%, var(--surface-3)); border-radius:14px; padding:5px;}
+.admin-subtabs button, .admin-grupos button{border-radius:10px;}
+.admin-subtabs button.active, .admin-grupos button.active{box-shadow:0 1px 3px rgba(31,24,16,.12);}
+/* Calendarios (Cronograma, Inventario, Eventos) */
+.cal-cell{border-color:color-mix(in srgb, var(--border) 80%, transparent);}
+@media(hover:hover){ .cal-cell:not(.empty):hover{border-color:var(--border-strong); background:var(--surface-2);} }
+.cal-cell.today{box-shadow:inset 0 0 0 2px var(--accent);}
+.day-detail-title{font-size:22px;}
+/* Horarios: cabecera de la grilla más clara */
+.hor-grid thead th{background:color-mix(in srgb, var(--surface-2) 70%, var(--surface));}
+/* Ventanas, avisos y entrada */
+.modal-overlay{backdrop-filter:blur(3px);}
+.modal-box{box-shadow:var(--shadow-2);}
+@media(min-width:800px){ .modal-box{border-radius:20px;} }
+.toast{border-radius:12px;}
+#loginScreen{background:radial-gradient(120% 80% at 50% 0%, var(--surface) 0%, var(--bg) 60%);}
+.login-box{border-radius:20px; box-shadow:var(--shadow-2); padding:32px 28px;}
+.location-card{background:var(--surface); transition:transform .15s ease-out, box-shadow .15s ease-out;}
+@media(hover:hover){ .location-card:hover{transform:translateY(-1px); box-shadow:var(--shadow-2);} }
+.empty-note{background:color-mix(in srgb, var(--surface) 55%, transparent);}
+@media(prefers-reduced-motion: reduce){ .rec-card, .location-card{transition:none;} }
 </style>
 </head>
 <body>
