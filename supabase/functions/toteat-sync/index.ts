@@ -297,6 +297,31 @@ function tramos(ini: string, end: string, dias: number): [string, string][] {
 //  - Ventas netas y costo teórico (recetas de Toteat) desde las ventas.
 //  - Merma desde el inventario: entre la primera y la última toma física del período,
 //    lo esperado (inicial + compras + transformaciones + uso por ventas) contra lo contado.
+// Precios de insumos (fichas de recetas nuevas): último costo unitario de cada insumo del inventario de
+// Toteat en los últimos 14 días. Una sola consulta. También sirve para probar las claves del restaurante.
+async function preciosInsumos(loc: { id: string; slug: string; name: string }) {
+  const { cred, faltan, prefijo } = credenciales(loc.slug);
+  if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat para ${loc.name}: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
+  const ini = fechaToteat(13), end = fechaToteat(0);
+  const body = await toteatGet(cred, "inventorystate", { initial_date: ini, final_date: end });
+  const porNombre = new Map<string, { nombre: string; unidad: string; costo: number; fecha: string }>();
+  for (const ing of body.data ?? []) {
+    const nombre = String(ing.product ?? "").trim();
+    if (!nombre) continue;
+    let costo = 0, fecha = "";
+    for (const w of ing.warehouses ?? []) {
+      for (const d of w.inventories ?? []) {
+        const c = Number(d.cost), f = String(d.date ?? "");
+        if (c > 0 && f >= fecha) { costo = c; fecha = f; }
+      }
+    }
+    const previo = porNombre.get(norm(nombre));
+    if (!previo || (costo > 0 && fecha >= previo.fecha)) porNombre.set(norm(nombre), { nombre, unidad: String(ing.unit ?? ""), costo, fecha });
+  }
+  const insumos = [...porNombre.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  return { ok: true, tipo: "precios_insumos", restaurante: loc.name, desde: ini, hasta: end, total: insumos.length, con_precio: insumos.filter((i) => i.costo > 0).length, insumos };
+}
+
 async function foodCost(loc: { id: string; slug: string; name: string }, ini: string, end: string) {
   const { cred, faltan, prefijo } = credenciales(loc.slug);
   if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
@@ -720,6 +745,9 @@ Deno.serve(async (req) => {
       }
       if (accion === "foodcost") {
         return json(await foodCost(loc, String(payload.ini ?? ""), String(payload.end ?? "")));
+      }
+      if (accion === "precios_insumos") {
+        return json(await preciosInsumos(loc));
       }
       if (accion === "costos") {
         const res = await sincronizarCostos(svc, loc, !!aplicar);

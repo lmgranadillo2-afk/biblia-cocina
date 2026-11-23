@@ -1078,6 +1078,60 @@ nav.tabs button{position:relative;}
 .ev-estado-list{max-height:50vh; overflow-y:auto; margin-bottom:var(--space-3);}
 .ev-estado-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);}
 .ev-estado-row:last-child{border-bottom:none;}
+/* Recetas nuevas (solo super admin) */
+.rn-panel{position:fixed; inset:0; z-index:950; display:none; overflow-y:auto; background:var(--bg);}
+.rn-panel.open{display:block;}
+.rn-box{max-width:1280px; margin:0 auto; padding:16px 20px 60px;}
+.rn-top{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:var(--space-4);}
+.rn-top-tit{display:flex; flex-direction:column;}
+.rn-top h2{margin:0; font:700 26px/1.2 'Playfair Display',serif;}
+.rn-layout{display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;}
+.rn-aside{flex:1 1 240px; max-width:300px; display:flex; flex-direction:column; gap:10px;}
+.rn-main{flex:999 1 640px; min-width:0; display:flex; flex-direction:column; gap:12px;}
+.rn-toteat{display:flex; flex-direction:column; gap:6px; padding:10px; font-size:13px; color:var(--text-muted); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+.rn-err{color:var(--danger) !important; font-weight:600;}
+.rn-lista{display:flex; flex-direction:column; gap:6px;}
+.rn-item{display:flex; flex-direction:column; gap:2px; padding:10px 12px; text-align:left; font:inherit; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer;}
+.rn-item.active{border-color:var(--accent); background:var(--accent-soft);}
+.rn-item span{font-size:12px; color:var(--text-muted);}
+.rn-item-cod{font-family:'IBM Plex Mono',monospace;}
+.rn-acciones{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; align-items:center;}
+.rn-hoja{overflow-x:auto; background:#FFFFFF; border:2px solid var(--text); box-shadow:var(--shadow-2);}
+.rn-hoja-in{min-width:820px; color:var(--text);}
+.rn-hoja input, .rn-hoja select, .rn-hoja textarea{font:inherit; color:var(--text); background:transparent; border:0; border-radius:0; min-height:0; box-shadow:none;}
+.rn-hoja input:focus, .rn-hoja select:focus, .rn-hoja textarea:focus{outline:2px solid var(--accent); outline-offset:-2px;}
+.rn-logo{display:flex; justify-content:center; align-items:center; min-height:56px; padding:10px; border-bottom:2px solid var(--text);}
+.rn-logo img{max-height:56px; max-width:220px; object-fit:contain;}
+.rn-cab{display:grid; grid-template-columns:220px minmax(0, 1fr); border-bottom:2px solid var(--text); background:#DCE6F2;}
+.rn-cab label{padding:8px 10px; font-weight:700; border-right:2px solid var(--text); border-bottom:1px solid var(--text);}
+.rn-cab input{padding:8px 10px; font-weight:600; border-bottom:1px solid var(--text) !important;}
+.rn-row{display:grid; grid-template-columns:minmax(200px, 2.2fr) 100px 80px 160px 120px minmax(140px, 1.6fr) 40px; border-bottom:1px solid var(--text);}
+.rn-row > *{border-right:2px solid var(--text) !important; padding:6px 8px; min-width:0;}
+.rn-row > :last-child{border-right:0 !important;}
+.rn-head{background:#DCE6F2; border-bottom:2px solid var(--text); font-weight:700; font-size:14px; text-align:center;}
+.rn-head .rn-nuevo, .rn-precio, .rn-costo{background:color-mix(in srgb, var(--accent-soft) 70%, #FFFFFF);}
+.rn-ingcel{display:flex; align-items:center; gap:6px; padding:0 !important;}
+.rn-ingcel input{flex:1; min-width:0; padding:6px 8px;}
+.rn-tt{flex:none; margin-right:6px; padding:1px 6px; font-size:11px; font-weight:600; color:var(--info); background:var(--info-bg); border-radius:var(--radius-sm);}
+.rn-num, .rn-mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.rn-num{text-align:right;}
+.rn-precio{display:flex; align-items:center; padding:0 !important;}
+.rn-precio input{flex:1; min-width:0; padding:6px;}
+.rn-precio select{flex:none; font-size:12px; color:var(--text-muted);}
+.rn-costo{display:flex; align-items:center; justify-content:flex-end; font:600 13px 'IBM Plex Mono',monospace;}
+.rn-x{background:#FFFFFF; color:var(--danger); font-size:18px; font-weight:700; cursor:pointer; border-top:0; border-bottom:0; border-left:0;}
+.rn-pie{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; padding:10px; border-bottom:2px solid var(--text);}
+.rn-tot{display:flex; flex-wrap:wrap; align-items:center; gap:16px; font-size:14px;}
+.rn-tot b{font:600 17px 'IBM Plex Mono',monospace;}
+.rn-rinde{display:flex; align-items:center; gap:6px; color:var(--text-muted);}
+.rn-rinde input{width:70px; border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px 6px;}
+.rn-rinde select{border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px;}
+.rn-poru{color:var(--text-muted);}
+.rn-proc-tit{padding:8px; text-align:center; font-weight:700; border-bottom:2px solid var(--text);}
+.rn-hoja textarea{display:block; width:100%; box-sizing:border-box; padding:10px 12px; line-height:1.6; resize:vertical;}
+.rn-map{display:flex; flex-direction:column; gap:6px; margin-bottom:8px;}
+.rn-map-row{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);}
+.rn-map-row input{width:180px;}
 /* Montajes (checklist) */
 #view-montajes .mon-box{max-width:1000px; margin:0 auto;}
 .mon-cab{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:var(--space-3);}
@@ -1738,6 +1792,7 @@ nav.tabs button{position:relative;}
       <div class="rec-list-pane">
         <div class="rec-search"><input type="text" id="searchInput" placeholder="Buscar receta o código..."></div>
         <button class="btn btn-secondary rec-tools-btn" id="calcProdBtn">Calcular producción</button>
+        <button class="btn btn-secondary rec-tools-btn" id="rnBtn" style="display:none">Recetas nuevas</button>
         <div class="rec-count" id="recCount"></div>
         <div class="rec-items" id="recItems"></div>
       </div>
@@ -1746,6 +1801,8 @@ nav.tabs button{position:relative;}
         <div class="detail-body" id="detailBody"></div>
       </div>
     </div>
+
+    <div id="rnPanel" class="rn-panel" role="dialog" aria-modal="true" aria-label="Recetas nuevas"><div id="rnBox" class="rn-box"></div></div>
 
     <div id="view-calculadora" class="view">
       <div class="detail-title" style="margin-bottom:4px;">Calculadora de precios</div>
@@ -3686,6 +3743,7 @@ function enterArea(loc, area){
   document.getElementById('tab-mercadeo').style.display = puedeMercadeo() ? '' : 'none';
   document.getElementById('tab-informes').style.display = puedeInformes() ? '' : 'none';
   document.getElementById('tab-shows').style.display = puedeShows() ? '' : 'none';
+  document.getElementById('rnBtn').style.display = profile.is_super_admin ? '' : 'none';
   document.getElementById('tab-montajes').style.display = (esRrhh() || esInformes() || esMercadeo() || esFacturas()) ? 'none' : '';
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -11283,6 +11341,366 @@ async function mlDescargar(){
   await exportarTabla({ formato, titulo: 'Montaje · ' + (m.nombre || ''), subtitulo: [monFechas(m), m.lugar, monPuntoNombre(m)].filter(Boolean).join(' · '),
     nombre: 'Montaje ' + (m.nombre || ''), hoja: 'Lista', horizontal: true, columnas, filas });
 }
+
+/* ---------- RECETAS NUEVAS (sql/recetas_nuevas.sql, decisiones de Miguel 23 nov) ----------
+   Fichas de recetas en desarrollo con el formato de la ficha de Dos Santos + precio (por kg / l / und), costo por
+   línea, costo total y rendimiento. Solo super admin (RLS is_super_admin). Cada ficha es de un restaurante: su logo
+   y su Toteat (acción precios_insumos de la función de Toteat) para traer el último precio de cada insumo.
+   "Pasar al Recetario" crea la receta en un área del restaurante (ingredientes con el código del catálogo cuando
+   coincide el nombre) y deja el procedimiento como observación. Los precios de la ficha no cambian el catálogo. */
+const RN = { locs: [], locId: null, fichas: [], selId: null, draft: null, dirty: false, toteat: {}, catalogo: null, pasar: null };
+const RN_UNIDADES = ['g', 'kg', 'ml', 'l', 'und'];
+const RN_A_RECETA = { g: 'GR', kg: 'KG', ml: 'ML', l: 'L', und: 'UND' };
+
+function rnNum(v){ return parseFloat(String(v === null || v === undefined ? '' : v).replace(/\$|\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')) || 0; }
+function rnCant(v){ return parseFloat(String(v === null || v === undefined ? '' : v).replace(',', '.')) || 0; }
+// Costo de una línea: peso neto llevado a kg / l / und × precio. null = falta dato; 'x' = la unidad no cuadra.
+function rnCostoFila(f){
+  const p = rnNum(f.precio), q = rnCant(f.peso);
+  if(!p || !q) return null;
+  const base = { g: ['m', q / 1000], kg: ['m', q], ml: ['v', q / 1000], l: ['v', q], und: ['u', q] }[f.unidad];
+  const por = { kg: 'm', l: 'v', und: 'u' }[f.por];
+  if(!base) return null;
+  // kg y l se tratan como intercambiables (1 l ≈ 1 kg) para no bloquear líquidos con precio por kg.
+  const g = x => x === 'v' ? 'm' : x;
+  if(g(base[0]) !== g(por)) return 'x';
+  return base[1] * p;
+}
+// Unidad de Toteat → precio por kg / l / und.
+function rnDesdeToteat(t){
+  const u = String(t.unidad || '').toLowerCase().trim();
+  if(/^(kg|kilo)/.test(u)) return { precio: t.costo, por: 'kg' };
+  if(/^(g|gr|gramo)/.test(u)) return { precio: t.costo * 1000, por: 'kg' };
+  if(/^(ml|cc|mililitro)/.test(u)) return { precio: t.costo * 1000, por: 'l' };
+  if(/^(l|lt|litro)/.test(u)) return { precio: t.costo, por: 'l' };
+  return { precio: t.costo, por: 'und' };
+}
+function rnNorm(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+function rnToteatDe(nombre){
+  const t = RN.toteat[RN.locId];
+  if(!t || !t.insumos) return null;
+  const n = rnNorm(nombre);
+  return t.insumos.find(x => rnNorm(x.nombre) === n) || null;
+}
+function rnFilaVacia(){ return { ing: '', peso: '', unidad: 'g', precio: '', por: 'kg', obs: '', toteat: null }; }
+function rnLoc(id){ return RN.locs.find(l => l.id === (id || RN.locId)) || null; }
+
+async function rnAbrir(){
+  if(!profile || !profile.is_super_admin) return;
+  document.getElementById('rnPanel').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if(!RN.locs.length){
+    const { data } = await supa.from('locations').select('id, name, slug, logo_data_url').not('slug', 'in', '(eventos,admin)').eq('activo', true).order('name');
+    RN.locs = data || [];
+  }
+  if(!RN.locId) RN.locId = (currentLocation && RN.locs.some(l => l.id === currentLocation.id)) ? currentLocation.id : (RN.locs[0] || {}).id;
+  await rnCargarFichas();
+  rnPintar();
+}
+function rnCerrar(){
+  if(RN.dirty && !confirm('Hay cambios sin guardar en la ficha. ¿Salir igual?')) return;
+  RN.dirty = false;
+  document.getElementById('rnPanel').classList.remove('open');
+  document.body.style.overflow = '';
+}
+async function rnCargarFichas(){
+  const { data, error } = await supa.from('recetas_nuevas').select('*').eq('location_id', RN.locId).order('updated_at', { ascending: false });
+  if(error) showToast('No se pudieron cargar las fichas: ' + error.message, 'danger');
+  RN.fichas = data || [];
+  if(!RN.fichas.some(f => f.id === RN.selId)) rnSeleccionar(RN.fichas[0] ? RN.fichas[0].id : null, true);
+}
+function rnSeleccionar(id, sinPintar){
+  RN.selId = id;
+  const f = RN.fichas.find(x => x.id === id);
+  RN.draft = f ? { id: f.id, codigo: f.codigo || '', nombre: f.nombre || '', categoria: f.categoria || '', rinde: f.rinde === null ? '' : String(f.rinde),
+    rinde_unidad: f.rinde_unidad || 'kg', procedimiento: f.procedimiento || '', filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
+  if(RN.draft && !RN.draft.filas.length) RN.draft.filas.push(rnFilaVacia());
+  RN.dirty = false;
+  if(!sinPintar) rnPintar();
+}
+
+function rnPintar(){
+  const box = document.getElementById('rnBox');
+  const loc = rnLoc(), d = RN.draft, t = RN.toteat[RN.locId];
+  const toteatTxt = !t ? 'Sin consultar todavía.'
+    : t.estado === 'cargando' ? 'Consultando Toteat...'
+    : t.estado === 'error' ? 'No se pudo: ' + t.msg
+    : `${t.total} insumos de Toteat (${t.con_precio} con precio) · consultado ${mlHora(t.at)}`;
+  const lista = RN.fichas.map(f => `<button type="button" class="rn-item${f.id === RN.selId ? ' active' : ''}" data-rn="sel" data-id="${f.id}">
+      <span class="rn-item-cod">${escapeHtml(f.codigo || 'Sin código')}</span>
+      <b>${escapeHtml(f.nombre || 'Ficha sin nombre')}</b>
+      <span>${(f.filas || []).filter(x => x.ing).length} ingredientes${f.pasada_at ? ' · en el Recetario' : ''}</span>
+    </button>`).join('');
+  box.innerHTML = `
+    <div class="rn-top">
+      <button type="button" class="btn btn-ghost btn-small" data-rn="cerrar">← Volver al recetario</button>
+      <div class="rn-top-tit"><span class="section-label" style="margin:0;">Solo super admin</span><h2>Recetas nuevas</h2></div>
+    </div>
+    <div class="rn-layout">
+      <aside class="rn-aside">
+        <label class="field-label" for="rnLoc">Restaurante</label>
+        <select id="rnLoc">${RN.locs.map(l => `<option value="${l.id}" ${l.id === RN.locId ? 'selected' : ''}>${escapeHtml(l.name)}</option>`).join('')}</select>
+        <div class="rn-toteat">
+          <div class="${t && t.estado === 'error' ? 'rn-err' : ''}">${escapeHtml(toteatTxt)}</div>
+          <button type="button" class="btn btn-secondary btn-small" data-rn="toteat" ${t && t.estado === 'cargando' ? 'disabled' : ''}>${t && t.estado === 'ok' ? 'Volver a consultar Toteat' : 'Traer precios de Toteat'}</button>
+        </div>
+        <button type="button" class="btn btn-accent btn-block" data-rn="nueva">+ Nueva ficha</button>
+        <div class="rn-lista">${lista || '<div class="empty-note">Todavía no hay fichas de este restaurante.</div>'}</div>
+      </aside>
+      <main class="rn-main">${d ? rnFichaHtml(d, loc) : '<div class="empty-list">Elige una ficha o crea una nueva.</div>'}</main>
+    </div>
+    <datalist id="rnToteatList">${(t && t.insumos ? t.insumos : []).map(x => `<option value="${escapeHtml(x.nombre)}"></option>`).join('')}</datalist>`;
+  rnRecalcular();
+}
+
+function rnFichaHtml(d, loc){
+  const ficha = RN.fichas.find(f => f.id === d.id) || {};
+  const filas = d.filas.map((f, i) => `
+    <div class="rn-row">
+      <div class="rn-ingcel"><input type="text" data-rn-f="ing" data-i="${i}" value="${escapeHtml(f.ing)}" list="rnToteatList" placeholder="Ingrediente" aria-label="Ingrediente">
+        ${f.toteat ? `<span class="rn-tt" title="Precio de Toteat">Toteat ${escapeHtml(fmtFechaCorta(f.toteat.fecha))}</span>` : ''}</div>
+      <input type="text" inputmode="decimal" data-rn-f="peso" data-i="${i}" value="${escapeHtml(f.peso)}" aria-label="Peso neto" class="rn-num">
+      <select data-rn-f="unidad" data-i="${i}" aria-label="Unidad">${RN_UNIDADES.map(u => `<option ${u === f.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select>
+      <div class="rn-precio"><input type="text" inputmode="decimal" data-rn-f="precio" data-i="${i}" value="${escapeHtml(f.precio)}" placeholder="$" aria-label="Precio" class="rn-num">
+        <select data-rn-f="por" data-i="${i}" aria-label="Precio por">${['kg', 'l', 'und'].map(u => `<option value="${u}" ${u === f.por ? 'selected' : ''}>/${u}</option>`).join('')}</select></div>
+      <div class="rn-costo" id="rnCosto${i}"></div>
+      <input type="text" data-rn-f="obs" data-i="${i}" value="${escapeHtml(f.obs)}" aria-label="Observaciones">
+      <button type="button" class="rn-x" data-rn="quitar" data-i="${i}" aria-label="Quitar ingrediente">×</button>
+    </div>`).join('');
+  return `
+    <div class="rn-acciones">
+      ${ficha.pasada_at ? `<span class="badge ok">En el Recetario · ${escapeHtml(ficha.pasada_por || '')} · ${mlHora(ficha.pasada_at)}</span>` : ''}
+      <button type="button" class="btn btn-ghost btn-small" data-rn="descargar">Descargar</button>
+      <button type="button" class="btn btn-ghost btn-small" data-rn="borrar">Borrar ficha</button>
+      <button type="button" class="btn btn-secondary btn-small" data-rn="toteat-filas" ${RN.toteat[RN.locId] && RN.toteat[RN.locId].estado === 'ok' ? '' : 'disabled'}>Actualizar precios de Toteat</button>
+      <button type="button" class="btn btn-secondary btn-small" data-rn="pasar">Pasar al Recetario</button>
+      <button type="button" class="btn btn-accent btn-small" data-rn="guardar" id="rnGuardar">${RN.dirty ? 'Guardar ficha' : 'Guardada'}</button>
+    </div>
+    ${RN.pasar ? rnPasarHtml() : ''}
+    <div class="rn-hoja"><div class="rn-hoja-in">
+      <div class="rn-logo">${loc && loc.logo_data_url ? `<img src="${escapeHtml(loc.logo_data_url)}" alt="${escapeHtml(loc.name)}">` : `<b>${escapeHtml(loc ? loc.name : '')}</b>`}</div>
+      <div class="rn-cab">
+        <label for="rnCodigo">CÓDIGO</label><input id="rnCodigo" data-rn-h="codigo" value="${escapeHtml(d.codigo)}" class="rn-mono">
+        <label for="rnNombre">NOMBRE RECETA</label><input id="rnNombre" data-rn-h="nombre" value="${escapeHtml(d.nombre)}">
+        <label for="rnCategoria">CATEGORÍA</label><input id="rnCategoria" data-rn-h="categoria" value="${escapeHtml(d.categoria)}">
+      </div>
+      <div class="rn-row rn-head"><div>INGREDIENTES</div><div>PESO NETO</div><div>UNIDAD</div><div class="rn-nuevo">PRECIO</div><div class="rn-nuevo">COSTO</div><div>OBSERVACIONES</div><div></div></div>
+      ${filas}
+      <div class="rn-pie">
+        <button type="button" class="btn btn-ghost btn-small" data-rn="agregar">+ Agregar ingrediente</button>
+        <div class="rn-tot">
+          <label class="rn-rinde">Rinde <input type="text" inputmode="decimal" data-rn-h="rinde" value="${escapeHtml(d.rinde)}" class="rn-num" aria-label="Rendimiento">
+            <select data-rn-h="rinde_unidad" aria-label="Unidad del rendimiento">${['kg', 'l', 'porciones', 'und'].map(u => `<option ${u === d.rinde_unidad ? 'selected' : ''}>${u}</option>`).join('')}</select></label>
+          <span>Costo total <b id="rnTotal"></b></span>
+          <span id="rnPorU" class="rn-poru"></span>
+        </div>
+      </div>
+      <div class="rn-proc-tit">PROCEDIMIENTO</div>
+      <textarea data-rn-h="procedimiento" rows="7" aria-label="Procedimiento">${escapeHtml(d.procedimiento)}</textarea>
+    </div></div>
+    <p class="field-help">Precio por kg, por litro o por unidad; el costo de cada línea = peso neto llevado a esa unidad × precio. Los precios de la ficha no cambian el catálogo de insumos.</p>`;
+}
+function fmtFechaCorta(yyyymmdd){ const s = String(yyyymmdd || ''); return /^\d{8}$/.test(s) ? fmtFecha(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`) : s; }
+
+function rnRecalcular(){
+  const d = RN.draft;
+  if(!d) return;
+  let total = 0, faltan = 0;
+  d.filas.forEach((f, i) => {
+    const c = rnCostoFila(f), el = document.getElementById('rnCosto' + i);
+    if(typeof c === 'number') total += c; else if(f.ing) faltan++;
+    if(el){ el.textContent = c === 'x' ? 'Unidad no cuadra' : c === null ? '—' : fmtMoney(c); el.classList.toggle('rn-err', c === 'x'); }
+  });
+  const r = rnCant(d.rinde);
+  const tot = document.getElementById('rnTotal'), pu = document.getElementById('rnPorU');
+  if(tot) tot.textContent = fmtMoney(total) || '$0';
+  if(pu) pu.textContent = [r && total ? fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : '', faltan ? faltan + ' sin precio' : ''].filter(Boolean).join(' · ');
+  const g = document.getElementById('rnGuardar');
+  if(g) g.textContent = RN.dirty ? 'Guardar ficha' : 'Guardada';
+}
+
+function rnPasarHtml(){
+  const P = RN.pasar;
+  if(P.cargando) return '<div class="ml-panel"><div class="empty-note">Preparando...</div></div>';
+  return `<div class="ml-panel">
+    <div class="section-label" style="margin-top:0;">Pasar al Recetario</div>
+    <div class="ml-edit">
+      <div class="field" style="flex:1 1 200px;"><label class="field-label" for="rnPArea">Área</label>
+        <select id="rnPArea">${P.areas.map(a => `<option value="${a.id}" ${a.id === P.areaId ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}</select></div>
+      <div class="field" style="flex:1 1 160px;"><label class="field-label" for="rnPCodigo">Código de la receta</label><input id="rnPCodigo" value="${escapeHtml(P.codigo)}" class="rn-mono"></div>
+    </div>
+    <p class="field-help">Cada ingrediente se une al catálogo de insumos por su código para que la receta se costee. Los que coinciden por nombre ya vienen; escribe o busca el código de los demás (sin código, la receta queda con costo incompleto).</p>
+    <div class="rn-map">${P.filas.map((f, i) => `<div class="rn-map-row"><span>${escapeHtml(f.ing)} <span class="ev-dim">${escapeHtml(f.peso)} ${escapeHtml(f.unidad)}</span></span>
+      <input type="text" data-rn-code="${i}" value="${escapeHtml(f.code || '')}" list="rnCatalogoList" placeholder="Código del catálogo" aria-label="Código de ${escapeHtml(f.ing)}" class="rn-mono"></div>`).join('')}</div>
+    <datalist id="rnCatalogoList">${(RN.catalogo || []).map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)}</option>`).join('')}</datalist>
+    <p class="field-help">El procedimiento queda como una observación de la receta.</p>
+    <div class="ml-acciones"><button type="button" class="btn btn-secondary" data-rn="pasar-cancelar">Cancelar</button><button type="button" class="btn btn-accent" data-rn="pasar-ok">Crear la receta</button></div>
+  </div>`;
+}
+
+async function rnGuardar(){
+  const d = RN.draft;
+  if(!d) return true;
+  const fila = {
+    codigo: d.codigo.trim() || null, nombre: d.nombre.trim(), categoria: d.categoria.trim() || null,
+    rinde: rnCant(d.rinde) || null, rinde_unidad: d.rinde_unidad, procedimiento: d.procedimiento.trim() || null,
+    filas: d.filas.filter(f => f.ing.trim() || f.peso || f.precio).map(f => ({ ...f, ing: f.ing.trim() }))
+  };
+  const { data, error } = await supa.from('recetas_nuevas').update(fila).eq('id', d.id).select().single();
+  if(error){ showToast('No se guardó la ficha: ' + error.message, 'danger'); return false; }
+  const k = RN.fichas.findIndex(x => x.id === d.id); if(k >= 0) RN.fichas[k] = data;
+  RN.dirty = false;
+  return true;
+}
+
+async function rnTraerToteat(){
+  const locId = RN.locId;
+  RN.toteat[locId] = { estado: 'cargando' };
+  rnPintar();
+  const { data, error } = await supa.functions.invoke(TOTEAT_FUNCION, { body: { location_id: locId, accion: 'precios_insumos' } });
+  let msg = error ? error.message : (!data ? 'sin respuesta' : (data.ok === false ? data.error : ''));
+  if(error && error.context && typeof error.context.json === 'function'){ try { const j = await error.context.json(); if(j && j.error) msg = j.error; } catch(e){} }
+  RN.toteat[locId] = msg ? { estado: 'error', msg, at: new Date().toISOString() }
+    : { estado: 'ok', insumos: data.insumos || [], total: data.total || 0, con_precio: data.con_precio || 0, at: new Date().toISOString() };
+  if(RN.locId === locId) rnPintar();
+  if(!msg && !(data.total)) showToast('Toteat respondió, pero sin insumos en los últimos 14 días', 'warn');
+}
+
+async function rnClick(ev){
+  const b = ev.target.closest('[data-rn]');
+  if(!b) return;
+  const act = b.dataset.rn, d = RN.draft;
+  if(act === 'cerrar'){ rnCerrar(); return; }
+  if(act === 'toteat'){ rnTraerToteat(); return; }
+  if(act === 'sel'){
+    if(RN.dirty && !confirm('Hay cambios sin guardar en esta ficha. ¿Cambiar de ficha igual?')) return;
+    RN.pasar = null; rnSeleccionar(b.dataset.id); return;
+  }
+  if(act === 'nueva'){
+    if(RN.dirty && !(await rnGuardar())) return;
+    const { data, error } = await supa.from('recetas_nuevas').insert({ location_id: RN.locId, nombre: '', filas: [rnFilaVacia()] }).select().single();
+    if(error){ showToast('No se pudo crear: ' + error.message, 'danger'); return; }
+    RN.fichas.unshift(data); RN.pasar = null; rnSeleccionar(data.id);
+    const n = document.getElementById('rnNombre'); if(n) n.focus();
+    return;
+  }
+  if(!d) return;
+  if(act === 'agregar'){ d.filas.push(rnFilaVacia()); RN.dirty = true; rnPintar(); const x = document.querySelector(`[data-rn-f="ing"][data-i="${d.filas.length - 1}"]`); if(x) x.focus(); return; }
+  if(act === 'quitar'){ d.filas.splice(+b.dataset.i, 1); if(!d.filas.length) d.filas.push(rnFilaVacia()); RN.dirty = true; rnPintar(); return; }
+  if(act === 'guardar'){ b.disabled = true; const ok = await rnGuardar(); b.disabled = false; if(ok){ showToast('Ficha guardada', 'ok'); rnPintar(); } return; }
+  if(act === 'borrar'){
+    if(!confirm(`¿Borrar la ficha «${d.nombre || 'sin nombre'}»? No se puede deshacer.${RN.fichas.find(f => f.id === d.id && f.pasada_at) ? ' La receta que ya pasó al Recetario no se toca.' : ''}`)) return;
+    const { error } = await supa.from('recetas_nuevas').delete().eq('id', d.id);
+    if(error){ showToast('No se pudo borrar: ' + error.message, 'danger'); return; }
+    RN.fichas = RN.fichas.filter(f => f.id !== d.id); RN.dirty = false; RN.pasar = null;
+    rnSeleccionar(RN.fichas[0] ? RN.fichas[0].id : null); return;
+  }
+  if(act === 'toteat-filas'){
+    let n = 0;
+    d.filas.forEach(f => { const t = rnToteatDe(f.ing); if(t && t.costo > 0){ const p = rnDesdeToteat(t); f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha }; n++; } });
+    RN.dirty = RN.dirty || n > 0; rnPintar();
+    showToast(n ? `Se actualizaron ${n} precios con Toteat` : 'Ningún ingrediente coincide con un insumo de Toteat con precio', n ? 'ok' : 'warn');
+    return;
+  }
+  if(act === 'descargar'){ rnDescargar(); return; }
+  if(act === 'pasar'){
+    if(!d.nombre.trim()){ showToast('Ponle nombre a la receta primero', 'warn'); return; }
+    if(RN.dirty && !(await rnGuardar())) return;
+    RN.pasar = { cargando: true }; rnPintar();
+    const [ar, cat] = await Promise.all([
+      supa.from('areas').select('id, name').eq('location_id', RN.locId).order('created_at'),
+      RN.catalogo ? Promise.resolve({ data: RN.catalogo }) : supa.from('group_ingredients').select('code, name')
+    ]);
+    RN.catalogo = cat.data || [];
+    const porNombre = new Map(RN.catalogo.map(c => [rnNorm(c.name), c.code]));
+    const filas = d.filas.filter(f => f.ing.trim()).map(f => ({ ...f, code: f.code || porNombre.get(rnNorm(f.ing)) || '' }));
+    const areas = ar.data || [];
+    const cocina = areas.find(a => rnNorm(a.name) === 'cocina');
+    RN.pasar = { areas, areaId: (cocina || areas[0] || {}).id, codigo: d.codigo, filas };
+    rnPintar(); return;
+  }
+  if(act === 'pasar-cancelar'){ RN.pasar = null; rnPintar(); return; }
+  if(act === 'pasar-ok'){
+    const P = RN.pasar, areaId = document.getElementById('rnPArea').value, codigo = document.getElementById('rnPCodigo').value.trim().toUpperCase();
+    if(!areaId){ showToast('Elige el área', 'warn'); return; }
+    if(!codigo){ showToast('La receta necesita un código', 'warn'); return; }
+    document.querySelectorAll('[data-rn-code]').forEach(inp => { P.filas[+inp.dataset.rnCode].code = inp.value.trim().toUpperCase(); });
+    const { data: existe } = await supa.from('recipes').select('id').eq('area_id', areaId).eq('code', codigo).maybeSingle();
+    if(existe){ showToast(`Ya hay una receta con el código ${codigo} en esa área`, 'warn'); return; }
+    b.disabled = true;
+    const sinCodigo = P.filas.filter(f => !f.code).length;
+    if(sinCodigo && !confirm(`${sinCodigo} ingrediente(s) quedan sin código del catálogo y la receta saldrá con costo incompleto. ¿Crearla igual?`)){ b.disabled = false; return; }
+    const receta = {
+      code: codigo, name: d.nombre.trim(), location_id: RN.locId, area_id: areaId,
+      yield_qty: rnCant(d.rinde) || null, yield_unit: rnCant(d.rinde) ? ({ kg: 'KG', l: 'L', porciones: 'UND', und: 'UND' }[d.rinde_unidad] || 'UND') : null,
+      ingredients: P.filas.map(f => ({ code: f.code || '', name: f.ing, qty: rnCant(f.peso), unit: RN_A_RECETA[f.unidad] || 'UND' }))
+    };
+    const { data: rec, error } = await supa.from('recipes').insert(receta).select('id').single();
+    if(error){ b.disabled = false; showToast('No se creó la receta: ' + error.message, 'danger'); return; }
+    if(d.procedimiento.trim()){
+      const o = await supa.from('observations').insert({ recipe_code: codigo, author: profile.name || session.user.email, note: 'Procedimiento:\n' + d.procedimiento.trim(), created_by: session.user.id, location_id: RN.locId, area_id: areaId });
+      if(o.error) showToast('La receta quedó, pero el procedimiento no: ' + o.error.message, 'warn');
+    }
+    const marca = { pasada_recipe_id: rec.id, pasada_area_id: areaId, pasada_por: profile.name || session.user.email, pasada_at: new Date().toISOString(), codigo,
+      filas: d.filas.map(f => { const m = P.filas.find(x => x.ing === f.ing.trim()); return m ? { ...f, code: m.code } : f; }) };
+    const u = await supa.from('recetas_nuevas').update(marca).eq('id', d.id).select().single();
+    if(!u.error){ const k = RN.fichas.findIndex(x => x.id === d.id); if(k >= 0) RN.fichas[k] = u.data; }
+    d.codigo = codigo; RN.pasar = null;
+    showToast(`Receta ${codigo} creada en ${(P.areas.find(a => a.id === areaId) || {}).name || 'el área'}`, 'ok');
+    if(currentArea && currentArea.id === areaId){ await loadRecipes(); renderRecipeList(); }
+    rnPintar(); return;
+  }
+}
+
+function rnCampo(ev){
+  const el = ev.target, d = RN.draft;
+  if(el.id === 'rnLoc'){
+    if(ev.type !== 'change') return;
+    if(RN.dirty && !confirm('Hay cambios sin guardar en esta ficha. ¿Cambiar de restaurante igual?')){ el.value = RN.locId; return; }
+    RN.locId = el.value; RN.selId = null; RN.pasar = null; RN.dirty = false;
+    rnCargarFichas().then(rnPintar); return;
+  }
+  if(!d) return;
+  if(el.dataset.rnH){ d[el.dataset.rnH] = el.value; RN.dirty = true; rnRecalcular(); return; }
+  if(el.dataset.rnF){
+    const f = d.filas[+el.dataset.i], k = el.dataset.rnF;
+    if(!f) return;
+    f[k] = el.value; RN.dirty = true;
+    if(k === 'precio' || k === 'por') f.toteat = null;
+    // Al elegir un insumo de Toteat (evento change), trae su precio si la línea no tiene uno puesto a mano.
+    if(k === 'ing' && ev.type === 'change'){
+      const t = rnToteatDe(f.ing);
+      if(t && t.costo > 0 && (!f.precio || f.toteat)){
+        const p = rnDesdeToteat(t);
+        f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha };
+        if(t.unidad && /^(g|gr|kg|kilo)/i.test(t.unidad) && f.unidad === 'und') f.unidad = 'g';
+        rnPintar(); return;
+      }
+    }
+    rnRecalcular();
+  }
+}
+
+async function rnDescargar(){
+  const formato = await elegirFormato('Descargar ficha', EXP_OPC);
+  if(!formato) return;
+  const d = RN.draft, loc = rnLoc();
+  let total = 0;
+  const filas = d.filas.filter(f => f.ing).map(f => { const c = rnCostoFila(f); if(typeof c === 'number') total += c;
+    return [f.ing, rnCant(f.peso) || '', f.unidad, rnNum(f.precio) ? rnNum(f.precio) : '', rnNum(f.precio) ? '/' + f.por : '', typeof c === 'number' ? Math.round(c) : '', f.obs || '']; });
+  const r = rnCant(d.rinde);
+  if(d.procedimiento.trim()) filas.push(['PROCEDIMIENTO', '', '', '', '', '', d.procedimiento.trim()]);
+  await exportarTabla({ formato, titulo: (d.codigo ? d.codigo + ' · ' : '') + (d.nombre || 'Receta nueva'),
+    subtitulo: [loc ? loc.name : '', d.categoria, 'Costo total ' + fmtMoney(total), r ? 'Rinde ' + r + ' ' + d.rinde_unidad + ' · ' + fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : ''].filter(Boolean).join(' · '),
+    nombre: 'Ficha ' + (d.nombre || 'receta'), hoja: 'Ficha', horizontal: true,
+    columnas: [{ t: 'Ingrediente', w: 30 }, { t: 'Peso neto', tipo: 'num', w: 11 }, { t: 'Unidad', w: 8 }, { t: 'Precio', tipo: 'num', w: 12 }, { t: 'Por', w: 7 }, { t: 'Costo', tipo: 'num', total: true, w: 12 }, { t: 'Observaciones', w: 40 }],
+    filas });
+}
+
+document.getElementById('rnBtn').addEventListener('click', rnAbrir);
+document.getElementById('rnBox').addEventListener('click', rnClick);
+document.getElementById('rnBox').addEventListener('input', rnCampo);
+document.getElementById('rnBox').addEventListener('change', rnCampo);
 
 /* ---------- CALCULADORA DE PRECIOS (solo super admin) ----------
    Precio sin ICO = costo total ÷ (1 − margen); precio de carta = precio sin ICO × (1 + ICO). El margen y el food cost
