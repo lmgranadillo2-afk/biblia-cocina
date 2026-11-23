@@ -1,4 +1,4 @@
-# Biblia de Cocina — Grupo Junín
+# Junín Operaciones (antes Biblia de Cocina) — Grupo Junín
 
 Herramienta interna de gestión de cocina, multi-restaurante, multi-usuario, para el Grupo Junín (Colombia).
 
@@ -13,6 +13,13 @@ Herramienta interna de gestión de cocina, multi-restaurante, multi-usuario, par
 1. Editar `index.html` directamente (contiene placeholders `PEGA_AQUI_TU_SUPABASE_URL` y `PEGA_AQUI_TU_SUPABASE_ANON_KEY` en el código fuente original — en este repo ya deben estar con los valores reales).
 2. `git add`, `git commit`, `git push` — Vercel se encarga del resto.
 3. Los cambios de base de datos van como scripts `.sql` sueltos que se corren a mano en el SQL Editor de Supabase (no hay migraciones versionadas todavía — ver sección de mejoras pendientes).
+
+## Organización de la app (23 nov 2026, decisiones de Miguel)
+
+- **Nombre:** Junín Operaciones (title, manifest, PWA, login). El repo y el dominio siguen siendo biblia-cocina.
+- **Entrada directa:** la app recuerda el último punto y área por persona y equipo (`localStorage` `junin-ctx-<user id>`, `ctxGuardado`; se guarda en `enterArea`) y entra directo; se cambia con el selector Punto/Área. Solo la primera vez (varios puntos) sale la pantalla de elegir.
+- **Menú por secciones** (`.nav-sec` en `#mainNav`; ver DESIGN.md §3).
+- **Eventos es pestaña propia** (`tab-eventos`, módulo `eventos`): usa la vista de Costeo con solo la subpestaña Eventos (`switchTab`: `vista = costeo`). Un área con `costeo` también ve Eventos (`modulosConEventos`). "Costeo" se llama ahora **Costos y carta** y ya no muestra eventos. El punto Eventos tiene solo el módulo `eventos` (`sql/organizacion_eventos.sql`) y ahí no se muestran Admin, Calculadora ni RRHH (salvo super admin); Montajes y Chat siempre. Shows: también el usuario de Eventos (`es_shows`).
 
 ## Arquitectura de datos
 

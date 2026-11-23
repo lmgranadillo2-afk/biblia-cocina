@@ -1,4 +1,4 @@
-# DESIGN.md — Biblia de Cocina (propuesta de rediseño v2)
+# DESIGN.md — Junín Operaciones (antes Biblia de Cocina; propuesta de rediseño v2)
 
 > Estado: **APLICADO** — fases 1 a 4 aprobadas por Miguel módulo por módulo (oct 2026).
 > Este documento manda sobre cualquier decisión visual. Si un cambio de UI contradice algo de aquí, se pregunta antes.
@@ -106,6 +106,8 @@ Hoy hay 9 pestañas repartidas con `flex:1` en una sola fila: en celular no cabe
 - Recetario y Costeo mantienen el patrón lista (340 px) + detalle.
 
 **Entre 800 y 1023 px:** barra lateral colapsada a íconos (72 px).
+
+**Secciones del menú (23 nov 2026, aprobado por Miguel):** Cocina (Recetario, Producción, Cronograma) · Compras e inventario (Pedidos, Bajas, Inventario, Facturas) · Eventos (Eventos, Montajes, Shows) · Costos (Costos y carta, Calculadora) · Equipo (Horarios, RRHH, Chat) · Gerencia (Informes, Mercadeo, Admin). Títulos de sección `.nav-sec` en mono 10.5 px mayúsculas solo con la barra completa (≥ 1024 px); entre 800 y 1023 px son una línea divisoria; en celular no se muestran. Una sección sin pestañas visibles se esconde (`layoutNav`). Próximas entregas aprobadas: pantalla de Inicio por rol y diseño con más profundidad (barra lateral oscura con acento del punto, tarjetas con sombra suave), según el render https://claude.ai/artifact/EDM26orjra8rRxRvk55V49.
 
 Los botones conservan sus `id` actuales (`tab-recetario`, `tab-produccion`, …) para no romper la lógica JS; solo cambia dónde se pintan.
 
