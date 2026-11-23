@@ -14970,12 +14970,17 @@ function bajaKanbanCardHtml(b, mode){
   </div>`;
 }
 
+const BAJA_RESUELTAS_VISIBLES = 3;
 function renderBajaKanban(list, boardEl, mode){
   boardEl.innerHTML = BAJA_COLUMNS.map(col => {
     const items = list.filter(b => b.status === col.key);
+    // Ingresadas y denegadas se archivan solas: en el tablero quedan las 3 más recientes; el resto, en el historial.
+    if(col.key !== 'pendiente') items.sort((a, b) => String(b.resuelto_at || b.created_at).localeCompare(String(a.resuelto_at || a.created_at)));
+    const visibles = col.key === 'pendiente' ? items : items.slice(0, BAJA_RESUELTAS_VISIBLES);
+    const mas = items.length - visibles.length;
     const cards = items.length === 0
       ? '<div class="kanban-empty">' + (col.key === 'pendiente' ? 'No hay bajas pendientes' : 'Sin bajas ' + col.tab.toLowerCase() + ' esta semana') + '</div>'
-      : items.map(b => bajaKanbanCardHtml(b, mode)).join('');
+      : visibles.map(b => bajaKanbanCardHtml(b, mode)).join('') + (mas > 0 ? '<button type="button" class="btn btn-ghost btn-small btn-block" data-baja-hist>Ver ' + mas + ' más en el historial</button>' : '');
     return `<div class="kanban-col" data-col="${col.key}">
       <div class="kanban-col-header">
         <span class="kanban-dot ${col.key}"></span>
@@ -14998,6 +15003,7 @@ function renderBajaKanban(list, boardEl, mode){
       });
     });
   }
+  boardEl.querySelectorAll('[data-baja-hist]').forEach(b => b.addEventListener('click', () => { const t = document.getElementById(mode === 'admin' ? 'bajaToggleView' : 'myBajaToggleHist'); if(t) t.click(); }));
   bajaCargarFotos(boardEl);
 }
 
