@@ -10450,8 +10450,8 @@ const INF = { mes: null, fuente: null, rests: null };  // fuente/rests: los pone
 function infDatos(){
   const ini = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth(), 1)), fin = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth() + 1, 0));
   const ev = (INF.fuente || COSTEO_EVENTOS).filter(e => e.estado === 'confirmado' && e.fecha && e.fecha >= ini && e.fecha <= fin)
-    .map(e => ({ e, fecha: e.fecha, cliente: e.cliente || e.nombre || '', rest: ((INF.rests || []).find(r => r.id === e.restaurante_id) || restauranteDe(e.restaurante_id) || {}).name || 'Sin restaurante', rid: e.restaurante_id || '-', pax: toNum(e.invitados), valor: segValor(e) }))
-    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.cliente.localeCompare(b.cliente));
+    .map(e => ({ e, fecha: e.fecha, hora: (e.horario || '').trim(), cliente: e.cliente || e.nombre || '', rest: ((INF.rests || []).find(r => r.id === e.restaurante_id) || restauranteDe(e.restaurante_id) || {}).name || 'Sin restaurante', rid: e.restaurante_id || '-', pax: toNum(e.invitados), valor: segValor(e) }))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora) || a.cliente.localeCompare(b.cliente));
   const rests = (INF.rests || RESTAURANTES || []).map(r => ({ id: r.id, nombre: r.name }));
   ev.forEach(x => { if(!rests.some(r => r.id === x.rid)) rests.push({ id: x.rid, nombre: x.rest }); });
   const porRest = rests.map(r => { const l = ev.filter(x => x.rid === r.id); return { nombre: r.nombre, n: l.length, pax: l.reduce((t, x) => t + x.pax, 0), valor: l.reduce((t, x) => t + x.valor, 0) }; });
@@ -10461,7 +10461,7 @@ function infMesTexto(){ const t = INF.mes.toLocaleDateString('es-CO', { month: '
 function infMillones(n){ return n >= 1e6 ? '$' + (n / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' M' : fmtMoney(n); }
 function infHojaHtml(){
   const d = infDatos(), max = Math.max(1, ...d.porRest.map(r => r.valor));
-  const filasEv = d.ev.map(x => `<tr><td>${escapeHtml(new Date(x.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }))}</td><td>${escapeHtml(x.cliente)}</td><td>${escapeHtml(x.rest)}</td><td class="num">${x.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(x.valor) || '—')}</td></tr>`).join('');
+  const filasEv = d.ev.map(x => `<tr><td>${escapeHtml(new Date(x.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }))}</td><td>${escapeHtml(x.hora || '—')}</td><td>${escapeHtml(x.cliente)}</td><td>${escapeHtml(x.rest)}</td><td class="num">${x.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(x.valor) || '—')}</td></tr>`).join('');
   const barras = d.porRest.map(r => `<div class="inf-fila"><span class="inf-nom">${escapeHtml(r.nombre)}<small>${r.n ? r.n + ' evento' + (r.n === 1 ? '' : 's') + ' · ' + r.pax.toLocaleString('es-CO') + ' PAX' : 'Sin eventos confirmados'}</small></span>
     <span class="inf-pista">${r.valor ? `<i style="width:${Math.max(1.5, r.valor / max * 100)}%" title="${escapeHtml(r.nombre + ': ' + fmtMoney(r.valor))}"></i>` : ''}</span><span class="inf-tot">${r.valor ? escapeHtml(infMillones(r.valor)) : '—'}</span></div>`).join('');
   return `<header class="inf-portada"><span class="inf-etq">Grupo Junín · Informe de eventos confirmados</span><h1>${escapeHtml(infMesTexto())}</h1>
@@ -10473,8 +10473,8 @@ function infHojaHtml(){
         <div class="inf-kpi"><span>Valor cotizado</span><b>${escapeHtml(infMillones(d.valor))}</b><small>${escapeHtml(fmtMoney(d.valor))}</small></div>
       </section>
       <section><h2>Valor por restaurante</h2><div class="inf-chart">${barras}</div></section>
-      <section><h2>Eventos confirmados</h2><table class="inf-tabla"><thead><tr><th>Fecha</th><th>Cliente</th><th>Restaurante</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
-        <tbody>${filasEv}</tbody><tfoot><tr><td colspan="3">Total</td><td class="num">${d.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(d.valor))}</td></tr></tfoot></table></section>
+      <section><h2>Eventos confirmados</h2><table class="inf-tabla"><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Restaurante</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
+        <tbody>${filasEv}</tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${d.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(d.valor))}</td></tr></tfoot></table></section>
       <section><h2>Resumen por restaurante</h2><table class="inf-tabla"><thead><tr><th>Restaurante</th><th class="num">Eventos</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
         <tbody>${d.porRest.map(r => `<tr><td>${escapeHtml(r.nombre)}</td><td class="num">${r.n}</td><td class="num">${r.pax.toLocaleString('es-CO')}</td><td class="num">${r.valor ? escapeHtml(fmtMoney(r.valor)) : '—'}</td></tr>`).join('')}</tbody></table></section>`
       : `<p class="inf-vacio">No hay eventos confirmados con fecha en ${escapeHtml(infMesTexto().toLowerCase())}.</p>`}
@@ -10550,7 +10550,7 @@ async function infExcel(){
   const d = infDatos();
   await descargarFilas({ formato: 'xlsx', horizontal: false, hoja: 'Eventos', nombre: 'informe_eventos_' + horIso(INF.mes).slice(0, 7),
     titulo: 'Informe de eventos confirmados · ' + infMesTexto(), subtitulo: d.n + ' eventos · ' + d.pax.toLocaleString('es-CO') + ' PAX · ' + fmtMoney(d.valor),
-    cab: ['Fecha', 'Cliente', 'Restaurante', 'PAX', 'Valor cotizado'], filas: d.ev.map(x => [x.fecha, x.cliente, x.rest, x.pax, Math.round(x.valor)]) });
+    cab: ['Fecha', 'Hora', 'Cliente', 'Restaurante', 'PAX', 'Valor cotizado'], filas: d.ev.map(x => [x.fecha, x.hora, x.cliente, x.rest, x.pax, Math.round(x.valor)]) });
 }
 async function segDescargar(){
   const formato = await elegirFormato('Seguimiento de eventos', EXP_OPC_CSV); if(!formato) return;
