@@ -998,6 +998,7 @@ nav.tabs button{position:relative;}
 .inf-mes{display:flex; align-items:center; gap:var(--space-2);}
 .inf-mes b{font:600 16px 'IBM Plex Mono',monospace; min-width:150px; text-align:center;}
 .inf-acc{display:flex; flex-wrap:wrap; gap:var(--space-2);}
+.inf-marcas{display:flex; flex-wrap:wrap; gap:6px; padding:var(--space-2) var(--space-4); background:var(--surface); border-bottom:1px solid var(--border);}
 .inf-scroll{flex:1; overflow:auto; padding:var(--space-5) var(--space-4) var(--space-12);}
 .inf-hoja{max-width:820px; margin:0 auto; background:var(--surface); border-radius:6px; box-shadow:var(--shadow-2); overflow:hidden; color:var(--text);}
 .inf-hoja.captura{width:820px; max-width:none; border-radius:0; box-shadow:none;}
@@ -10446,43 +10447,49 @@ function segAbrirFicha(id){
    personas (PAX) y valor cotizado (segValor); sin comparación con el mes anterior; lo descargan los que ven Seguimiento.
    Se ve como una hoja con portada, cifras, gráfico por restaurante y tablas; se descarga como PDF con el mismo diseño
    (html2canvas + jsPDF), imagen PNG para WhatsApp o Excel con los datos. */
-const INF = { mes: null, fuente: null, rests: null };  // fuente/rests: los pone la pestaña Informes
+const INF = { mes: null, fuente: null, rests: null, marca: '' };  // marca: id del restaurante elegido ('' = todas)  // fuente/rests: los pone la pestaña Informes
 function infDatos(){
   const ini = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth(), 1)), fin = horIso(new Date(INF.mes.getFullYear(), INF.mes.getMonth() + 1, 0));
-  const ev = (INF.fuente || COSTEO_EVENTOS).filter(e => e.estado === 'confirmado' && e.fecha && e.fecha >= ini && e.fecha <= fin)
+  const todos = (INF.fuente || COSTEO_EVENTOS).filter(e => e.estado === 'confirmado' && e.fecha && e.fecha >= ini && e.fecha <= fin)
     .map(e => ({ e, fecha: e.fecha, hora: (e.horario || '').trim(), cliente: e.cliente || e.nombre || '', rest: ((INF.rests || []).find(r => r.id === e.restaurante_id) || restauranteDe(e.restaurante_id) || {}).name || 'Sin restaurante', rid: e.restaurante_id || '-', pax: toNum(e.invitados), valor: segValor(e) }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora) || a.cliente.localeCompare(b.cliente));
   const rests = (INF.rests || RESTAURANTES || []).map(r => ({ id: r.id, nombre: r.name }));
-  ev.forEach(x => { if(!rests.some(r => r.id === x.rid)) rests.push({ id: x.rid, nombre: x.rest }); });
-  const porRest = rests.map(r => { const l = ev.filter(x => x.rid === r.id); return { nombre: r.nombre, n: l.length, pax: l.reduce((t, x) => t + x.pax, 0), valor: l.reduce((t, x) => t + x.valor, 0) }; });
-  return { ev, porRest, n: ev.length, pax: ev.reduce((t, x) => t + x.pax, 0), valor: ev.reduce((t, x) => t + x.valor, 0) };
+  todos.forEach(x => { if(!rests.some(r => r.id === x.rid)) rests.push({ id: x.rid, nombre: x.rest }); });
+  const marcas = rests.map(r => ({ id: r.id, nombre: r.nombre, n: todos.filter(x => x.rid === r.id).length }));
+  if(INF.marca && !rests.some(r => r.id === INF.marca)) INF.marca = '';
+  const marca = INF.marca ? rests.find(r => r.id === INF.marca) : null;
+  const ev = marca ? todos.filter(x => x.rid === marca.id) : todos;
+  const porRest = (marca ? [marca] : rests).map(r => { const l = ev.filter(x => x.rid === r.id); return { nombre: r.nombre, n: l.length, pax: l.reduce((t, x) => t + x.pax, 0), valor: l.reduce((t, x) => t + x.valor, 0) }; });
+  return { ev, porRest, marcas, marca, n: ev.length, pax: ev.reduce((t, x) => t + x.pax, 0), valor: ev.reduce((t, x) => t + x.valor, 0) };
 }
 function infMesTexto(){ const t = INF.mes.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }).replace(' de ', ' '); return t.charAt(0).toUpperCase() + t.slice(1); }
 function infMillones(n){ return n >= 1e6 ? '$' + (n / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' M' : fmtMoney(n); }
 function infHojaHtml(){
   const d = infDatos(), max = Math.max(1, ...d.porRest.map(r => r.valor));
-  const filasEv = d.ev.map(x => `<tr><td>${escapeHtml(new Date(x.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }))}</td><td>${escapeHtml(x.hora || '—')}</td><td>${escapeHtml(x.cliente)}</td><td>${escapeHtml(x.rest)}</td><td class="num">${x.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(x.valor) || '—')}</td></tr>`).join('');
+  const filasEv = d.ev.map(x => `<tr><td>${escapeHtml(new Date(x.fecha + 'T12:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }))}</td><td>${escapeHtml(x.hora || '—')}</td><td>${escapeHtml(x.cliente)}</td>${d.marca ? '' : `<td>${escapeHtml(x.rest)}</td>`}<td class="num">${x.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(x.valor) || '—')}</td></tr>`).join('');
   const barras = d.porRest.map(r => `<div class="inf-fila"><span class="inf-nom">${escapeHtml(r.nombre)}<small>${r.n ? r.n + ' evento' + (r.n === 1 ? '' : 's') + ' · ' + r.pax.toLocaleString('es-CO') + ' PAX' : 'Sin eventos confirmados'}</small></span>
     <span class="inf-pista">${r.valor ? `<i style="width:${Math.max(1.5, r.valor / max * 100)}%" title="${escapeHtml(r.nombre + ': ' + fmtMoney(r.valor))}"></i>` : ''}</span><span class="inf-tot">${r.valor ? escapeHtml(infMillones(r.valor)) : '—'}</span></div>`).join('');
-  return `<header class="inf-portada"><span class="inf-etq">Grupo Junín · Informe de eventos confirmados</span><h1>${escapeHtml(infMesTexto())}</h1>
-      <p>Eventos confirmados con fecha en el mes: personas y valor cotizado.</p></header>
+  return `<header class="inf-portada"><span class="inf-etq">Grupo Junín · Informe de eventos confirmados${d.marca ? ' · ' + escapeHtml(d.marca.nombre) : ''}</span><h1>${escapeHtml(infMesTexto())}</h1>
+      <p>${d.marca ? 'Eventos confirmados de ' + escapeHtml(d.marca.nombre) + ' con fecha en el mes: hora, personas y valor cotizado.' : 'Eventos confirmados con fecha en el mes: personas y valor cotizado.'}</p></header>
     <div class="inf-cuerpo">${d.n ? `
       <section class="inf-kpis">
         <div class="inf-kpi dest"><span>Eventos confirmados</span><b>${d.n}</b></div>
         <div class="inf-kpi"><span>Personas (PAX)</span><b>${d.pax.toLocaleString('es-CO')}</b></div>
         <div class="inf-kpi"><span>Valor cotizado</span><b>${escapeHtml(infMillones(d.valor))}</b><small>${escapeHtml(fmtMoney(d.valor))}</small></div>
       </section>
-      <section><h2>Valor por restaurante</h2><div class="inf-chart">${barras}</div></section>
-      <section><h2>Eventos confirmados</h2><table class="inf-tabla"><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Restaurante</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
-        <tbody>${filasEv}</tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${d.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(d.valor))}</td></tr></tfoot></table></section>
-      <section><h2>Resumen por restaurante</h2><table class="inf-tabla"><thead><tr><th>Restaurante</th><th class="num">Eventos</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
-        <tbody>${d.porRest.map(r => `<tr><td>${escapeHtml(r.nombre)}</td><td class="num">${r.n}</td><td class="num">${r.pax.toLocaleString('es-CO')}</td><td class="num">${r.valor ? escapeHtml(fmtMoney(r.valor)) : '—'}</td></tr>`).join('')}</tbody></table></section>`
-      : `<p class="inf-vacio">No hay eventos confirmados con fecha en ${escapeHtml(infMesTexto().toLowerCase())}.</p>`}
+      ${d.marca ? '' : `<section><h2>Valor por restaurante</h2><div class="inf-chart">${barras}</div></section>`}
+      <section><h2>Eventos confirmados</h2><table class="inf-tabla"><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th>${d.marca ? '' : '<th>Restaurante</th>'}<th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
+        <tbody>${filasEv}</tbody><tfoot><tr><td colspan="${d.marca ? 3 : 4}">Total</td><td class="num">${d.pax.toLocaleString('es-CO')}</td><td class="num">${escapeHtml(fmtMoney(d.valor))}</td></tr></tfoot></table></section>
+      ${d.marca ? '' : `<section><h2>Resumen por restaurante</h2><table class="inf-tabla"><thead><tr><th>Restaurante</th><th class="num">Eventos</th><th class="num">PAX</th><th class="num">Valor cotizado</th></tr></thead>
+        <tbody>${d.porRest.map(r => `<tr><td>${escapeHtml(r.nombre)}</td><td class="num">${r.n}</td><td class="num">${r.pax.toLocaleString('es-CO')}</td><td class="num">${r.valor ? escapeHtml(fmtMoney(r.valor)) : '—'}</td></tr>`).join('')}</tbody></table></section>`}`
+      : `<p class="inf-vacio">No hay eventos confirmados${d.marca ? ' de ' + escapeHtml(d.marca.nombre) : ''} con fecha en ${escapeHtml(infMesTexto().toLowerCase())}.</p>`}
       <footer class="inf-pie"><span>Junín Operaciones · generado el ${escapeHtml(new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }))}</span><span>Valor cotizado con propina sugerida; sin menú en la app: el anotado en Seguimiento</span></footer>
     </div>`;
 }
 function infPintar(){
   document.getElementById('infMes').textContent = infMesTexto();
+  const d = infDatos(), b = (id, t, n) => `<button type="button" class="aud-chip${INF.marca === id ? ' active' : ''}" data-inf-marca="${escapeHtml(id)}" aria-pressed="${INF.marca === id}">${escapeHtml(t)}<span>${n}</span></button>`;
+  document.getElementById('infMarcas').innerHTML = b('', 'Todas las marcas', d.marcas.reduce((t, x) => t + x.n, 0)) + d.marcas.map(x => b(x.id, x.nombre, x.n)).join('');
   document.getElementById('infHoja').innerHTML = infHojaHtml();
 }
 function infAbrir(){
@@ -10494,9 +10501,12 @@ function infAbrir(){
         <div class="inf-mes"><button type="button" class="btn btn-secondary" data-inf="ant" aria-label="Mes anterior">${HOR_ICO.izq}</button><b id="infMes"></b><button type="button" class="btn btn-secondary" data-inf="sig" aria-label="Mes siguiente">${HOR_ICO.der}</button></div>
         <div class="inf-acc"><button type="button" class="btn btn-accent" data-inf="pdf">Descargar PDF</button><button type="button" class="btn btn-secondary" data-inf="img">Imagen para WhatsApp</button><button type="button" class="btn btn-secondary" data-inf="xlsx">Excel</button><button type="button" class="btn btn-ghost" data-inf="cerrar">Cerrar</button></div>
       </div>
+      <div class="inf-marcas" id="infMarcas" role="group" aria-label="Ver por marca"></div>
       <div class="inf-scroll"><article class="inf-hoja" id="infHoja"></article></div>`;
     document.body.appendChild(m);
     m.addEventListener('click', async e => {
+      const mk = e.target.closest('[data-inf-marca]');
+      if(mk){ INF.marca = mk.dataset.infMarca; infPintar(); return; }
       const b = e.target.closest('[data-inf]'); if(!b) return;
       const a = b.dataset.inf;
       if(a === 'cerrar'){ m.classList.remove('open'); return; }
@@ -10512,7 +10522,8 @@ function infAbrir(){
   m.classList.add('open');
   m.querySelector('[data-inf="cerrar"]').focus();
 }
-function infNombreArchivo(ext){ return 'informe_eventos_' + horIso(INF.mes).slice(0, 7) + '.' + ext; }
+function infSufijoMarca(){ const m = infDatos().marca; return m ? '_' + m.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') : ''; }
+function infNombreArchivo(ext){ return 'informe_eventos_' + horIso(INF.mes).slice(0, 7) + infSufijoMarca() + '.' + ext; }
 async function infCanvas(){
   await cargarHtml2Canvas();
   try { await document.fonts.ready; } catch(_){}
@@ -10548,8 +10559,8 @@ async function infExportar(tipo){
 }
 async function infExcel(){
   const d = infDatos();
-  await descargarFilas({ formato: 'xlsx', horizontal: false, hoja: 'Eventos', nombre: 'informe_eventos_' + horIso(INF.mes).slice(0, 7),
-    titulo: 'Informe de eventos confirmados · ' + infMesTexto(), subtitulo: d.n + ' eventos · ' + d.pax.toLocaleString('es-CO') + ' PAX · ' + fmtMoney(d.valor),
+  await descargarFilas({ formato: 'xlsx', horizontal: false, hoja: 'Eventos', nombre: 'informe_eventos_' + horIso(INF.mes).slice(0, 7) + infSufijoMarca(),
+    titulo: 'Informe de eventos confirmados · ' + infMesTexto() + (d.marca ? ' · ' + d.marca.nombre : ''), subtitulo: d.n + ' eventos · ' + d.pax.toLocaleString('es-CO') + ' PAX · ' + fmtMoney(d.valor),
     cab: ['Fecha', 'Hora', 'Cliente', 'Restaurante', 'PAX', 'Valor cotizado'], filas: d.ev.map(x => [x.fecha, x.hora, x.cliente, x.rest, x.pax, Math.round(x.valor)]) });
 }
 async function segDescargar(){
