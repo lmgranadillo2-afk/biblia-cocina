@@ -4547,6 +4547,7 @@ document.getElementById('tab-informes').addEventListener('click', ()=>switchTab(
 document.getElementById('tab-shows').addEventListener('click', ()=>switchTab('shows'));
 document.getElementById('tab-montajes').addEventListener('click', ()=>switchTab('montajes'));
 function switchTab(name){
+  try { USO.tab = name; } catch(e){}   // USO se declara más abajo (registro de uso)
   ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes','shows','montajes'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     document.getElementById('view-'+n).classList.toggle('active', n===name);
@@ -4583,6 +4584,63 @@ function switchTab(name){
     if(!visibles[costeoSub]) switchCosteoSub(esHub() ? 'eventos' : 'platos'); else renderCosteoList();
   }); }
 }
+
+/* ---------- REGISTRO DE TIEMPO DE USO (sql/uso_app.sql, decisiones de Miguel 23 nov) ----------
+   Cada minuto suma 1 a la pestaña que se está usando si la app está visible y hubo un toque, clic, tecla o
+   desplazamiento en los últimos 5 minutos. No cuenta la pantalla de marcación (kiosco). Se envía cada 5 minutos
+   y al ocultar o cerrar la app, por la RPC uso_sumar (máx. 10 min por envío). "Aperturas": al entrar y al
+   volver tras más de 30 minutos fuera. Lo ven super admin y Gerencia en Informes → Uso de la app. */
+const USO = { tab: 'recetario', ultimaAct: Date.now(), acum: {}, ticks: 0, apPend: 1, ocultoDesde: null, enviando: false };
+const USO_INACTIVO_MS = 5 * 60 * 1000;
+['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(ev => document.addEventListener(ev, () => { USO.ultimaAct = Date.now(); }, { capture: true, passive: true }));
+function usoModulo(){
+  const rn = document.getElementById('rnPanel');
+  if(rn && rn.classList.contains('open')) return 'recetas_nuevas';
+  return USO.tab || 'otro';
+}
+function usoEnKiosco(){ const k = document.getElementById('horKiosco'); return !!(k && !k.hidden); }
+function usoSumar(min, ap){
+  if(!session || !currentLocation || usoEnKiosco()) return false;
+  const k = [isoDia(new Date()), currentLocation.id, currentArea ? currentArea.id : '', usoModulo()].join('|');
+  const x = USO.acum[k] || (USO.acum[k] = { min: 0, ap: 0 });
+  x.min += min; x.ap += ap;
+  return true;
+}
+async function usoEnviar(){
+  if(USO.enviando || !session) return;
+  const claves = Object.keys(USO.acum).filter(k => USO.acum[k].min || USO.acum[k].ap);
+  if(!claves.length) return;
+  USO.enviando = true;
+  try {
+    for(const k of claves){
+      const x = USO.acum[k]; delete USO.acum[k];
+      const [fecha, loc, area, mod] = k.split('|');
+      while(x.min > 0 || x.ap > 0){
+        const m = Math.min(x.min, 10), a = Math.min(x.ap, 5);
+        const { error } = await supa.rpc('uso_sumar', { p_fecha: fecha, p_location: loc || null, p_area: area || null, p_modulo: mod, p_minutos: m, p_aperturas: a });
+        if(error){
+          // Sin conexión o sin el SQL: se guarda para el próximo envío (con tope, para no crecer sin fin).
+          const y = USO.acum[k] || (USO.acum[k] = { min: 0, ap: 0 });
+          y.min = Math.min(y.min + x.min, 600); y.ap = Math.min(y.ap + x.ap, 20);
+          break;
+        }
+        x.min -= m; x.ap -= a;
+      }
+    }
+  } finally { USO.enviando = false; }
+}
+setInterval(() => {
+  if(document.visibilityState !== 'visible') return;
+  if(USO.apPend && usoSumar(0, USO.apPend)) USO.apPend = 0;
+  if(Date.now() - USO.ultimaAct < USO_INACTIVO_MS) usoSumar(1, 0);
+  if(++USO.ticks % 5 === 0) usoEnviar();
+}, 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden'){ USO.ocultoDesde = Date.now(); usoEnviar(); return; }
+  if(USO.ocultoDesde && Date.now() - USO.ocultoDesde > 30 * 60 * 1000) USO.apPend++;
+  USO.ocultoDesde = null; USO.ultimaAct = Date.now();
+});
+window.addEventListener('pagehide', () => { usoEnviar(); });
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
 const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','facturas','horarios','calculadora','mercadeo','informes','shows','montajes','chat','admin'];
@@ -15601,8 +15659,52 @@ const INFS_CAT = [
       const filas = [];
       ses.forEach(x => (x.inventory_items || []).forEach(i => filas.push([x.fecha, infsLoc(x.location_id), infsArea(x.area_id), i.item_code || '', i.item_name || '', Number(i.cantidad) || 0, i.unidad || '', i.bodega || '', x.status === 'cerrado' ? 'Cerrado' : (x.status || ''), x.creado_por_nombre || ''])));
       return { cab: ['Fecha', 'Punto', 'Área', 'Código', 'Insumo', 'Cantidad', 'Unidad', 'Bodega', 'Estado del conteo', 'Contó'], filas };
+  } },
+  { id: 'uso_personas', grupo: 'Uso de la app', t: 'Uso por persona', d: 'Minutos reales con la app en uso (visible y con actividad en los últimos 5 min), días activos, promedio por día, veces que la abrió y la pestaña que más usa. Cuenta desde que se activó el registro.', async cargar(){
+      const r = await infsUso(), m = new Map();
+      r.forEach(x => {
+        if(!m.has(x.r_user_id)) m.set(x.r_user_id, { n: x.r_persona || '', puntos: new Set(), min: 0, ap: 0, dias: new Set(), mods: {}, ult: '' });
+        const p = m.get(x.r_user_id);
+        if(x.r_punto) p.puntos.add(x.r_punto);
+        p.min += x.r_minutos; p.ap += x.r_aperturas;
+        if(x.r_minutos > 0){ p.dias.add(x.r_fecha); p.mods[x.r_modulo] = (p.mods[x.r_modulo] || 0) + x.r_minutos; if(x.r_fecha > p.ult) p.ult = x.r_fecha; }
+      });
+      const filas = [...m.values()].sort((a, b) => b.min - a.min).map(p => {
+        const top = Object.entries(p.mods).sort((a, b) => b[1] - a[1])[0];
+        return [p.n, [...p.puntos].sort().join(', '), p.min, Math.round(p.min / 6) / 10, p.dias.size, p.dias.size ? Math.round(p.min / p.dias.size) : 0, p.ap, top ? usoNombreModulo(top[0]) : '', p.ult];
+      });
+      return { cab: ['Persona', 'Puntos', 'Minutos', 'Horas', 'Días activos', 'Promedio min/día', 'Veces que abrió la app', 'Pestaña más usada', 'Último día de uso'], filas };
+  } },
+  { id: 'uso_pestanas', grupo: 'Uso de la app', t: 'Uso por pestaña', d: 'En qué se va el tiempo: minutos por pestaña, porcentaje del total y cuántas personas la usaron.', async cargar(){
+      const r = await infsUso(), m = new Map();
+      let tot = 0;
+      r.forEach(x => { if(!x.r_minutos) return; tot += x.r_minutos; if(!m.has(x.r_modulo)) m.set(x.r_modulo, { min: 0, u: new Set() }); const p = m.get(x.r_modulo); p.min += x.r_minutos; p.u.add(x.r_user_id); });
+      const filas = [...m.entries()].sort((a, b) => b[1].min - a[1].min).map(([k, p]) => [usoNombreModulo(k), p.min, Math.round(p.min / 6) / 10, tot ? Math.round(p.min * 1000 / tot) / 10 : 0, p.u.size]);
+      return { cab: ['Pestaña', 'Minutos', 'Horas', '% del tiempo', 'Personas'], filas };
+  } },
+  { id: 'uso_dias', grupo: 'Uso de la app', t: 'Uso por día', d: 'Minutos de uso, personas activas y veces que se abrió la app, día por día.', async cargar(){
+      const r = await infsUso(), m = new Map();
+      r.forEach(x => { if(!m.has(x.r_fecha)) m.set(x.r_fecha, { min: 0, ap: 0, u: new Set() }); const p = m.get(x.r_fecha); p.min += x.r_minutos; p.ap += x.r_aperturas; if(x.r_minutos) p.u.add(x.r_user_id); });
+      const filas = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([f, p]) => [f, p.min, Math.round(p.min / 6) / 10, p.u.size, p.ap]);
+      return { cab: ['Fecha', 'Minutos', 'Horas', 'Personas activas', 'Veces que se abrió la app'], filas };
   } }
 ];
+// Uso de la app: filas de la RPC uso_app_informe con los filtros de Informes (sin fechas: últimos 30 días).
+async function infsUso(){
+  const f = INFS.f, hoy = new Date();
+  const desde = f.desde || isoDia(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 29)), hasta = f.hasta || isoDia(hoy);
+  const area = f.area && !f.area.startsWith('nombre:') ? f.area : null;
+  const { data, error } = await supa.rpc('uso_app_informe', { p_desde: desde, p_hasta: hasta, p_location: f.loc || null, p_area: area });
+  if(error) throw new Error(error.message.includes('uso_app_informe') ? 'Falta correr sql/uso_app.sql en Supabase' : error.message);
+  let filas = data || [];
+  if(f.area && f.area.startsWith('nombre:')) filas = filas.filter(x => x.r_area === f.area.slice(7));
+  return filas;
+}
+function usoNombreModulo(m){
+  if(m === 'recetas_nuevas') return 'Recetas nuevas';
+  const b = document.getElementById('tab-' + m);
+  return (b && b.title) || m.charAt(0).toUpperCase() + m.slice(1);
+}
 async function infsAbrir(){
   if(!puedeInformes()) return;
   const box = document.getElementById('infsBox');
