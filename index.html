@@ -14906,12 +14906,14 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
 // Bajas de la semana + las pendientes de semanas anteriores (una pendiente nunca se archiva sola; decisión de Miguel 23 nov).
 async function bajasTablero(filtro){
   const { monday, sunday } = getWeekRange(new Date());
-  const [semana, viejas] = await Promise.all([
+  const [semana, viejas, resueltas] = await Promise.all([
     filtro(supa.from('bajas').select('*')).gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday)).order('created_at', {ascending:false}),
-    filtro(supa.from('bajas').select('*')).eq('status', 'pendiente').lt('fecha', toISODate(monday)).order('fecha', {ascending:true})
+    filtro(supa.from('bajas').select('*')).eq('status', 'pendiente').lt('fecha', toISODate(monday)).order('fecha', {ascending:true}),
+    // Resueltas esta semana aunque sean de fechas anteriores (así una baja vieja pasa a Ingresada / Denegada)
+    filtro(supa.from('bajas').select('*')).neq('status', 'pendiente').lt('fecha', toISODate(monday)).gte('resuelto_at', monday.toISOString()).order('resuelto_at', {ascending:false})
   ]);
   const list = semana.error ? [] : (semana.data || []);
-  (viejas.error ? [] : (viejas.data || [])).forEach(b => { if(!list.some(x => x.id === b.id)) list.push(b); });
+  [viejas, resueltas].forEach(r => (r.error ? [] : (r.data || [])).forEach(b => { if(!list.some(x => x.id === b.id)) list.push(b); }));
   BAJA_LUNES = toISODate(monday);
   return list;
 }
@@ -15078,12 +15080,15 @@ document.getElementById('bajaReviewCancel').addEventListener('click', ()=>{
   currentReviewBajaId = null;
 });
 
+function bajaAvisoNoCambio(error){
+  showToast(error ? 'No se pudo cambiar la baja: ' + error.message : 'La base de datos no dejó cambiar esta baja (tu cuenta no tiene permiso de admin en esa área). Avísale al super admin.', 'danger');
+}
 async function bajaIngresar(id, btn){
   if(btn) btn.disabled = true;
-  const { error } = await supa.from('bajas').update({
+  const { data, error } = await supa.from('bajas').update({
     status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
-  }).eq('id', id);
-  if(error){ if(btn) btn.disabled = false; showToast('Error al marcar como ingresada: ' + error.message); return; }
+  }).eq('id', id).select('id');
+  if(error || !(data || []).length){ if(btn) btn.disabled = false; bajaAvisoNoCambio(error); return; }
   showToast('Baja marcada como ingresada', 'ok');
   recargarBajas();
 }
@@ -15102,10 +15107,10 @@ async function bajaCargarFotos(boardEl){
 
 document.getElementById('bajaReviewApprove').addEventListener('click', async ()=>{
   if(!currentReviewBajaId) return;
-  const { error } = await supa.from('bajas').update({
+  const { data, error } = await supa.from('bajas').update({
     status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
-  }).eq('id', currentReviewBajaId);
-  if(error){ showToast('Error al marcar como ingresada: ' + error.message); return; }
+  }).eq('id', currentReviewBajaId).select('id');
+  if(error || !(data || []).length){ bajaAvisoNoCambio(error); return; }
   showToast('Baja marcada como ingresada');
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
@@ -15121,10 +15126,10 @@ document.getElementById('bajaReviewReject').addEventListener('click', async ()=>
   }
   const motivo = document.getElementById('bajaRejectMotivo').value.trim();
   if(!motivo){ showToast('Escribe el motivo por el que se deniega'); return; }
-  const { error } = await supa.from('bajas').update({
+  const { data, error } = await supa.from('bajas').update({
     status: 'rechazado', rechazo_motivo: motivo, resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
-  }).eq('id', currentReviewBajaId);
-  if(error){ showToast('Error al denegar: ' + error.message); return; }
+  }).eq('id', currentReviewBajaId).select('id');
+  if(error || !(data || []).length){ bajaAvisoNoCambio(error); return; }
   showToast('Baja denegada');
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
