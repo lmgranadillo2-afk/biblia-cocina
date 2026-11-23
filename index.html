@@ -1083,6 +1083,43 @@ nav.tabs button{position:relative;}
 .ev-estado-list{max-height:50vh; overflow-y:auto; margin-bottom:var(--space-3);}
 .ev-estado-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);}
 .ev-estado-row:last-child{border-bottom:none;}
+/* Inicio por rol */
+.ini-box{max-width:1200px; margin:0 auto; display:flex; flex-direction:column; gap:22px;}
+.ini-cab{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:14px;}
+.ini-eyebrow{font:600 11px/1.4 'IBM Plex Mono',monospace; letter-spacing:1.3px; text-transform:uppercase; color:var(--text-muted);}
+.ini-cab h1{margin:4px 0 0; font:700 clamp(26px, 3.4vw, 34px)/1.15 'Playfair Display',serif; text-wrap:balance;}
+.ini-acciones{display:flex; flex-wrap:wrap; gap:8px;}
+.ini-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap:14px;}
+.ini-card{all:unset; box-sizing:border-box; cursor:pointer; display:flex; flex-direction:column; gap:10px; padding:16px 18px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 1px 2px rgba(31,24,16,.05), 0 8px 24px rgba(31,24,16,.06); transition:transform .15s ease-out, box-shadow .15s ease-out;}
+.ini-card:hover{transform:translateY(-1px); box-shadow:0 2px 4px rgba(31,24,16,.06), 0 12px 28px rgba(31,24,16,.09);}
+.ini-card:focus-visible{box-shadow:var(--focus-ring);}
+.ini-card-top{display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text-muted);}
+.ini-card b{font:600 34px/1 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
+.ini-card small{font-size:13px; color:var(--text-muted);}
+.ini-cols{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start;}
+.ini-col{display:flex; flex-direction:column; gap:18px; min-width:0;}
+.ini-col-a{flex:3 1 420px;} .ini-col-b{flex:2 1 300px;}
+.ini-col:empty{display:none;}
+.ini-panel{display:flex; flex-direction:column; gap:10px; padding:20px; background:var(--surface); border:1px solid var(--border); border-radius:18px;}
+.ini-panel-cab{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+.ini-panel h2{margin:0; font:700 20px/1.2 'Playfair Display',serif;}
+.ini-dim{font-size:12px; color:var(--text-dim);}
+.ini-oscuro{background:var(--text); border-color:var(--text); color:var(--bg);}
+.ini-oscuro h2{color:var(--surface);} .ini-oscuro .ini-dim{color:color-mix(in srgb, var(--bg) 60%, var(--text));}
+.ini-vacio{font-size:14px; color:color-mix(in srgb, var(--bg) 65%, var(--text));}
+.ini-fila, .ini-ev, .ini-mon{all:unset; box-sizing:border-box; cursor:pointer; display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px;}
+.ini-fila{background:var(--surface-2);} .ini-fila:hover{background:var(--surface-3);}
+.ini-fila:focus-visible, .ini-ev:focus-visible, .ini-mon:focus-visible{box-shadow:var(--focus-ring);}
+.ini-fila-txt, .ini-ev-txt{flex:1; min-width:0; display:flex; flex-direction:column;}
+.ini-fila-txt b, .ini-ev-txt b{font-size:14px;} .ini-fila-txt small{font-size:12px; color:var(--text-muted);}
+.ini-punto{flex:none; width:10px; height:10px; border-radius:999px; background:var(--warn);} .ini-punto.ok{background:var(--ok);}
+.ini-ev{padding:8px 4px;} .ini-ev:hover{background:color-mix(in srgb, var(--bg) 10%, transparent);}
+.ini-ev-fecha{flex:none; width:46px; padding:6px 0; border-radius:10px; background:color-mix(in srgb, var(--bg) 12%, var(--text)); display:flex; flex-direction:column; align-items:center; line-height:1.1;}
+.ini-ev-fecha b{font:700 18px 'IBM Plex Mono',monospace; color:var(--surface);} .ini-ev-fecha small{font-size:10px; text-transform:uppercase; color:color-mix(in srgb, var(--bg) 60%, var(--text));}
+.ini-ev-txt b{color:var(--surface);} .ini-ev-txt small{font-size:12px; color:color-mix(in srgb, var(--bg) 65%, var(--text));}
+.ini-mon{flex-direction:column; align-items:stretch; gap:6px; padding:8px 0;} .ini-mon:hover{background:var(--surface-2);}
+.ini-mon-top{display:flex; justify-content:space-between; gap:8px; font-size:14px;} .ini-mon-top span{font:600 12px 'IBM Plex Mono',monospace; color:var(--text-muted);}
+.ini-mon small{font-size:12px; color:var(--text-muted);}
 /* Recetas nuevas (solo super admin) */
 .rn-panel{position:fixed; inset:0; z-index:950; display:none; overflow-y:auto; background:var(--bg);}
 .rn-panel.open{display:block;}
@@ -1766,6 +1803,7 @@ nav.tabs button{position:relative;}
       <button class="user-btn" id="userMenuBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Mi cuenta"><span id="userInitial"></span></button>
     </header>
     <nav class="tabs" id="mainNav">
+      <button id="tab-inicio" style="display:none" title="Inicio" aria-label="Inicio"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg><span class="tab-label">Inicio</span></button>
       <div class="nav-sec" data-nav-sec="cocina" aria-hidden="true">Cocina</div>
       <button id="tab-recetario" class="active" title="Recetario" aria-label="Recetario"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span class="tab-label">Recetario</span></button>
       <button id="tab-produccion" title="Producción" aria-label="Producción"><svg class="ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg><span class="tab-label">Producción</span></button>
@@ -2058,6 +2096,7 @@ nav.tabs button{position:relative;}
 
     <div id="view-informes" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="infsBox"></div></div>
 
+    <div id="view-inicio" class="view" style="padding:18px 16px 48px; overflow-y:auto;"><div id="iniBox" class="ini-box"></div></div>
     <div id="view-montajes" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="monBox" class="mon-box"></div></div>
     <div id="view-shows" class="view" style="padding:18px 20px 60px; overflow-y:auto;"><div id="shwBox"></div></div>
 
@@ -3744,7 +3783,8 @@ function applyAreaModuleVisibility(modulesArea){
     if(area) supa.rpc('horario_puede_editar', { p_area: area }).then(({ data }) => { if(data && currentArea && currentArea.id === area){ horTab.style.display = ''; layoutNav(); } });
   }
   const firstAvailable = MODULE_TABS.find(m => modules.includes(m) && !(m === 'horarios' && conHorarios));
-  if(firstAvailable) switchTab(firstAvailable);
+  if(tabVisible('inicio')) switchTab('inicio');
+  else if(firstAvailable) switchTab(firstAvailable);
   layoutNav();
 }
 
@@ -3772,6 +3812,8 @@ function enterArea(loc, area){
   document.getElementById('rnBtn').style.display = profile.is_super_admin ? '' : 'none';
   if(esPuntoEventos() && !profile.is_super_admin) ['tab-admin', 'tab-calculadora', 'tab-rrhh'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   document.getElementById('tab-montajes').style.display = (esRrhh() || esInformes() || esMercadeo() || esFacturas()) ? 'none' : '';
+  document.getElementById('tab-inicio').style.display = (esRrhh() || esInformes() || esMercadeo() || esFacturas()) ? 'none' : '';
+  INI.datos = null;
   document.getElementById('tab-rrhh').style.display = (esRrhh() || profile.role === 'admin' || profile.is_super_admin) ? '' : 'none';
   document.getElementById('adminsub-usuarios').style.display = profile.is_super_admin ? 'inline-block' : 'none';
   document.getElementById('adminsub-puntos').style.display = profile.is_super_admin ? 'inline-block' : 'none';
@@ -4574,10 +4616,11 @@ document.getElementById('tab-mercadeo').addEventListener('click', ()=>switchTab(
 document.getElementById('tab-informes').addEventListener('click', ()=>switchTab('informes'));
 document.getElementById('tab-shows').addEventListener('click', ()=>switchTab('shows'));
 document.getElementById('tab-montajes').addEventListener('click', ()=>switchTab('montajes'));
+document.getElementById('tab-inicio').addEventListener('click', ()=>switchTab('inicio'));
 function switchTab(name){
   try { USO.tab = name; } catch(e){}   // USO se declara más abajo (registro de uso)
   const vista = name === 'eventos' ? 'costeo' : name;   // Eventos se muestra en la vista de Costeo
-  ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','eventos','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes','shows','montajes'].forEach(n=>{
+  ['inicio','recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','eventos','admin','calculadora','chat','horarios','rrhh','facturas','mercadeo','informes','shows','montajes'].forEach(n=>{
     document.getElementById('tab-'+n).classList.toggle('active', n===name);
     const v = document.getElementById('view-'+n); if(v) v.classList.toggle('active', n===vista);
   });
@@ -4589,6 +4632,7 @@ function switchTab(name){
   if(name==='informes') infsAbrir();
   if(name==='shows') shwAbrir();
   if(name==='montajes') monAbrir();
+  if(name==='inicio') iniAbrir();
   if(name==='cronograma') loadCalendarMonth();
   if(name==='pedidos') loadMyOrders();
   if(name==='bajas') loadMyBajas();
@@ -4614,6 +4658,178 @@ function switchTab(name){
   }); }
 }
 
+/* ---------- INICIO POR ROL (entrega 2 de la organización, 23 nov) ----------
+   Primera pestaña y la que abre al entrar (menos los roles globales). Muestra lo urgente según los módulos del
+   área: producciones y cronograma de hoy, pedidos por aprobar / sin enviar / por recibir (atrasados), bajas,
+   próximos eventos del restaurante y montajes abiertos. En el punto Eventos: eventos de la semana, por confirmar,
+   sin estado, anticipos por cobrar, sin cotización y montajes. Cada tarjeta lleva a su módulo. */
+const INI = { cargando: false, datos: null, area: null };
+function iniTiene(m){ return tabVisible(m); }
+function iniSaludo(){ const h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'; }
+function iniDiaTxt(f){
+  if(!f) return { dia: '—', mes: '' };
+  const d = new Date(f + 'T12:00');
+  return { dia: d.getDate(), mes: d.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '') };
+}
+async function iniAbrir(){
+  const box = document.getElementById('iniBox');
+  if(!box || !currentArea) return;
+  if(INI.area !== currentArea.id){ INI.datos = null; INI.area = currentArea.id; }
+  iniPintar();
+  if(INI.cargando) return;
+  INI.cargando = true;
+  try { INI.datos = await iniCargar(); } catch(e){ INI.datos = { error: e.message }; }
+  INI.cargando = false;
+  if(document.getElementById('view-inicio').classList.contains('active')) iniPintar();
+}
+async function iniCargar(){
+  const hoy = isoDia(new Date()), en7 = isoDia(new Date(Date.now() + 7 * 86400000));
+  const area = currentArea.id, loc = currentLocation.id, admin = isAdminRole() || !!profile.is_super_admin;
+  const eventosPunto = esPuntoEventos();
+  const q = {};
+  const vacio = Promise.resolve({ data: [] });
+  if(!eventosPunto){
+    q.prod = iniTiene('produccion') ? supa.from('productions').select('id, status, ingresado').eq('area_id', area).eq('fecha', hoy) : vacio;
+    q.crono = iniTiene('cronograma') ? supa.from('schedule_items').select('recipe_code, recipe_name, cantidad_label, fecha').eq('area_id', area).eq('fecha', hoy) : vacio;
+    q.hechas = iniTiene('cronograma') ? supa.from('productions').select('recipe_code').eq('area_id', area).eq('fecha', hoy).eq('status', 'activo') : vacio;
+    q.porAprobar = iniTiene('pedidos') && admin ? supa.from('orders').select('id, created_at').eq('area_id', area).eq('status', 'pendiente') : vacio;
+    q.sinEnviar = iniTiene('pedidos') ? supa.from('orders').select('id').eq('area_id', area).eq('status', 'aprobado').eq('enviado', false) : vacio;
+    q.porRecibir = iniTiene('pedidos') ? supa.from('orders').select('id, codigo, proveedor, enviado_at, entrega_esperada, status, enviado, recibido').eq('area_id', area).eq('status', 'aprobado').eq('enviado', true).eq('recibido', false) : vacio;
+    q.bajas = iniTiene('bajas') ? supa.from('bajas').select('id').eq('location_id', loc).or(`area_id.eq.${area},area_id.is.null`).eq('status', 'pendiente') : vacio;
+  }
+  if(iniTiene('eventos')){
+    let e = supa.from('costeo_eventos').select('id, nombre, cliente, fecha, horario, invitados, estado, restaurante_id, items, tiempos').gte('fecha', hoy).order('fecha').limit(200);
+    if(!eventosPunto && !esHub()) e = e.eq('restaurante_id', loc);
+    q.eventos = e;
+  }
+  if(iniTiene('montajes')){
+    let m = supa.from('montajes').select('id, nombre, fecha, fecha_fin, lugar, location_id, estado, montaje_items(listo_at)').eq('estado', 'abierto').order('fecha', { ascending: true, nullsFirst: false });
+    if(!eventosPunto && !esHub()) m = m.eq('location_id', loc);
+    q.montajes = m;
+  }
+  const claves = Object.keys(q), res = await Promise.all(claves.map(k => q[k]));
+  const r = {}; claves.forEach((k, i) => { r[k] = res[i].error ? [] : (res[i].data || []); });
+  // Anticipos por cobrar: eventos confirmados que vienen, sin anticipo anotado en Seguimiento.
+  if(eventosPunto && (r.eventos || []).length){
+    const conf = r.eventos.filter(e => e.estado === 'confirmado').map(e => e.id);
+    if(conf.length){
+      const s = await supa.from('eventos_seguimiento').select('evento_id, anticipo_valor').in('evento_id', conf);
+      const conAnticipo = new Set((s.data || []).filter(x => Number(x.anticipo_valor) > 0).map(x => x.evento_id));
+      r.sinAnticipo = conf.filter(id => !conAnticipo.has(id));
+    } else r.sinAnticipo = [];
+  }
+  r.hoy = hoy; r.en7 = en7; r.admin = admin; r.eventosPunto = eventosPunto;
+  return r;
+}
+
+function iniPintar(){
+  const box = document.getElementById('iniBox'), D = INI.datos;
+  const nombre = ((profile && profile.name) || '').split(' ')[0] || '';
+  const fechaTxt = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const cab = `<div class="ini-cab">
+      <div><div class="ini-eyebrow">${escapeHtml(fechaTxt.charAt(0).toUpperCase() + fechaTxt.slice(1))} · ${escapeHtml(currentLocation.name)} · ${escapeHtml(currentArea.name)}</div>
+      <h1>${iniSaludo()}${nombre ? ', ' + escapeHtml(nombre) : ''}</h1></div>
+      <div class="ini-acciones">${iniAccionesHtml()}</div>
+    </div>`;
+  if(!D){ box.innerHTML = cab + '<div class="empty-note">Cargando lo de hoy...</div>'; return; }
+  if(D.error){ box.innerHTML = cab + `<div class="empty-note">No se pudo cargar el resumen: ${escapeHtml(D.error)}</div>`; return; }
+  box.innerHTML = cab + (D.eventosPunto ? iniEventosHtml(D) : iniOperacionHtml(D));
+}
+function iniAccionesHtml(){
+  const b = (ir, t, accion) => `<button type="button" class="btn ${accion === 'principal' ? 'btn-accent' : 'btn-secondary'}" data-ini-ir="${ir}"${accion && accion !== 'principal' ? ` data-ini-accion="${accion}"` : ''}>${t}</button>`;
+  const out = [];
+  if(esPuntoEventos()){
+    if(iniTiene('montajes') && monPuedeEditar()) out.push(b('montajes', '+ Montaje'));
+    if(iniTiene('eventos') && eventosPuedeEditar()) out.push(b('eventos', '+ Evento', 'principal'));
+    return out.join('');
+  }
+  if(iniTiene('pedidos')) out.push(b('pedidos', '+ Pedido'));
+  if(iniTiene('bajas')) out.push(b('bajas', '+ Baja'));
+  if(iniTiene('produccion')) out.push(b('produccion', '+ Producción', 'principal'));
+  return out.join('');
+}
+function iniTarjeta(ir, titulo, n, detalle, estado, tono){
+  return `<button type="button" class="ini-card" data-ini-ir="${ir}">
+    <span class="ini-card-top"><span>${escapeHtml(titulo)}</span>${estado ? `<span class="badge ${tono}">${escapeHtml(estado)}</span>` : ''}</span>
+    <b>${n}</b><small>${escapeHtml(detalle)}</small></button>`;
+}
+function iniEventoFila(e, oscuro){
+  const d = iniDiaTxt(e.fecha), est = (EVENTO_ESTADOS.find(s => s.key === e.estado) || {});
+  const tono = e.estado === 'confirmado' ? 'ok' : e.estado === 'cancelado' ? 'neutral' : 'warn';
+  const rest = (restauranteDe(e.restaurante_id) || {}).name;
+  return `<button type="button" class="ini-ev" data-ini-ir="eventos" data-ini-evento="${e.id}">
+    <span class="ini-ev-fecha"><b>${d.dia}</b><small>${escapeHtml(d.mes)}</small></span>
+    <span class="ini-ev-txt"><b>${escapeHtml(e.nombre || 'Evento')}</b><small>${escapeHtml([e.invitados ? e.invitados + ' invitados' : '', e.horario, rest].filter(Boolean).join(' · '))}</small></span>
+    <span class="badge ${tono}">${escapeHtml(est.label || 'Sin estado')}</span></button>`;
+}
+function iniMontajesHtml(D){
+  const ms = (D.montajes || []).slice(0, 4);
+  if(!ms.length) return '';
+  return `<section class="ini-panel"><div class="ini-panel-cab"><h2>Montajes abiertos</h2><button type="button" class="btn btn-ghost btn-small" data-ini-ir="montajes">Ver todos</button></div>
+    ${ms.map(m => { const t = (m.montaje_items || []).length, l = (m.montaje_items || []).filter(i => i.listo_at).length, pct = t ? Math.round(l * 100 / t) : 0;
+      return `<button type="button" class="ini-mon" data-ini-ir="montajes" data-ini-montaje="${m.id}"><span class="ini-mon-top"><b>${escapeHtml(m.nombre)}</b><span>${l} de ${t}</span></span>
+        <span class="ml-barra"><i style="width:${pct}%"></i></span><small>${escapeHtml([monFechas(m), m.lugar].filter(Boolean).join(' · ') || 'Sin fecha')}</small></button>`; }).join('')}
+  </section>`;
+}
+function iniOperacionHtml(D){
+  const cards = [];
+  if(iniTiene('produccion')){
+    const vivas = D.prod.filter(p => p.status !== 'anulado');
+    cards.push(iniTarjeta('produccion', 'Producciones de hoy', vivas.length, vivas.length ? vivas.filter(p => p.ingresado).length + ' ingresadas al inventario' : 'Todavía no hay', vivas.length ? 'Al día' : '', 'ok'));
+  }
+  if(iniTiene('pedidos')){
+    if(D.admin) cards.push(iniTarjeta('pedidos', 'Pedidos por aprobar', D.porAprobar.length, D.porAprobar.length ? 'Esperando tu revisión' : 'Nada pendiente', D.porAprobar.length ? 'Revisar' : '', 'warn'));
+    const atras = D.porRecibir.filter(o => (entregaPedido(o) || {}).atrasado).length;
+    cards.push(iniTarjeta('pedidos', 'Pedidos por recibir', D.porRecibir.length, atras ? atras + ' atrasado' + (atras > 1 ? 's' : '') : 'Ninguno atrasado', atras ? 'Atrasado' : '', 'danger'));
+    cards.push(iniTarjeta('pedidos', 'Aprobados sin enviar', D.sinEnviar.length, D.sinEnviar.length ? 'Hay que enviarlos al proveedor' : 'Todo enviado', D.sinEnviar.length ? 'Enviar' : '', 'info'));
+  }
+  if(iniTiene('bajas')) cards.push(iniTarjeta('bajas', 'Bajas pendientes', D.bajas.length, D.bajas.length ? (D.admin ? 'Por ingresar o denegar' : 'Esperando revisión del admin') : 'Nada pendiente', D.bajas.length ? 'Revisar' : '', 'warn'));
+  const hechas = new Set((D.hechas || []).map(p => p.recipe_code));
+  const crono = (D.crono || []);
+  const hoyHtml = iniTiene('cronograma') ? `<section class="ini-panel ini-ancho"><div class="ini-panel-cab"><h2>Para hoy en ${escapeHtml(currentArea.name)}</h2><button type="button" class="btn btn-ghost btn-small" data-ini-ir="cronograma">Cronograma</button></div>
+    ${crono.length ? crono.map(it => { const ok = hechas.has(it.recipe_code); return `<button type="button" class="ini-fila" data-ini-ir="produccion"><span class="ini-punto ${ok ? 'ok' : 'warn'}"></span><span class="ini-fila-txt"><b>${escapeHtml(it.recipe_name || it.recipe_code)}</b><small>${escapeHtml(it.cantidad_label || '')}</small></span><span class="badge ${ok ? 'ok' : 'warn'}">${ok ? 'Producida' : 'Pendiente'}</span></button>`; }).join('')
+      : '<div class="empty-note">Nada programado para hoy en el cronograma.</div>'}
+  </section>` : '';
+  const evs = (D.eventos || []).filter(e => e.estado !== 'cancelado' && e.fecha <= D.en7);
+  const evHtml = iniTiene('eventos') ? `<section class="ini-panel ini-oscuro"><div class="ini-panel-cab"><h2>Próximos eventos</h2><span class="ini-dim">7 días</span></div>
+    ${evs.length ? evs.slice(0, 5).map(e => iniEventoFila(e)).join('') : '<div class="ini-vacio">No hay eventos en los próximos 7 días.</div>'}
+  </section>` : '';
+  return `${cards.length ? `<div class="ini-cards">${cards.join('')}</div>` : ''}
+    <div class="ini-cols"><div class="ini-col ini-col-a">${hoyHtml}</div><div class="ini-col ini-col-b">${evHtml}${iniMontajesHtml(D)}</div></div>`;
+}
+function iniEventosHtml(D){
+  const evs = (D.eventos || []).filter(e => e.estado !== 'cancelado');
+  const semana = evs.filter(e => e.fecha <= D.en7);
+  const porConfirmar = evs.filter(e => e.estado === 'pendiente'), sinEstado = evs.filter(e => !e.estado);
+  const sinCotizar = evs.filter(e => evSinMenuIni(e) && e.fecha <= isoDia(new Date(Date.now() + 21 * 86400000)));
+  const cards = [
+    iniTarjeta('eventos', 'Eventos esta semana', semana.length, semana.filter(e => e.estado === 'confirmado').length + ' confirmados', '', 'ok'),
+    iniTarjeta('eventos', 'Por confirmar', porConfirmar.length, porConfirmar.length ? 'Pendientes con fecha por venir' : 'Nada pendiente', porConfirmar.length ? 'Seguir' : '', 'warn'),
+    iniTarjeta('eventos', 'Anticipos por cobrar', (D.sinAnticipo || []).length, (D.sinAnticipo || []).length ? 'Confirmados sin anticipo en Seguimiento' : 'Todos con anticipo', (D.sinAnticipo || []).length ? 'Cobrar' : '', 'danger'),
+    iniTarjeta('eventos', 'Sin cotización', sinCotizar.length, sinCotizar.length ? 'En las próximas 3 semanas, sin menú' : 'Todos cotizados', sinCotizar.length ? 'Cotizar' : '', 'info')
+  ];
+  if(sinEstado.length) cards.push(iniTarjeta('eventos', 'Sin estado', sinEstado.length, 'Defínelo en cada evento', 'Definir', 'warn'));
+  return `<div class="ini-cards">${cards.join('')}</div>
+    <div class="ini-cols"><div class="ini-col ini-col-a"><section class="ini-panel ini-oscuro"><div class="ini-panel-cab"><h2>Próximos eventos</h2><span class="ini-dim">7 días</span></div>
+      ${semana.length ? semana.slice(0, 8).map(e => iniEventoFila(e)).join('') : '<div class="ini-vacio">No hay eventos en los próximos 7 días.</div>'}
+    </section></div><div class="ini-col ini-col-b">${iniMontajesHtml(D)}</div></div>`;
+}
+function evSinMenuIni(e){ return !(e.items || []).length && !(e.tiempos || []).some(t => (t.opciones || []).length); }
+
+// Espera a que el módulo termine de cargar antes de abrir un evento o montaje puntual.
+function iniCuando(listo, hacer, intentos){ intentos = intentos || 0; if(listo()) return hacer(); if(intentos < 25) setTimeout(() => iniCuando(listo, hacer, intentos + 1), 200); }
+const iniCosteoListo = () => !/Cargando/.test(document.getElementById('costeoItems').textContent || '');
+document.getElementById('iniBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-ini-ir]');
+  if(!b) return;
+  const ir = b.dataset.iniIr;
+  if(!tabVisible(ir)) return;
+  switchTab(ir);
+  if(ir === 'eventos' && b.dataset.iniEvento){ const id = b.dataset.iniEvento; iniCuando(() => iniCosteoListo() && COSTEO_EVENTOS.some(x => x.id === id), () => openCosteoEvento(id)); }
+  else if(ir === 'eventos' && b.classList.contains('btn-accent') && eventosPuedeEditar()) iniCuando(iniCosteoListo, () => openCosteoEvento(null));
+  if(ir === 'montajes' && b.dataset.iniMontaje){ const id = b.dataset.iniMontaje; iniCuando(() => ML.lista.some(x => x.id === id), () => monAbrirMontaje(id)); }
+  if(ir === 'montajes' && !b.dataset.iniMontaje && b.textContent.includes('+')) iniCuando(() => !ML.cargandoLista, () => { ML.panel = 'nuevo-montaje'; monPintar(); });
+});
 /* ---------- REGISTRO DE TIEMPO DE USO (sql/uso_app.sql, decisiones de Miguel 23 nov) ----------
    Cada minuto suma 1 a la pestaña que se está usando si la app está visible y hubo un toque, clic, tecla o
    desplazamiento en los últimos 5 minutos. No cuenta la pantalla de marcación (kiosco). Se envía cada 5 minutos
@@ -4672,11 +4888,11 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => { usoEnviar(); });
 
 /* ---------- NAVEGACIÓN: barra inferior (celular) con 4 módulos + Más, según rol ---------- */
-const ALL_TABS = ['recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','eventos','facturas','horarios','calculadora','mercadeo','informes','shows','montajes','chat','admin'];
+const ALL_TABS = ['inicio','recetario','produccion','cronograma','pedidos','bajas','inventario','costeo','eventos','facturas','horarios','calculadora','mercadeo','informes','shows','montajes','chat','admin'];
 // En celular caben 4 + "Más": el Chat va siempre a la vista.
 const NAV_PRIORIDAD = {
-  cocina: ['recetario','produccion','pedidos','chat'],
-  admin:  ['recetario','pedidos','admin','chat']
+  cocina: ['inicio','produccion','pedidos','chat'],
+  admin:  ['inicio','pedidos','admin','chat']
 };
 let USER_LOCATIONS = [];
 const navMovil = window.matchMedia('(max-width: 799px)');
