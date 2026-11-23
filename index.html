@@ -755,6 +755,9 @@ main .ev-table tr.ev-total td{background:var(--surface-2); font-weight:700; padd
 .kanban-card .kc-note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--danger); margin-bottom:2px;}
 .kanban-card .kc-actions{display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3);}
 .kanban-card .kc-actions .btn{flex:1 1 0;}
+.kanban-card .kc-foto{margin-top:var(--space-2);}
+.kanban-card .kc-foto img{display:block; width:100%; max-height:160px; object-fit:cover; border-radius:10px; border:1px solid var(--border);}
+.kanban-card .kc-foto span{font-size:12px; color:var(--text-dim);}
 .kanban-card .kc-actions .badge{white-space:normal; max-width:100%;}
 .kanban-card .kc-note.recepcion{border-left-color:var(--warn); background:var(--warn-bg);}
 .kanban-card .kc-note.recepcion b{color:var(--warn);}
@@ -14900,13 +14903,21 @@ document.getElementById('bajaSubmit').addEventListener('click', async ()=>{
   loadMyBajas();
 });
 
-async function loadMyBajas(){
+// Bajas de la semana + las pendientes de semanas anteriores (una pendiente nunca se archiva sola; decisión de Miguel 23 nov).
+async function bajasTablero(filtro){
   const { monday, sunday } = getWeekRange(new Date());
-  const { data, error } = await supa.from('bajas').select('*')
-    .eq('location_id', currentLocation.id).eq('area_id', currentArea.id)
-    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
-    .order('created_at', {ascending:false});
-  const list = error ? [] : (data || []);
+  const [semana, viejas] = await Promise.all([
+    filtro(supa.from('bajas').select('*')).gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday)).order('created_at', {ascending:false}),
+    filtro(supa.from('bajas').select('*')).eq('status', 'pendiente').lt('fecha', toISODate(monday)).order('fecha', {ascending:true})
+  ]);
+  const list = semana.error ? [] : (semana.data || []);
+  (viejas.error ? [] : (viejas.data || [])).forEach(b => { if(!list.some(x => x.id === b.id)) list.push(b); });
+  BAJA_LUNES = toISODate(monday);
+  return list;
+}
+let BAJA_LUNES = null;
+async function loadMyBajas(){
+  const list = await bajasTablero(q => q.eq('location_id', currentLocation.id).eq('area_id', currentArea.id));
   renderBajaKanban(list, document.getElementById('bajaKanban'), 'own');
 }
 
@@ -14941,13 +14952,19 @@ function bajaKanbanCardHtml(b, mode){
     extra += `<div class="kc-resuelto">${b.status === 'aprobado' ? 'Ingresada' : 'Denegada'} por ${escapeHtml(b.resuelto_por)}${cuando ? ' · ' + cuando : ''}</div>`;
   }
   const clickable = puedeResolverBaja(mode) && b.status === 'pendiente';
+  const vieja = b.status === 'pendiente' && BAJA_LUNES && b.fecha < BAJA_LUNES;
+  const diasVieja = vieja ? Math.max(1, Math.round((Date.now() - new Date(b.fecha + 'T12:00')) / 86400000)) : 0;
+  const soloSA = b.causa === 'prueba' && !puedeResolverPrueba(b);
+  const fotoHtml = b.foto_path ? `<div class="kc-foto" data-baja-foto="${escapeHtml(b.foto_path)}"><span>Cargando foto...</span></div>` : '';
+  const accionesHtml = clickable && !soloSA ? `<div class="kc-actions"><button type="button" class="btn btn-ok btn-small" data-baja-ingresar="${b.id}">Marcar como ingresada</button><button type="button" class="btn btn-danger-outline btn-small" data-baja-denegar="${b.id}">Denegar</button></div>` : '';
   return `<div class="kanban-card ${b.status}" data-baja-id="${b.id}" style="${clickable?'':'cursor:default;'}"${clickable ? ' role="button" tabindex="0"' : ''}>
     <div class="kc-head"><span class="kc-code">${b.codigo || ''}</span><span class="kc-badges">${b.area_id ? '' : '<span class="badge warn" title="Baja anterior a la separación por áreas">Sin área</span>'}<span class="badge neutral">${tipoLabel}</span></span></div>
     <div class="kc-title">${escapeHtml(b.item_name)}</div>
     <div class="kc-meta"><span class="kc-qty">${fmtQty(b.cantidad)} ${escapeHtml(b.unidad)}</span> · ${fechaCorta}${mode==='admin' ? ' · ' + escapeHtml(b.creado_por_nombre||'') : ''}</div>
     ${b.causa ? `<div class="kc-items"><span class="kc-label">Causa</span>${escapeHtml(bajaCausaTexto(b))}${b.causa === 'prueba' ? ` <span class="badge info">${bajaPruebaEnBarra(b) ? 'Admin de Barra' : 'Super admin'}</span>` : ''}</div>` : ''}
     <div class="kc-items"><span class="kc-label">${b.causa ? 'Detalle' : 'Motivo'}</span>${escapeHtml(b.motivo)}</div>
-    ${extra}
+    ${vieja ? `<div class="kc-note recepcion"><b>Sin ingresar desde hace ${diasVieja} día${diasVieja === 1 ? '' : 's'}</b>Sigue en el tablero hasta que se ingrese o se deniegue.</div>` : ''}
+    ${fotoHtml}${extra}${accionesHtml}
   </div>`;
 }
 
@@ -14955,7 +14972,7 @@ function renderBajaKanban(list, boardEl, mode){
   boardEl.innerHTML = BAJA_COLUMNS.map(col => {
     const items = list.filter(b => b.status === col.key);
     const cards = items.length === 0
-      ? '<div class="kanban-empty">Sin bajas ' + col.tab.toLowerCase() + ' esta semana</div>'
+      ? '<div class="kanban-empty">' + (col.key === 'pendiente' ? 'No hay bajas pendientes' : 'Sin bajas ' + col.tab.toLowerCase() + ' esta semana') + '</div>'
       : items.map(b => bajaKanbanCardHtml(b, mode)).join('');
     return `<div class="kanban-col" data-col="${col.key}">
       <div class="kanban-col-header">
@@ -14970,9 +14987,16 @@ function renderBajaKanban(list, boardEl, mode){
 
   if(puedeResolverBaja(mode)){
     boardEl.querySelectorAll('.kanban-card.pendiente').forEach(el=>{
-      el.addEventListener('click', ()=>openBajaReview(el.dataset.bajaId, list));
+      el.addEventListener('click', e=>{
+        const ing = e.target.closest('[data-baja-ingresar]'), den = e.target.closest('[data-baja-denegar]');
+        if(ing){ e.stopPropagation(); bajaIngresar(ing.dataset.bajaIngresar, ing); return; }
+        if(den){ e.stopPropagation(); openBajaReview(den.dataset.bajaDenegar, list); document.getElementById('bajaReviewReject').click(); return; }
+        if(e.target.closest('.kc-foto img')) return;
+        openBajaReview(el.dataset.bajaId, list);
+      });
     });
   }
+  bajaCargarFotos(boardEl);
 }
 
 /* ---------- ADMIN: revisar bajas ---------- */
@@ -14981,12 +15005,7 @@ let currentReviewBajaId = null;
 function recargarBajas(){ loadMyBajas(); loadAdminBajas(); }
 
 async function loadAdminBajas(){
-  const { monday, sunday } = getWeekRange(new Date());
-  const { data, error } = await supa.from('bajas').select('*')
-    .eq('location_id', currentLocation.id).or(`area_id.eq.${currentArea.id},area_id.is.null`)
-    .gte('fecha', toISODate(monday)).lte('fecha', toISODate(sunday))
-    .order('created_at', {ascending:false});
-  const list = error ? [] : (data || []);
+  const list = await bajasTablero(q => q.eq('location_id', currentLocation.id).or(`area_id.eq.${currentArea.id},area_id.is.null`));
   renderBajaKanban(list, document.getElementById('adminBajaKanban'), 'admin');
   const bloqueInformes = document.getElementById('bajaInformesSemanales');
   bloqueInformes.style.display = (profile && profile.is_super_admin) ? 'block' : 'none';
@@ -15058,6 +15077,28 @@ document.getElementById('bajaReviewCancel').addEventListener('click', ()=>{
   document.getElementById('bajaReviewModal').classList.remove('open');
   currentReviewBajaId = null;
 });
+
+async function bajaIngresar(id, btn){
+  if(btn) btn.disabled = true;
+  const { error } = await supa.from('bajas').update({
+    status: 'aprobado', resuelto_por: profile.name || session.user.email, resuelto_at: new Date().toISOString()
+  }).eq('id', id);
+  if(error){ if(btn) btn.disabled = false; showToast('Error al marcar como ingresada: ' + error.message); return; }
+  showToast('Baja marcada como ingresada', 'ok');
+  recargarBajas();
+}
+// Miniaturas de las fotos de las bajas (bucket privado chat-fotos, enlaces firmados de 1 hora).
+async function bajaCargarFotos(boardEl){
+  const cajas = [...boardEl.querySelectorAll('[data-baja-foto]')];
+  if(!cajas.length) return;
+  const paths = [...new Set(cajas.map(c => c.dataset.bajaFoto))];
+  const { data } = await supa.storage.from('chat-fotos').createSignedUrls(paths, 3600);
+  const url = {}; (data || []).forEach(x => { if(x.signedUrl) url[x.path] = x.signedUrl; });
+  cajas.forEach(c => {
+    const u = url[c.dataset.bajaFoto];
+    c.innerHTML = u ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener"><img src="${escapeHtml(u)}" alt="Foto de la baja" loading="lazy"></a>` : '<span>No se pudo cargar la foto</span>';
+  });
+}
 
 document.getElementById('bajaReviewApprove').addEventListener('click', async ()=>{
   if(!currentReviewBajaId) return;
