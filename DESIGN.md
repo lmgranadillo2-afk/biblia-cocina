@@ -198,3 +198,13 @@ Hacerlo **por fases, un commit por fase**, mostrando el resultado antes de hacer
 4. **Pulido por módulo.** Recetario → Producción → Pedidos (kanban + semáforo) → Bajas → Inventario → Costeo → Admin.
 
 Verificar cada fase en 390 px (celular) y 1280 px (escritorio), con al menos Cantina Dos Santos y Rúnico. Al terminar, actualizar la línea de "Tema visual" en `CLAUDE.md` para que apunte a este archivo.
+
+## 9. Diseño v3 · Junín Operaciones (entrega 3, 23 nov 2026, aprobado por Miguel)
+
+Bloque CSS al final del <style> principal ("DISEÑO v3"), que manda sobre lo anterior sin tocar la lógica:
+
+- **Menú lateral oscuro** (≥ 800 px): tokens `--shell-bg` #1C1712, `--shell-hover` #2B241B, `--shell-line` #3A3127, `--shell-text` #E9DFCF, `--shell-muted` #A6987F, `--shell-strong` #FFF8EE. Pestaña activa: fondo `--shell-strong`, texto `--text`, ícono `--accent-strong` y barra de 3 px `--accent` (el acento sigue siendo el del punto). El logo del punto va sobre una placa clara redondeada para que se vea en lo oscuro.
+- **Barra inferior del celular** también en `--shell-bg`.
+- **Profundidad:** `--shadow-1` y `--shadow-2` en dos capas; `--radius-card` 14 px para tarjetas, formularios y paneles; tarjetas de pedidos/bajas/producción con radio 12 px y sombra; las tarjetas tocables suben 1 px al pasar el mouse.
+- **Títulos de página** (`.admin-header h2`) en Playfair hasta 30 px; botones con radio 12 px y el principal con una sombra suave del acento.
+- **Inicio** (`.ini-*`): tarjetas con número grande en mono, panel oscuro de próximos eventos, montajes con barra de avance.
