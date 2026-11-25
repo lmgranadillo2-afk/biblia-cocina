@@ -8261,6 +8261,7 @@ async function loadRecipes(){
     ingredients: r.ingredients || [],
     yield_qty: r.yield_qty === null ? '' : String(r.yield_qty),
     yield_unit: r.yield_unit || '',
+    unidad_descarga: r.unidad_descarga || '',
     activo_inventario: r.activo_inventario !== false,
     // Sin la columna (SQL recetas_activa.sql aún sin correr) todas cuentan como activas.
     activa: r.activa !== false, activa_por: r.activa_por || '', activa_at: r.activa_at || null,
@@ -11858,15 +11859,26 @@ async function rnCargarSugerencias(locId){
   if(RN.sug[locId]) return;
   RN.sug[locId] = [];
   let [ins, rec] = await Promise.all([
-    supa.from('location_ingredient_activation').select('group_ingredients(code, name)').eq('location_id', locId).eq('active', true),
-    supa.from('recipes').select('code, name, activa, areas(name)').eq('location_id', locId)
+    supa.from('location_ingredient_activation').select('group_ingredients(code, name, unidad)').eq('location_id', locId).eq('active', true),
+    supa.from('recipes').select('code, name, activa, unidad_descarga, yield_unit, areas(name)').eq('location_id', locId)
   ]);
-  if(rec.error) rec = await supa.from('recipes').select('code, name, activa').eq('location_id', locId);
+  if(rec.error) rec = await supa.from('recipes').select('code, name, activa, yield_unit').eq('location_id', locId);
   const lista = [];
-  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo' }); });
-  (rec.data || []).forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : '') }); });
+  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad) }); });
+  (rec.data || []).forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : ''), unidad: rnUnidadDe(r.unidad_descarga || r.yield_unit) }); });
   RN.sug[locId] = lista;
   if(RN.locId === locId) rnPintar();
+}
+// GR/KG/ML/L/UND (o parecidos) → unidad de la ficha (g, kg, ml, l, und). '' si no se reconoce.
+function rnUnidadDe(u){
+  const s = String(u || '').toLowerCase().trim();
+  if(!s) return '';
+  if(/^(kg|kilo)/.test(s)) return 'kg';
+  if(/^(g|gr|gramo)/.test(s)) return 'g';
+  if(/^(ml|cc|mililitro)/.test(s)) return 'ml';
+  if(/^(l|lt|litro)/.test(s)) return 'l';
+  if(/^(und|un|unidad|porci)/.test(s)) return 'und';
+  return '';
 }
 function rnSugDe(nombre){
   const n = rnNorm(nombre);
@@ -11919,7 +11931,7 @@ function rnSeleccionar(id, sinPintar){
   const f = RN.fichas.find(x => x.id === id);
   RN.draft = f ? { id: f.id, codigo: f.codigo || '', nombre: f.nombre || '', categoria: f.categoria || '', rinde: f.rinde === null ? '' : String(f.rinde),
     rinde_unidad: f.rinde_unidad || 'kg', procedimiento: f.procedimiento || '',
-    tipo: f.tipo || 'plato', empaque_ref: f.empaque_ref === null || f.empaque_ref === undefined ? '' : String(f.empaque_ref), empaque_unidad: f.empaque_unidad || 'g',
+    unidad_descarga: f.unidad_descarga || '', tipo: f.tipo || 'plato', empaque_ref: f.empaque_ref === null || f.empaque_ref === undefined ? '' : String(f.empaque_ref), empaque_unidad: f.empaque_unidad || 'g',
     rend_unidades: f.rend_unidades === null || f.rend_unidades === undefined ? '' : String(f.rend_unidades), rend_gramos: f.rend_gramos === null || f.rend_gramos === undefined ? '' : String(f.rend_gramos), filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
   if(RN.draft && !RN.draft.filas.length) RN.draft.filas.push(rnFilaVacia());
   RN.dirty = false;
@@ -11991,6 +12003,7 @@ function rnFichaHtml(d, loc){
         <label for="rnNombre">NOMBRE RECETA</label><input id="rnNombre" data-rn-h="nombre" value="${escapeHtml(d.nombre)}">
         <label for="rnCategoria">CATEGORÍA</label><input id="rnCategoria" data-rn-h="categoria" value="${escapeHtml(d.categoria)}">
         <label for="rnTipo">TIPO</label><select id="rnTipo" data-rn-h="tipo" data-rn-repintar="1"><option value="plato" ${d.tipo !== 'subreceta' ? 'selected' : ''}>Plato terminado</option><option value="subreceta" ${d.tipo === 'subreceta' ? 'selected' : ''}>Subreceta</option></select>
+        <label for="rnDescarga">UNIDAD DE DESCARGUE (TOTEAT)</label><select id="rnDescarga" data-rn-h="unidad_descarga"><option value="">Sin definir</option>${['GR', 'KG', 'ML', 'L', 'UND'].map(u => `<option ${u === d.unidad_descarga ? 'selected' : ''}>${u}</option>`).join('')}</select>
       </div>
       <div class="rn-row rn-head"><div>INGREDIENTES</div><div>PESO NETO</div><div>UNIDAD</div><div class="rn-nuevo">PRECIO</div><div class="rn-nuevo">COSTO</div><div>OBSERVACIONES</div><div></div></div>
       ${filas}
@@ -12070,7 +12083,7 @@ async function rnGuardar(){
   const fila = {
     codigo: d.codigo.trim() || null, nombre: d.nombre.trim(), categoria: d.categoria.trim() || null,
     rinde: rnCant(d.rinde) || null, rinde_unidad: d.rinde_unidad, procedimiento: d.procedimiento.trim() || null,
-    tipo: d.tipo, empaque_ref: rnCant(d.empaque_ref) || null, empaque_unidad: d.empaque_unidad, rend_unidades: rnCant(d.rend_unidades) || null, rend_gramos: rnCant(d.rend_gramos) || null,
+    unidad_descarga: d.unidad_descarga || null, tipo: d.tipo, empaque_ref: rnCant(d.empaque_ref) || null, empaque_unidad: d.empaque_unidad, rend_unidades: rnCant(d.rend_unidades) || null, rend_gramos: rnCant(d.rend_gramos) || null,
     filas: d.filas.filter(f => f.ing.trim() || f.peso || f.precio).map(f => ({ ...f, ing: f.ing.trim() }))
   };
   const { data, error } = await supa.from('recetas_nuevas').update(fila).eq('id', d.id).select().single();
@@ -12159,6 +12172,7 @@ async function rnClick(ev){
     if(sinCodigo && !confirm(`${sinCodigo} ingrediente(s) quedan sin código del catálogo y la receta saldrá con costo incompleto. ¿Crearla igual?`)){ b.disabled = false; return; }
     const receta = {
       code: codigo, name: d.nombre.trim(), location_id: RN.locId, area_id: areaId,
+      ...(d.unidad_descarga ? { unidad_descarga: d.unidad_descarga } : {}),
       ...(d.tipo === 'subreceta'
         ? (rnRendGramos(d) ? { yield_qty: +(rnRendGramos(d) / 1000).toFixed(3), yield_unit: d.empaque_unidad === 'ml' ? 'L' : 'KG' } : rnCant(d.rend_unidades) ? { yield_qty: rnCant(d.rend_unidades), yield_unit: 'UND' } : { yield_qty: null, yield_unit: null })
         : { yield_qty: rnCant(d.rinde) || null, yield_unit: rnCant(d.rinde) ? ({ kg: 'KG', l: 'L', porciones: 'UND', und: 'UND' }[d.rinde_unidad] || 'UND') : null }),
@@ -12200,6 +12214,11 @@ function rnCampo(ev){
     if(k === 'ing' && ev.type === 'change'){
       const s = rnSugDe(f.ing), antes = f.code || '';
       f.code = s ? s.code : '';
+      let cambioUnidad = false;
+      if(s && s.unidad && s.unidad !== f.unidad){
+        f.unidad = s.unidad; cambioUnidad = true;
+        if(!f.precio) f.por = { g: 'kg', kg: 'kg', ml: 'l', l: 'l', und: 'und' }[s.unidad];
+      }
       const t = rnToteatDe(f.ing);
       if(t && t.costo > 0 && (!f.precio || f.toteat)){
         const p = rnDesdeToteat(t);
@@ -12207,7 +12226,7 @@ function rnCampo(ev){
         if(t.unidad && /^(g|gr|kg|kilo)/i.test(t.unidad) && f.unidad === 'und') f.unidad = 'g';
         rnPintar(); return;
       }
-      if((f.code || '') !== antes){ rnPintar(); return; }
+      if((f.code || '') !== antes || cambioUnidad){ rnPintar(); return; }
     }
     rnRecalcular();
   }
@@ -12230,7 +12249,7 @@ async function rnDescargar(){
   }
   if(d.procedimiento.trim()) filas.push(['PROCEDIMIENTO', '', '', '', '', '', d.procedimiento.trim()]);
   await exportarTabla({ formato, titulo: (d.codigo ? d.codigo + ' · ' : '') + (d.nombre || 'Receta nueva'),
-    subtitulo: [loc ? loc.name : '', d.tipo === 'subreceta' ? 'Subreceta' : 'Plato terminado', d.categoria, 'Costo total ' + fmtMoney(total), r && d.tipo !== 'subreceta' ? 'Rinde ' + r + ' ' + d.rinde_unidad + ' · ' + fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : ''].filter(Boolean).join(' · '),
+    subtitulo: [loc ? loc.name : '', d.tipo === 'subreceta' ? 'Subreceta' : 'Plato terminado', d.categoria, d.unidad_descarga ? 'Descarga en Toteat: ' + d.unidad_descarga : '', 'Costo total ' + fmtMoney(total), r && d.tipo !== 'subreceta' ? 'Rinde ' + r + ' ' + d.rinde_unidad + ' · ' + fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : ''].filter(Boolean).join(' · '),
     nombre: 'Ficha ' + (d.nombre || 'receta'), hoja: 'Ficha', horizontal: true,
     columnas: [{ t: 'Ingrediente', w: 30 }, { t: 'Peso neto', tipo: 'num', w: 11 }, { t: 'Unidad', w: 8 }, { t: 'Precio', tipo: 'num', w: 12 }, { t: 'Por', w: 7 }, { t: 'Costo', tipo: 'num', total: true, w: 12 }, { t: 'Observaciones', w: 40 }],
     filas });
@@ -12395,6 +12414,7 @@ async function renderDetail(r){
   const yieldHtml = hasYield
     ? `<div class="yield-stamp"><span class="label">Rinde</span><span class="value">${fmtQty(r.yield_qty)} ${normalizeUnitLabel(r.yield_unit)}</span></div>`
     : `<div class="yield-stamp empty"><span class="label">Rinde</span><span class="value">Sin dato</span></div>`;
+  const descargaHtml = r.unidad_descarga ? `<div class="yield-stamp small"><span class="label">Descarga en Toteat</span><span class="value">${escapeHtml(r.unidad_descarga)}</span></div>` : '';
 
   let ingHtml;
   if(r.ingredients.length === 0){
@@ -12409,7 +12429,7 @@ async function renderDetail(r){
     <div class="detail-title">${escapeHtml(r.name)}</div>
     <div class="detail-code">${escapeHtml(r.code)}</div>
     ${r.activa === false ? `<div class="rec-inactiva-aviso"><b>Receta inactiva.</b> No sale en Producción, Calcular producción ni Cronograma.${r.activa_por ? ` Desactivada por ${escapeHtml(r.activa_por)}${r.activa_at ? ' el ' + new Date(r.activa_at).toLocaleDateString('es-CO') : ''}.` : ''}</div>` : ''}
-    ${yieldHtml}
+    ${yieldHtml}${descargaHtml}
     ${isAdminRole() ? `<div class="rec-activa-row">${r.activa === false
       ? '<button class="btn btn-accent btn-small" id="recActivaBtn">Activar receta</button>'
       : '<button class="btn btn-danger-outline btn-small" id="recActivaBtn">Desactivar receta</button>'}</div>` : ''}
