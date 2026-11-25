@@ -1166,6 +1166,7 @@ nav.tabs button{position:relative;}
 .rn-head .rn-nuevo, .rn-precio, .rn-costo{background:color-mix(in srgb, var(--accent-soft) 70%, #FFFFFF);}
 .rn-ingcel{display:flex; align-items:center; gap:6px; padding:0 !important;}
 .rn-ingcel input{flex:1; min-width:0; padding:6px 8px;}
+.rn-cod{color:var(--text-muted); background:var(--surface-2); font-family:'IBM Plex Mono',monospace;}
 .rn-tt{flex:none; margin-right:6px; padding:1px 6px; font-size:11px; font-weight:600; color:var(--info); background:var(--info-bg); border-radius:var(--radius-sm);}
 .rn-num, .rn-mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
 .rn-num{text-align:right;}
@@ -11811,7 +11812,7 @@ async function mlDescargar(){
    y su Toteat (acción precios_insumos de la función de Toteat) para traer el último precio de cada insumo.
    "Pasar al Recetario" crea la receta en un área del restaurante (ingredientes con el código del catálogo cuando
    coincide el nombre) y deja el procedimiento como observación. Los precios de la ficha no cambian el catálogo. */
-const RN = { locs: [], locId: null, fichas: [], selId: null, draft: null, dirty: false, toteat: {}, catalogo: null, pasar: null };
+const RN = { locs: [], locId: null, fichas: [], selId: null, draft: null, dirty: false, toteat: {}, catalogo: null, pasar: null, sug: {} };
 const RN_UNIDADES = ['g', 'kg', 'ml', 'l', 'und'];
 const RN_A_RECETA = { g: 'GR', kg: 'KG', ml: 'ML', l: 'L', und: 'UND' };
 
@@ -11845,6 +11846,31 @@ function rnToteatDe(nombre){
   const n = rnNorm(nombre);
   return t.insumos.find(x => rnNorm(x.nombre) === n) || null;
 }
+// Sugerencias para la columna Ingrediente: insumos activos del restaurante y sus recetas/subrecetas (sin productos de carta CS/CC).
+async function rnCargarSugerencias(locId){
+  if(RN.sug[locId]) return;
+  RN.sug[locId] = [];
+  let [ins, rec] = await Promise.all([
+    supa.from('location_ingredient_activation').select('group_ingredients(code, name)').eq('location_id', locId).eq('active', true),
+    supa.from('recipes').select('code, name, activa, areas(name)').eq('location_id', locId)
+  ]);
+  if(rec.error) rec = await supa.from('recipes').select('code, name, activa').eq('location_id', locId);
+  const lista = [];
+  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo' }); });
+  (rec.data || []).forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : '') }); });
+  RN.sug[locId] = lista;
+  if(RN.locId === locId) rnPintar();
+}
+function rnSugDe(nombre){
+  const n = rnNorm(nombre);
+  return n ? (RN.sug[RN.locId] || []).find(x => rnNorm(x.nombre) === n) || null : null;
+}
+function rnDatalistHtml(t){
+  const vistos = new Set(), op = [];
+  (RN.sug[RN.locId] || []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="${escapeHtml(x.tipo + (x.code ? ' · ' + x.code : ''))}"></option>`); });
+  (t && t.insumos ? t.insumos : []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="Toteat"></option>`); });
+  return op.join('');
+}
 function rnFilaVacia(){ return { ing: '', peso: '', unidad: 'g', precio: '', por: 'kg', obs: '', toteat: null }; }
 function rnLoc(id){ return RN.locs.find(l => l.id === (id || RN.locId)) || null; }
 
@@ -11859,6 +11885,7 @@ async function rnAbrir(){
   if(!RN.locId) RN.locId = (currentLocation && RN.locs.some(l => l.id === currentLocation.id)) ? currentLocation.id : (RN.locs[0] || {}).id;
   await rnCargarFichas();
   rnPintar();
+  rnCargarSugerencias(RN.locId);
 }
 function rnCerrar(){
   if(RN.dirty && !confirm('Hay cambios sin guardar en la ficha. ¿Salir igual?')) return;
@@ -11912,7 +11939,7 @@ function rnPintar(){
       </aside>
       <main class="rn-main">${d ? rnFichaHtml(d, loc) : '<div class="empty-list">Elige una ficha o crea una nueva.</div>'}</main>
     </div>
-    <datalist id="rnToteatList">${(t && t.insumos ? t.insumos : []).map(x => `<option value="${escapeHtml(x.nombre)}"></option>`).join('')}</datalist>`;
+    <datalist id="rnToteatList">${rnDatalistHtml(t)}</datalist>`;
   rnRecalcular();
 }
 
@@ -11921,7 +11948,7 @@ function rnFichaHtml(d, loc){
   const filas = d.filas.map((f, i) => `
     <div class="rn-row">
       <div class="rn-ingcel"><input type="text" data-rn-f="ing" data-i="${i}" value="${escapeHtml(f.ing)}" list="rnToteatList" placeholder="Ingrediente" aria-label="Ingrediente">
-        ${f.toteat ? `<span class="rn-tt" title="Precio de Toteat">Toteat ${escapeHtml(fmtFechaCorta(f.toteat.fecha))}</span>` : ''}</div>
+        ${f.code ? `<span class="rn-tt rn-cod" title="Código en la app">${escapeHtml(f.code)}</span>` : ''}${f.toteat ? `<span class="rn-tt" title="Precio de Toteat">Toteat ${escapeHtml(fmtFechaCorta(f.toteat.fecha))}</span>` : ''}</div>
       <input type="text" inputmode="decimal" data-rn-f="peso" data-i="${i}" value="${escapeHtml(f.peso)}" aria-label="Peso neto" class="rn-num">
       <select data-rn-f="unidad" data-i="${i}" aria-label="Unidad">${RN_UNIDADES.map(u => `<option ${u === f.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select>
       <div class="rn-precio"><input type="text" inputmode="decimal" data-rn-f="precio" data-i="${i}" value="${escapeHtml(f.precio)}" placeholder="$" aria-label="Precio" class="rn-num">
@@ -12121,7 +12148,7 @@ function rnCampo(ev){
     if(ev.type !== 'change') return;
     if(RN.dirty && !confirm('Hay cambios sin guardar en esta ficha. ¿Cambiar de restaurante igual?')){ el.value = RN.locId; return; }
     RN.locId = el.value; RN.selId = null; RN.pasar = null; RN.dirty = false;
-    rnCargarFichas().then(rnPintar); return;
+    rnCargarFichas().then(rnPintar); rnCargarSugerencias(RN.locId); return;
   }
   if(!d) return;
   if(el.dataset.rnH){ d[el.dataset.rnH] = el.value; RN.dirty = true; rnRecalcular(); return; }
@@ -12132,6 +12159,8 @@ function rnCampo(ev){
     if(k === 'precio' || k === 'por') f.toteat = null;
     // Al elegir un insumo de Toteat (evento change), trae su precio si la línea no tiene uno puesto a mano.
     if(k === 'ing' && ev.type === 'change'){
+      const s = rnSugDe(f.ing), antes = f.code || '';
+      f.code = s ? s.code : '';
       const t = rnToteatDe(f.ing);
       if(t && t.costo > 0 && (!f.precio || f.toteat)){
         const p = rnDesdeToteat(t);
@@ -12139,6 +12168,7 @@ function rnCampo(ev){
         if(t.unidad && /^(g|gr|kg|kilo)/i.test(t.unidad) && f.unidad === 'und') f.unidad = 'g';
         rnPintar(); return;
       }
+      if((f.code || '') !== antes){ rnPintar(); return; }
     }
     rnRecalcular();
   }
