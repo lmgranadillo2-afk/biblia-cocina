@@ -1158,7 +1158,7 @@ nav.tabs button{position:relative;}
 .rn-logo img{max-height:56px; max-width:220px; object-fit:contain;}
 .rn-cab{display:grid; grid-template-columns:220px minmax(0, 1fr); border-bottom:2px solid var(--text); background:#DCE6F2;}
 .rn-cab label{padding:8px 10px; font-weight:700; border-right:2px solid var(--text); border-bottom:1px solid var(--text);}
-.rn-cab input{padding:8px 10px; font-weight:600; border-bottom:1px solid var(--text) !important;}
+.rn-cab input, .rn-cab select{padding:8px 10px; font-weight:600; border-bottom:1px solid var(--text) !important;}
 .rn-row{display:grid; grid-template-columns:minmax(200px, 2.2fr) 100px 80px 160px 120px minmax(140px, 1.6fr) 40px; border-bottom:1px solid var(--text);}
 .rn-row > *{border-right:2px solid var(--text) !important; padding:6px 8px; min-width:0;}
 .rn-row > :last-child{border-right:0 !important;}
@@ -1182,6 +1182,13 @@ nav.tabs button{position:relative;}
 .rn-rinde input{width:70px; border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px 6px;}
 .rn-rinde select{border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px;}
 .rn-poru{color:var(--text-muted);}
+.rn-emp{display:grid; grid-template-columns:260px 110px 80px minmax(0, 1fr); background:#DCE6F2; border-bottom:2px solid var(--text);}
+.rn-emp > *{padding:6px 8px; border-bottom:1px solid var(--text); border-right:2px solid var(--text) !important; display:flex; align-items:center;}
+.rn-emp > :nth-child(4n){border-right:0 !important;}
+.rn-emp label{font-weight:700;}
+.rn-emp input{background:#FFFFFF; justify-content:flex-end;}
+.rn-emp-u{justify-content:center; font-weight:700;}
+.rn-emp-c{font:600 13px 'IBM Plex Mono',monospace; color:var(--text-muted); background:#FFFFFF;}
 .rn-proc-tit{padding:8px; text-align:center; font-weight:700; border-bottom:2px solid var(--text);}
 .rn-hoja textarea{display:block; width:100%; box-sizing:border-box; padding:10px 12px; line-height:1.6; resize:vertical;}
 .rn-map{display:flex; flex-direction:column; gap:6px; margin-bottom:8px;}
@@ -11871,6 +11878,14 @@ function rnDatalistHtml(t){
   (t && t.insumos ? t.insumos : []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="Toteat"></option>`); });
   return op.join('');
 }
+// Subreceta: gramos que rinde = lo escrito, o referencia de empaque × unidades (si la referencia va en g o ml).
+function fmtNum1(n){ return (Math.round(n * 10) / 10).toLocaleString('es-CO'); }
+function rnRendGramos(d){
+  const g = rnCant(d.rend_gramos);
+  if(g) return g;
+  const ref = rnCant(d.empaque_ref), u = rnCant(d.rend_unidades);
+  return ref && u && d.empaque_unidad !== 'und' ? ref * u : 0;
+}
 function rnFilaVacia(){ return { ing: '', peso: '', unidad: 'g', precio: '', por: 'kg', obs: '', toteat: null }; }
 function rnLoc(id){ return RN.locs.find(l => l.id === (id || RN.locId)) || null; }
 
@@ -11903,7 +11918,9 @@ function rnSeleccionar(id, sinPintar){
   RN.selId = id;
   const f = RN.fichas.find(x => x.id === id);
   RN.draft = f ? { id: f.id, codigo: f.codigo || '', nombre: f.nombre || '', categoria: f.categoria || '', rinde: f.rinde === null ? '' : String(f.rinde),
-    rinde_unidad: f.rinde_unidad || 'kg', procedimiento: f.procedimiento || '', filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
+    rinde_unidad: f.rinde_unidad || 'kg', procedimiento: f.procedimiento || '',
+    tipo: f.tipo || 'plato', empaque_ref: f.empaque_ref === null || f.empaque_ref === undefined ? '' : String(f.empaque_ref), empaque_unidad: f.empaque_unidad || 'g',
+    rend_unidades: f.rend_unidades === null || f.rend_unidades === undefined ? '' : String(f.rend_unidades), rend_gramos: f.rend_gramos === null || f.rend_gramos === undefined ? '' : String(f.rend_gramos), filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
   if(RN.draft && !RN.draft.filas.length) RN.draft.filas.push(rnFilaVacia());
   RN.dirty = false;
   if(!sinPintar) rnPintar();
@@ -11919,7 +11936,7 @@ function rnPintar(){
   const lista = RN.fichas.map(f => `<button type="button" class="rn-item${f.id === RN.selId ? ' active' : ''}" data-rn="sel" data-id="${f.id}">
       <span class="rn-item-cod">${escapeHtml(f.codigo || 'Sin código')}</span>
       <b>${escapeHtml(f.nombre || 'Ficha sin nombre')}</b>
-      <span>${(f.filas || []).filter(x => x.ing).length} ingredientes${f.pasada_at ? ' · en el Recetario' : ''}</span>
+      <span>${f.tipo === 'subreceta' ? 'Subreceta · ' : ''}${(f.filas || []).filter(x => x.ing).length} ingredientes${f.pasada_at ? ' · en el Recetario' : ''}</span>
     </button>`).join('');
   box.innerHTML = `
     <div class="rn-top">
@@ -11973,18 +11990,28 @@ function rnFichaHtml(d, loc){
         <label for="rnCodigo">CÓDIGO</label><input id="rnCodigo" data-rn-h="codigo" value="${escapeHtml(d.codigo)}" class="rn-mono">
         <label for="rnNombre">NOMBRE RECETA</label><input id="rnNombre" data-rn-h="nombre" value="${escapeHtml(d.nombre)}">
         <label for="rnCategoria">CATEGORÍA</label><input id="rnCategoria" data-rn-h="categoria" value="${escapeHtml(d.categoria)}">
+        <label for="rnTipo">TIPO</label><select id="rnTipo" data-rn-h="tipo" data-rn-repintar="1"><option value="plato" ${d.tipo !== 'subreceta' ? 'selected' : ''}>Plato terminado</option><option value="subreceta" ${d.tipo === 'subreceta' ? 'selected' : ''}>Subreceta</option></select>
       </div>
       <div class="rn-row rn-head"><div>INGREDIENTES</div><div>PESO NETO</div><div>UNIDAD</div><div class="rn-nuevo">PRECIO</div><div class="rn-nuevo">COSTO</div><div>OBSERVACIONES</div><div></div></div>
       ${filas}
       <div class="rn-pie">
         <button type="button" class="btn btn-ghost btn-small" data-rn="agregar">+ Agregar ingrediente</button>
         <div class="rn-tot">
-          <label class="rn-rinde">Rinde <input type="text" inputmode="decimal" data-rn-h="rinde" value="${escapeHtml(d.rinde)}" class="rn-num" aria-label="Rendimiento">
-            <select data-rn-h="rinde_unidad" aria-label="Unidad del rendimiento">${['kg', 'l', 'porciones', 'und'].map(u => `<option ${u === d.rinde_unidad ? 'selected' : ''}>${u}</option>`).join('')}</select></label>
+          ${d.tipo === 'subreceta' ? '' : `<label class="rn-rinde">Rinde <input type="text" inputmode="decimal" data-rn-h="rinde" value="${escapeHtml(d.rinde)}" class="rn-num" aria-label="Rendimiento">
+            <select data-rn-h="rinde_unidad" aria-label="Unidad del rendimiento">${['kg', 'l', 'porciones', 'und'].map(u => `<option ${u === d.rinde_unidad ? 'selected' : ''}>${u}</option>`).join('')}</select></label>`}
           <span>Costo total <b id="rnTotal"></b></span>
           <span id="rnPorU" class="rn-poru"></span>
         </div>
       </div>
+      ${d.tipo === 'subreceta' ? `<div class="rn-proc-tit">EMPAQUE</div>
+      <div class="rn-emp">
+        <label for="rnEmpRef">REFERENCIA DE EMPAQUE</label><input id="rnEmpRef" type="text" inputmode="decimal" data-rn-h="empaque_ref" value="${escapeHtml(d.empaque_ref)}" class="rn-num" placeholder="30">
+        <select data-rn-h="empaque_unidad" aria-label="Unidad de la referencia">${[['g', 'GR'], ['ml', 'ML'], ['und', 'UND']].map(([v, t]) => `<option value="${v}" ${v === d.empaque_unidad ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="rn-emp-c" id="rnEmpCosto"></span>
+        <label for="rnEmpUnd">RENDIMIENTO EN UNIDADES</label><input id="rnEmpUnd" type="text" inputmode="decimal" data-rn-h="rend_unidades" value="${escapeHtml(d.rend_unidades)}" class="rn-num" placeholder="35">
+        <span class="rn-emp-u">UND</span><span class="rn-emp-c" id="rnEmpCostoU"></span>
+        <label for="rnEmpGr">RENDIMIENTO EN GRAMOS</label><input id="rnEmpGr" type="text" inputmode="decimal" data-rn-h="rend_gramos" value="${escapeHtml(d.rend_gramos)}" class="rn-num" placeholder="">
+        <span class="rn-emp-u">GR</span><span class="rn-emp-c" id="rnEmpCostoKg"></span>
+      </div>` : ''}
       <div class="rn-proc-tit">PROCEDIMIENTO</div>
       <textarea data-rn-h="procedimiento" rows="7" aria-label="Procedimiento">${escapeHtml(d.procedimiento)}</textarea>
     </div></div>
@@ -12001,7 +12028,16 @@ function rnRecalcular(){
     if(typeof c === 'number') total += c; else if(f.ing) faltan++;
     if(el){ el.textContent = c === 'x' ? 'Unidad no cuadra' : c === null ? '—' : fmtMoney(c); el.classList.toggle('rn-err', c === 'x'); }
   });
-  const r = rnCant(d.rinde);
+  let r = rnCant(d.rinde);
+  if(d.tipo === 'subreceta'){
+    const und = rnCant(d.rend_unidades), gr = rnRendGramos(d), ref = rnCant(d.empaque_ref);
+    const eg = document.getElementById('rnEmpGr'); if(eg) eg.placeholder = !rnCant(d.rend_gramos) && gr ? String(+gr.toFixed(1)) : '';
+    const put = (id, t) => { const el = document.getElementById(id); if(el) el.textContent = t; };
+    put('rnEmpCosto', ref && und && gr && Math.abs(ref * und - gr) > 0.5 && d.empaque_unidad !== 'und' ? (gr > ref * und ? 'Sobran ' : 'Faltan ') + fmtNum1(Math.abs(gr - ref * und)) + ' ' + (d.empaque_unidad === 'ml' ? 'ml' : 'g') : '');
+    put('rnEmpCostoU', und && total ? fmtMoney(total / und) + ' por und' : '');
+    put('rnEmpCostoKg', gr && total ? fmtMoney(total / gr * 1000) + ' por kg' : '');
+    r = 0;
+  }
   const tot = document.getElementById('rnTotal'), pu = document.getElementById('rnPorU');
   if(tot) tot.textContent = fmtMoney(total) || '$0';
   if(pu) pu.textContent = [r && total ? fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : '', faltan ? faltan + ' sin precio' : ''].filter(Boolean).join(' · ');
@@ -12034,6 +12070,7 @@ async function rnGuardar(){
   const fila = {
     codigo: d.codigo.trim() || null, nombre: d.nombre.trim(), categoria: d.categoria.trim() || null,
     rinde: rnCant(d.rinde) || null, rinde_unidad: d.rinde_unidad, procedimiento: d.procedimiento.trim() || null,
+    tipo: d.tipo, empaque_ref: rnCant(d.empaque_ref) || null, empaque_unidad: d.empaque_unidad, rend_unidades: rnCant(d.rend_unidades) || null, rend_gramos: rnCant(d.rend_gramos) || null,
     filas: d.filas.filter(f => f.ing.trim() || f.peso || f.precio).map(f => ({ ...f, ing: f.ing.trim() }))
   };
   const { data, error } = await supa.from('recetas_nuevas').update(fila).eq('id', d.id).select().single();
@@ -12122,7 +12159,9 @@ async function rnClick(ev){
     if(sinCodigo && !confirm(`${sinCodigo} ingrediente(s) quedan sin código del catálogo y la receta saldrá con costo incompleto. ¿Crearla igual?`)){ b.disabled = false; return; }
     const receta = {
       code: codigo, name: d.nombre.trim(), location_id: RN.locId, area_id: areaId,
-      yield_qty: rnCant(d.rinde) || null, yield_unit: rnCant(d.rinde) ? ({ kg: 'KG', l: 'L', porciones: 'UND', und: 'UND' }[d.rinde_unidad] || 'UND') : null,
+      ...(d.tipo === 'subreceta'
+        ? (rnRendGramos(d) ? { yield_qty: +(rnRendGramos(d) / 1000).toFixed(3), yield_unit: d.empaque_unidad === 'ml' ? 'L' : 'KG' } : rnCant(d.rend_unidades) ? { yield_qty: rnCant(d.rend_unidades), yield_unit: 'UND' } : { yield_qty: null, yield_unit: null })
+        : { yield_qty: rnCant(d.rinde) || null, yield_unit: rnCant(d.rinde) ? ({ kg: 'KG', l: 'L', porciones: 'UND', und: 'UND' }[d.rinde_unidad] || 'UND') : null }),
       ingredients: P.filas.map(f => ({ code: f.code || '', name: f.ing, qty: rnCant(f.peso), unit: RN_A_RECETA[f.unidad] || 'UND' }))
     };
     const { data: rec, error } = await supa.from('recipes').insert(receta).select('id').single();
@@ -12151,7 +12190,7 @@ function rnCampo(ev){
     rnCargarFichas().then(rnPintar); rnCargarSugerencias(RN.locId); return;
   }
   if(!d) return;
-  if(el.dataset.rnH){ d[el.dataset.rnH] = el.value; RN.dirty = true; rnRecalcular(); return; }
+  if(el.dataset.rnH){ d[el.dataset.rnH] = el.value; RN.dirty = true; if(el.dataset.rnRepintar){ if(ev.type === 'change') rnPintar(); return; } rnRecalcular(); return; }
   if(el.dataset.rnF){
     const f = d.filas[+el.dataset.i], k = el.dataset.rnF;
     if(!f) return;
@@ -12182,9 +12221,16 @@ async function rnDescargar(){
   const filas = d.filas.filter(f => f.ing).map(f => { const c = rnCostoFila(f); if(typeof c === 'number') total += c;
     return [f.ing, rnCant(f.peso) || '', f.unidad, rnNum(f.precio) ? rnNum(f.precio) : '', rnNum(f.precio) ? '/' + f.por : '', typeof c === 'number' ? Math.round(c) : '', f.obs || '']; });
   const r = rnCant(d.rinde);
+  if(d.tipo === 'subreceta'){
+    const und = rnCant(d.rend_unidades), gr = rnRendGramos(d);
+    filas.push(['EMPAQUE', '', '', '', '', '', '']);
+    filas.push(['Referencia de empaque', rnCant(d.empaque_ref) || '', { g: 'GR', ml: 'ML', und: 'UND' }[d.empaque_unidad] || '', '', '', '', und && total ? 'Costo por empaque ' + fmtMoney(total / und) : '']);
+    filas.push(['Rendimiento en unidades', und || '', 'UND', '', '', '', '']);
+    filas.push(['Rendimiento en gramos', gr || '', 'GR', '', '', '', gr && total ? fmtMoney(total / gr * 1000) + ' por kg' : '']);
+  }
   if(d.procedimiento.trim()) filas.push(['PROCEDIMIENTO', '', '', '', '', '', d.procedimiento.trim()]);
   await exportarTabla({ formato, titulo: (d.codigo ? d.codigo + ' · ' : '') + (d.nombre || 'Receta nueva'),
-    subtitulo: [loc ? loc.name : '', d.categoria, 'Costo total ' + fmtMoney(total), r ? 'Rinde ' + r + ' ' + d.rinde_unidad + ' · ' + fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : ''].filter(Boolean).join(' · '),
+    subtitulo: [loc ? loc.name : '', d.tipo === 'subreceta' ? 'Subreceta' : 'Plato terminado', d.categoria, 'Costo total ' + fmtMoney(total), r && d.tipo !== 'subreceta' ? 'Rinde ' + r + ' ' + d.rinde_unidad + ' · ' + fmtMoney(total / r) + ' por ' + (d.rinde_unidad === 'porciones' ? 'porción' : d.rinde_unidad) : ''].filter(Boolean).join(' · '),
     nombre: 'Ficha ' + (d.nombre || 'receta'), hoja: 'Ficha', horizontal: true,
     columnas: [{ t: 'Ingrediente', w: 30 }, { t: 'Peso neto', tipo: 'num', w: 11 }, { t: 'Unidad', w: 8 }, { t: 'Precio', tipo: 'num', w: 12 }, { t: 'Por', w: 7 }, { t: 'Costo', tipo: 'num', total: true, w: 12 }, { t: 'Observaciones', w: 40 }],
     filas });
