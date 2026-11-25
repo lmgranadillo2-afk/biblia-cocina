@@ -302,10 +302,13 @@ function tramos(ini: string, end: string, dias: number): [string, string][] {
 async function preciosInsumos(loc: { id: string; slug: string; name: string }) {
   const { cred, faltan, prefijo } = credenciales(loc.slug);
   if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat para ${loc.name}: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
-  const ini = fechaToteat(13), end = fechaToteat(0);
-  const body = await toteatGet(cred, "inventorystate", { initial_date: ini, final_date: end });
-  const porNombre = new Map<string, { nombre: string; unidad: string; costo: number; fecha: string }>();
-  for (const ing of body.data ?? []) {
+  // Últimos 42 días en 3 tramos de 14 (Toteat exige < 15 días por consulta): así sale el costo de insumos
+  // que se compran poco (ej. PRO071, comprado hace 3 semanas). toteatGet respeta el límite de 3 consultas/minuto.
+  const ini = fechaToteat(41), end = fechaToteat(0);
+  const datos: any[] = [];
+  for (const [a, b] of tramos(ini, end, 14)) datos.push(...((await toteatGet(cred, "inventorystate", { initial_date: a, final_date: b })).data ?? []));
+  const porNombre = new Map<string, { nombre: string; codigo: string; unidad: string; costo: number; fecha: string }>();
+  for (const ing of datos) {
     const nombre = String(ing.product ?? "").trim();
     if (!nombre) continue;
     let costo = 0, fecha = "";
@@ -316,7 +319,8 @@ async function preciosInsumos(loc: { id: string; slug: string; name: string }) {
       }
     }
     const previo = porNombre.get(norm(nombre));
-    if (!previo || (costo > 0 && fecha >= previo.fecha)) porNombre.set(norm(nombre), { nombre, unidad: String(ing.unit ?? ""), costo, fecha });
+    const codigo = String(ing.product_id ?? ing.productId ?? ing.code ?? "").trim();
+    if (!previo || (costo > 0 && fecha >= previo.fecha)) porNombre.set(norm(nombre), { nombre, codigo: codigo || previo?.codigo || "", unidad: String(ing.unit ?? ""), costo, fecha });
   }
   const insumos = [...porNombre.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   return { ok: true, tipo: "precios_insumos", restaurante: loc.name, desde: ini, hasta: end, total: insumos.length, con_precio: insumos.filter((i) => i.costo > 0).length, insumos };

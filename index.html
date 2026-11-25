@@ -11849,11 +11849,15 @@ function rnDesdeToteat(t){
   return { precio: t.costo, por: 'und' };
 }
 function rnNorm(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
-function rnToteatDe(nombre){
+// Insumo de Toteat por nombre o por código (si Toteat lo manda); `code` = código ya puesto en la línea.
+function rnToteatDe(nombre, code){
   const t = RN.toteat[RN.locId];
   if(!t || !t.insumos) return null;
-  const n = rnNorm(nombre);
-  return t.insumos.find(x => rnNorm(x.nombre) === n) || null;
+  const n = rnNorm(nombre), limpio = s => String(s || '').replace(/[\s-]+/g, '').toUpperCase();
+  const c1 = limpio(nombre), c2 = limpio(code);
+  return t.insumos.find(x => rnNorm(x.nombre) === n)
+    || t.insumos.find(x => x.codigo && (limpio(x.codigo) === c1 || (c2 && limpio(x.codigo) === c2)))
+    || null;
 }
 // Sugerencias para la columna Ingrediente: insumos activos del restaurante y sus recetas/subrecetas (sin productos de carta CS/CC).
 async function rnCatalogoGrupo(){
@@ -11959,7 +11963,7 @@ function rnSugDe(nombre){
 function rnDatalistHtml(t){
   const vistos = new Set(), op = [];
   (RN.sug[RN.locId] || []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="${escapeHtml((x.code ? x.code + ' · ' : '') + x.tipo)}"></option>`); });
-  (t && t.insumos ? t.insumos : []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="Toteat"></option>`); });
+  (t && t.insumos ? t.insumos : []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="${escapeHtml((x.codigo ? x.codigo + ' · ' : '') + 'Toteat')}"></option>`); });
   return op.join('');
 }
 // Subreceta: gramos que rinde = lo escrito, o referencia de empaque × unidades (si la referencia va en g o ml).
@@ -12015,7 +12019,7 @@ function rnPintar(){
   const box = document.getElementById('rnBox');
   const loc = rnLoc(), d = RN.draft, t = RN.toteat[RN.locId];
   const toteatTxt = !t ? 'Sin consultar todavía.'
-    : t.estado === 'cargando' ? 'Consultando Toteat...'
+    : t.estado === 'cargando' ? 'Consultando Toteat (42 días, puede tardar hasta un minuto)...'
     : t.estado === 'error' ? 'No se pudo: ' + t.msg
     : `${t.total} insumos de Toteat (${t.con_precio} con precio) · consultado ${mlHora(t.at)}`;
   const lista = RN.fichas.map(f => `<button type="button" class="rn-item${f.id === RN.selId ? ' active' : ''}" data-rn="sel" data-id="${f.id}">
@@ -12176,7 +12180,7 @@ async function rnTraerToteat(){
   RN.toteat[locId] = msg ? { estado: 'error', msg, at: new Date().toISOString() }
     : { estado: 'ok', insumos: data.insumos || [], total: data.total || 0, con_precio: data.con_precio || 0, at: new Date().toISOString() };
   if(RN.locId === locId) rnPintar();
-  if(!msg && !(data.total)) showToast('Toteat respondió, pero sin insumos en los últimos 14 días', 'warn');
+  if(!msg && !(data.total)) showToast('Toteat respondió, pero sin insumos en los últimos 42 días', 'warn');
 }
 
 async function rnClick(ev){
@@ -12210,7 +12214,7 @@ async function rnClick(ev){
   }
   if(act === 'toteat-filas'){
     let n = 0;
-    d.filas.forEach(f => { const t = rnToteatDe(f.ing); if(t && t.costo > 0){ const p = rnDesdeToteat(t); f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha }; n++; } });
+    d.filas.forEach(f => { const t = rnToteatDe(f.ing, f.code); if(t && t.costo > 0){ const p = rnDesdeToteat(t); f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha }; n++; } });
     RN.dirty = RN.dirty || n > 0; rnPintar();
     showToast(n ? `Se actualizaron ${n} precios con Toteat` : 'Ningún ingrediente coincide con un insumo de Toteat con precio', n ? 'ok' : 'warn');
     return;
@@ -12293,7 +12297,8 @@ function rnCampo(ev){
         f.unidad = s.unidad; cambioUnidad = true;
         if(!f.precio) f.por = { g: 'kg', kg: 'kg', ml: 'l', l: 'l', und: 'und' }[s.unidad];
       }
-      const t = rnToteatDe(f.ing);
+      const t = rnToteatDe(f.ing, f.code);
+      if(t && !s && rnNorm(t.nombre) !== rnNorm(f.ing)){ if(!f.code && t.codigo && !/^\d+$/.test(t.codigo)) f.code = t.codigo; f.ing = t.nombre; }
       if(t && t.costo > 0 && (!f.precio || f.toteat || f.app)){
         const p = rnDesdeToteat(t);
         f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha }; f.app = null;
