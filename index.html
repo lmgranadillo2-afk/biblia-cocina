@@ -11856,18 +11856,28 @@ function rnToteatDe(nombre){
   return t.insumos.find(x => rnNorm(x.nombre) === n) || null;
 }
 // Sugerencias para la columna Ingrediente: insumos activos del restaurante y sus recetas/subrecetas (sin productos de carta CS/CC).
+async function rnCatalogoGrupo(){
+  const todos = [];
+  for(let desde = 0; ; desde += 1000){
+    const r = await supa.from('group_ingredients').select('code, name, unidad, costo').order('code').range(desde, desde + 999);
+    if(r.error) return { data: todos, error: r.error };
+    todos.push(...(r.data || []));
+    if(!r.data || r.data.length < 1000) break;
+  }
+  return { data: todos, error: null };
+}
 async function rnCargarSugerencias(locId){
   if(RN.sug[locId]) return;
   RN.sug[locId] = [];
   let [ins, rec] = await Promise.all([
-    supa.from('location_ingredient_activation').select('group_ingredients(code, name, unidad, costo)').eq('location_id', locId).eq('active', true),
+    rnCatalogoGrupo(),
     supa.from('recipes').select('code, name, activa, unidad_descarga, yield_unit, yield_qty, ingredients, area_id, areas(name)').eq('location_id', locId)
   ]);
   if(rec.error) rec = await supa.from('recipes').select('code, name, activa, yield_unit, yield_qty, ingredients, area_id').eq('location_id', locId);
   if(!Object.keys(INGREDIENT_COST_MAP).length) await loadIngredientCosts();
   const recetas = rec.data || [];
   const lista = [];
-  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad), ...rnPrecioInsumo(g) }); });
+  (ins.data || []).forEach(g => { if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad), ...rnPrecioInsumo(g) }); });
   recetas.forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : ''), unidad: rnUnidadDe(r.unidad_descarga || r.yield_unit), ...rnPrecioReceta(r, recetas) }); });
   RN.sug[locId] = lista;
   if(RN.locId === locId){ rnPreciosApp(); rnPintar(); }
@@ -11939,11 +11949,16 @@ function rnPreciosApp(){
 }
 function rnSugDe(nombre){
   const n = rnNorm(nombre);
-  return n ? (RN.sug[RN.locId] || []).find(x => rnNorm(x.nombre) === n) || null : null;
+  if(!n) return null;
+  const lista = RN.sug[RN.locId] || [], cod = n.replace(/[\s-]+/g, '').toUpperCase();
+  // Por nombre exacto, o por código sin espacios ni guiones ("pro 071" = PRO071)
+  return lista.find(x => rnNorm(x.nombre) === n)
+    || lista.find(x => x.code && x.code.replace(/[\s-]+/g, '').toUpperCase() === cod)
+    || null;
 }
 function rnDatalistHtml(t){
   const vistos = new Set(), op = [];
-  (RN.sug[RN.locId] || []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="${escapeHtml(x.tipo + (x.code ? ' · ' + x.code : ''))}"></option>`); });
+  (RN.sug[RN.locId] || []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="${escapeHtml((x.code ? x.code + ' · ' : '') + x.tipo)}"></option>`); });
   (t && t.insumos ? t.insumos : []).forEach(x => { const k = rnNorm(x.nombre); if(vistos.has(k)) return; vistos.add(k); op.push(`<option value="${escapeHtml(x.nombre)}" label="Toteat"></option>`); });
   return op.join('');
 }
@@ -12271,6 +12286,7 @@ function rnCampo(ev){
     // Al elegir un insumo de Toteat (evento change), trae su precio si la línea no tiene uno puesto a mano.
     if(k === 'ing' && ev.type === 'change'){
       const s = rnSugDe(f.ing), antes = f.code || '';
+      if(s && rnNorm(s.nombre) !== rnNorm(f.ing)) f.ing = s.nombre;
       f.code = s ? s.code : '';
       let cambioUnidad = false;
       if(s && s.unidad && s.unidad !== f.unidad){
