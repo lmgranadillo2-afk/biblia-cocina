@@ -1166,6 +1166,7 @@ nav.tabs button{position:relative;}
 .rn-head .rn-nuevo, .rn-precio, .rn-costo{background:color-mix(in srgb, var(--accent-soft) 70%, #FFFFFF);}
 .rn-ingcel{display:flex; align-items:center; gap:6px; padding:0 !important;}
 .rn-ingcel input{flex:1; min-width:0; padding:6px 8px;}
+.rn-tt-warn{color:var(--warn); background:var(--warn-bg);}
 .rn-cod{color:var(--text-muted); background:var(--surface-2); font-family:'IBM Plex Mono',monospace;}
 .rn-tt{flex:none; margin-right:6px; padding:1px 6px; font-size:11px; font-weight:600; color:var(--info); background:var(--info-bg); border-radius:var(--radius-sm);}
 .rn-num, .rn-mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;}
@@ -11859,15 +11860,53 @@ async function rnCargarSugerencias(locId){
   if(RN.sug[locId]) return;
   RN.sug[locId] = [];
   let [ins, rec] = await Promise.all([
-    supa.from('location_ingredient_activation').select('group_ingredients(code, name, unidad)').eq('location_id', locId).eq('active', true),
-    supa.from('recipes').select('code, name, activa, unidad_descarga, yield_unit, areas(name)').eq('location_id', locId)
+    supa.from('location_ingredient_activation').select('group_ingredients(code, name, unidad, costo)').eq('location_id', locId).eq('active', true),
+    supa.from('recipes').select('code, name, activa, unidad_descarga, yield_unit, yield_qty, ingredients, area_id, areas(name)').eq('location_id', locId)
   ]);
-  if(rec.error) rec = await supa.from('recipes').select('code, name, activa, yield_unit').eq('location_id', locId);
+  if(rec.error) rec = await supa.from('recipes').select('code, name, activa, yield_unit, yield_qty, ingredients, area_id').eq('location_id', locId);
+  if(!Object.keys(INGREDIENT_COST_MAP).length) await loadIngredientCosts();
+  const recetas = rec.data || [];
   const lista = [];
-  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad) }); });
-  (rec.data || []).forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : ''), unidad: rnUnidadDe(r.unidad_descarga || r.yield_unit) }); });
+  (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad), ...rnPrecioInsumo(g) }); });
+  recetas.forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : ''), unidad: rnUnidadDe(r.unidad_descarga || r.yield_unit), ...rnPrecioReceta(r, recetas) }); });
   RN.sug[locId] = lista;
   if(RN.locId === locId) rnPintar();
+}
+// Precio por kg / l / und según el grupo de la unidad (MASA, VOLUMEN, CONTEO).
+function rnPorDeGrupo(u){ return { MASA: 'kg', VOLUMEN: 'l', CONTEO: 'und' }[unitGroup(u)] || null; }
+function rnPrecioInsumo(g){
+  const c = parseFloat(g.costo), por = rnPorDeGrupo(g.unidad);
+  return c > 0 && por ? { precio: c, por, origen: 'catalogo', incompleto: false } : {};
+}
+// Costo de una receta del restaurante con sus ingredientes (insumos del catálogo y subrecetas del mismo área o del punto).
+function rnCostoReceta(r, recetas, visto){
+  visto = visto || new Set();
+  if(visto.has(r.code)) return { total: 0, incompleto: true };
+  visto.add(r.code);
+  let total = 0, incompleto = false;
+  (r.ingredients || []).forEach(ing => {
+    const q = parseFloat(String(ing.qty).replace(',', '.')) || 0;
+    if(ing.code === 'AGUA' || !q) return;
+    const sub = recetas.find(x => x.code === ing.code && x.area_id === r.area_id) || recetas.find(x => x.code === ing.code);
+    if(sub){
+      const rinde = toBaseQty(parseFloat(sub.yield_qty), sub.yield_unit);
+      if(!rinde || unitGroup(ing.unit) !== unitGroup(sub.yield_unit)){ incompleto = true; return; }
+      const c = rnCostoReceta(sub, recetas, new Set(visto));
+      if(c.incompleto) incompleto = true;
+      total += toBaseQty(q, ing.unit) * c.total / rinde;
+      return;
+    }
+    const info = INGREDIENT_COST_MAP[ing.code];
+    if(!info || info.costo === null || info.costo === undefined || unitGroup(ing.unit) !== unitGroup(info.unidad)){ incompleto = true; return; }
+    total += toBaseQty(q, ing.unit) * parseFloat(info.costo);
+  });
+  return { total, incompleto };
+}
+function rnPrecioReceta(r, recetas){
+  const rinde = toBaseQty(parseFloat(r.yield_qty), r.yield_unit), por = rnPorDeGrupo(r.yield_unit);
+  if(!rinde || !por) return {};
+  const c = rnCostoReceta(r, recetas);
+  return c.total > 0 ? { precio: c.total / rinde, por, origen: 'receta', incompleto: c.incompleto } : {};
 }
 // GR/KG/ML/L/UND (o parecidos) → unidad de la ficha (g, kg, ml, l, und). '' si no se reconoce.
 function rnUnidadDe(u){
@@ -11977,7 +12016,7 @@ function rnFichaHtml(d, loc){
   const filas = d.filas.map((f, i) => `
     <div class="rn-row">
       <div class="rn-ingcel"><input type="text" data-rn-f="ing" data-i="${i}" value="${escapeHtml(f.ing)}" list="rnToteatList" placeholder="Ingrediente" aria-label="Ingrediente">
-        ${f.code ? `<span class="rn-tt rn-cod" title="Código en la app">${escapeHtml(f.code)}</span>` : ''}${f.toteat ? `<span class="rn-tt" title="Precio de Toteat">Toteat ${escapeHtml(fmtFechaCorta(f.toteat.fecha))}</span>` : ''}</div>
+        ${f.code ? `<span class="rn-tt rn-cod" title="Código en la app">${escapeHtml(f.code)}</span>` : ''}${f.app ? `<span class="rn-tt${f.app.incompleto ? ' rn-tt-warn' : ''}" title="${f.app.origen === 'receta' ? 'Costo de la receta en la app' + (f.app.incompleto ? ': le faltan costos a algunos ingredientes' : '') : 'Costo del catálogo de insumos'}">${f.app.origen === 'receta' ? (f.app.incompleto ? 'Costo incompleto' : 'Costo receta') : 'Catálogo'}</span>` : ''}${f.toteat ? `<span class="rn-tt" title="Precio de Toteat">Toteat ${escapeHtml(fmtFechaCorta(f.toteat.fecha))}</span>` : ''}</div>
       <input type="text" inputmode="decimal" data-rn-f="peso" data-i="${i}" value="${escapeHtml(f.peso)}" aria-label="Peso neto" class="rn-num">
       <select data-rn-f="unidad" data-i="${i}" aria-label="Unidad">${RN_UNIDADES.map(u => `<option ${u === f.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select>
       <div class="rn-precio"><input type="text" inputmode="decimal" data-rn-f="precio" data-i="${i}" value="${escapeHtml(f.precio)}" placeholder="$" aria-label="Precio" class="rn-num">
@@ -12209,7 +12248,7 @@ function rnCampo(ev){
     const f = d.filas[+el.dataset.i], k = el.dataset.rnF;
     if(!f) return;
     f[k] = el.value; RN.dirty = true;
-    if(k === 'precio' || k === 'por') f.toteat = null;
+    if(k === 'precio' || k === 'por'){ f.toteat = null; f.app = null; }
     // Al elegir un insumo de Toteat (evento change), trae su precio si la línea no tiene uno puesto a mano.
     if(k === 'ing' && ev.type === 'change'){
       const s = rnSugDe(f.ing), antes = f.code || '';
@@ -12220,12 +12259,18 @@ function rnCampo(ev){
         if(!f.precio) f.por = { g: 'kg', kg: 'kg', ml: 'l', l: 'l', und: 'und' }[s.unidad];
       }
       const t = rnToteatDe(f.ing);
-      if(t && t.costo > 0 && (!f.precio || f.toteat)){
+      if(t && t.costo > 0 && (!f.precio || f.toteat || f.app)){
         const p = rnDesdeToteat(t);
-        f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha };
+        f.precio = String(Math.round(p.precio)); f.por = p.por; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha }; f.app = null;
         if(t.unidad && /^(g|gr|kg|kilo)/i.test(t.unidad) && f.unidad === 'und') f.unidad = 'g';
         rnPintar(); return;
       }
+      if(s && s.precio > 0 && (!f.precio || f.app)){
+        f.precio = String(Math.round(s.precio)); f.por = s.por; f.toteat = null;
+        f.app = { origen: s.origen, incompleto: !!s.incompleto };
+        rnPintar(); return;
+      }
+      if(!s && f.app){ f.app = null; f.precio = ''; rnPintar(); return; }
       if((f.code || '') !== antes || cambioUnidad){ rnPintar(); return; }
     }
     rnRecalcular();
