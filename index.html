@@ -11870,7 +11870,7 @@ async function rnCargarSugerencias(locId){
   (ins.data || []).forEach(r => { const g = r.group_ingredients; if(g && g.name) lista.push({ nombre: g.name, code: g.code || '', tipo: 'Insumo', unidad: rnUnidadDe(g.unidad), ...rnPrecioInsumo(g) }); });
   recetas.forEach(r => { if(r.name && !esProductoCarta(r) && r.activa !== false) lista.push({ nombre: r.name, code: r.code || '', tipo: 'Receta' + (r.areas && r.areas.name ? ' · ' + r.areas.name : ''), unidad: rnUnidadDe(r.unidad_descarga || r.yield_unit), ...rnPrecioReceta(r, recetas) }); });
   RN.sug[locId] = lista;
-  if(RN.locId === locId) rnPintar();
+  if(RN.locId === locId){ rnPreciosApp(); rnPintar(); }
 }
 // Precio por kg / l / und según el grupo de la unidad (MASA, VOLUMEN, CONTEO).
 function rnPorDeGrupo(u){ return { MASA: 'kg', VOLUMEN: 'l', CONTEO: 'und' }[unitGroup(u)] || null; }
@@ -11918,6 +11918,24 @@ function rnUnidadDe(u){
   if(/^(l|lt|litro)/.test(s)) return 'l';
   if(/^(und|un|unidad|porci)/.test(s)) return 'und';
   return '';
+}
+function rnPreciosApp(){
+  const d = RN.draft;
+  if(!d || !(RN.sug[RN.locId] || []).length) return 0;
+  let n = 0;
+  d.filas.forEach(f => {
+    if(!f.ing || (f.precio && !f.app)) return;
+    const s = rnSugDe(f.ing);
+    if(!s) return;
+    if(!f.code) f.code = s.code;
+    if(s.precio > 0){
+      const p = String(Math.round(s.precio)), inc = !!s.incompleto;
+      if(f.precio === p && f.por === s.por && f.app && f.app.incompleto === inc) return;
+      f.precio = p; f.por = s.por; f.app = { origen: s.origen, incompleto: inc }; n++;
+    }
+  });
+  if(n) RN.dirty = true;
+  return n;
 }
 function rnSugDe(nombre){
   const n = rnNorm(nombre);
@@ -11974,6 +11992,7 @@ function rnSeleccionar(id, sinPintar){
     rend_unidades: f.rend_unidades === null || f.rend_unidades === undefined ? '' : String(f.rend_unidades), rend_gramos: f.rend_gramos === null || f.rend_gramos === undefined ? '' : String(f.rend_gramos), filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
   if(RN.draft && !RN.draft.filas.length) RN.draft.filas.push(rnFilaVacia());
   RN.dirty = false;
+  rnPreciosApp();
   if(!sinPintar) rnPintar();
 }
 
