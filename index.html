@@ -1124,6 +1124,21 @@ nav.tabs button{position:relative;}
 .ini-mon{flex-direction:column; align-items:stretch; gap:6px; padding:8px 0;} .ini-mon:hover{background:var(--surface-2);}
 .ini-mon-top{display:flex; justify-content:space-between; gap:8px; font-size:14px;} .ini-mon-top span{font:600 12px 'IBM Plex Mono',monospace; color:var(--text-muted);}
 .ini-mon small{font-size:12px; color:var(--text-muted);}
+/* Acta de entrega de eventos */
+.modal-box.acta-box{max-width:min(860px, 96vw); width:100%; max-height:92vh; overflow-y:auto; padding:var(--space-4) var(--space-5) var(--space-5);}
+.acta-cab{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:var(--space-3);}
+.acta-cab h3{margin:2px 0 0;}
+.acta-acc{display:flex; flex-wrap:wrap; gap:8px;}
+.acta-cuerpo{display:flex; flex-direction:column; gap:8px;}
+.acta-sec{margin-top:var(--space-3); font-weight:700; font-size:15px;}
+.acta-fila{display:grid; grid-template-columns:200px minmax(0, 1fr); align-items:center; gap:10px;}
+.acta-fila > span{font-size:14px; font-weight:600; color:var(--text-muted);}
+.acta-crono-fila{display:grid; grid-template-columns:200px minmax(0, 1fr) 36px; gap:8px; align-items:center;}
+.acta-crono-cab{font-size:13px; font-weight:600; color:var(--text-muted);}
+.acta-x{all:unset; cursor:pointer; text-align:center; font-size:20px; font-weight:700; color:var(--danger); border-radius:8px; padding:4px 0;}
+.acta-x:focus-visible{box-shadow:var(--focus-ring);}
+.acta-fact{display:flex; gap:18px;}
+@media (max-width:600px){ .acta-fila{grid-template-columns:1fr; gap:4px;} .acta-crono-fila{grid-template-columns:110px minmax(0, 1fr) 32px;} }
 /* Visor de facturas */
 .modal-box.fac-visor{max-width:min(960px, 96vw); width:100%; padding:var(--space-4) var(--space-5) var(--space-5);}
 .fac-visor-cab{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:var(--space-3);}
@@ -11008,6 +11023,10 @@ function renderCosteoEventoForm(){
       <button class="btn btn-ghost btn-small" id="evExpPdf">PDF</button>
       <button class="btn btn-ghost btn-small" id="evExpTxt">Copiar texto</button>
     </div>
+    ${d.id ? `<div class="section-label">Acta de entrega</div>
+    ${d.estadoOriginal === 'confirmado'
+      ? `<button class="btn btn-secondary btn-block" id="evActa" style="margin-bottom:10px;">${eventosPuedeEditar() ? 'Acta de entrega (ver y editar)' : 'Ver acta de entrega'}</button>`
+      : '<div class="empty-note" style="margin-bottom:10px;">El acta de entrega se genera cuando el evento está <b>confirmado</b>.</div>'}` : ''}
     <div id="evPreview"></div>
 
     <div style="display:flex; gap:10px; margin-top:14px;">
@@ -11044,6 +11063,8 @@ function renderCosteoEventoForm(){
   document.getElementById('evExpPdf').addEventListener('click', ()=>eventoExportarPdf(d));
   const docBtn = document.getElementById('evDocCompleto');
   if(docBtn) docBtn.addEventListener('click', ()=>eventoDocumentoCompleto(d));
+  const actaBtn = document.getElementById('evActa');
+  if(actaBtn) actaBtn.addEventListener('click', () => actaAbrir(d));
   const descBtn = document.getElementById('evDocDescargar');
   if(descBtn) descBtn.addEventListener('click', async e=>{
     const btn = e.currentTarget, texto = btn.textContent;
@@ -11230,10 +11251,242 @@ function renderCosteoEventoForm(){
 
 // Quien no puede editar eventos ve el mismo formulario bloqueado: puede revisar el menú y la cotización
 // y descargarla, pero no cambia, guarda ni borra nada.
+/* ---------- ACTA DE ENTREGA DE EVENTOS (sql/eventos_actas.sql, decisiones de Miguel 26 nov) ----------
+   Solo eventos confirmados. La crean y editan super admin y Eventos (eventosPuedeEditar); la ven, en solo lectura y con
+   descarga en PDF, los del restaurante del evento (RLS). El menú no se guarda en el acta: sale siempre del evento
+   (la misma tabla de la cotización, con precios). Formato del acta de Grupo Junín (logo en plantillas/grupo-junin/). */
+const ACTA = { ev: null, a: null, nueva: false, dirty: false, logo: null };
+function actaFechaTexto(f){
+  if(!f) return '';
+  const t = new Date(f + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+async function actaAbrir(d){
+  if(!d || !d.id) return;
+  ACTA.ev = d; ACTA.a = null; ACTA.dirty = false;
+  actaModal().classList.add('open');
+  document.getElementById('actaBox').innerHTML = '<div class="empty-note">Cargando el acta...</div>';
+  const { data, error } = await supa.from('eventos_actas').select('*').eq('evento_id', d.id).maybeSingle();
+  if(error){ document.getElementById('actaBox').innerHTML = '<div class="empty-note">No se pudo cargar el acta: ' + escapeHtml(error.message) + '</div>'; return; }
+  if(data){ ACTA.a = { ...data, cronograma: (data.cronograma || []).map(x => ({ ...x })) }; if(!ACTA.a.cronograma.length) ACTA.a.cronograma.push({ hora: '', momento: '' }); ACTA.nueva = false; }
+  else if(eventosPuedeEditar()){
+    // Primera vez: se llena con los datos del evento y del Seguimiento (abono y factura).
+    const seg = await supa.from('eventos_seguimiento').select('anticipo_valor, factura').eq('evento_id', d.id).maybeSingle();
+    const s = seg.data || {};
+    const r = restauranteDe(d.restaurante_id);
+    ACTA.a = {
+      evento_id: d.id, titulo: d.cliente || d.nombre || '',
+      fecha_hora: [actaFechaTexto(d.fecha), (d.horario || '').trim()].filter(Boolean).join(' / '),
+      sede: r ? r.name : '', invitados: toNum(d.invitados) ? String(toNum(d.invitados)) : '',
+      abono: toNum(s.anticipo_valor) ? fmtMoney(toNum(s.anticipo_valor)) : '',
+      cronograma: [{ hora: '', momento: '' }], observaciones: d.notas || '',
+      factura: s.factura === true ? true : s.factura === false ? false : null,
+      fecha_entrega: toISODate(new Date()), lider_comercial: d.encargado || ''
+    };
+    ACTA.nueva = true; ACTA.dirty = true;
+  }
+  actaPintar();
+}
+function actaModal(){
+  let m = document.getElementById('actaModal');
+  if(m) return m;
+  m = document.createElement('div'); m.id = 'actaModal'; m.className = 'modal-overlay';
+  m.innerHTML = '<div class="modal-box acta-box" role="dialog" aria-modal="true" aria-labelledby="actaTit"><div id="actaBox"></div></div>';
+  document.body.appendChild(m);
+  m.addEventListener('click', e => { if(e.target === m) actaCerrar(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && m.classList.contains('open')) actaCerrar(); });
+  m.addEventListener('input', actaCampo);
+  m.addEventListener('change', actaCampo);
+  m.addEventListener('click', actaClick);
+  return m;
+}
+function actaCerrar(){
+  if(ACTA.dirty && ACTA.a && eventosPuedeEditar() && !confirm(ACTA.nueva ? 'El acta todavía no está guardada. ¿Cerrar igual?' : 'Hay cambios sin guardar en el acta. ¿Cerrar igual?')) return;
+  ACTA.dirty = false;
+  const m = document.getElementById('actaModal'); if(m) m.classList.remove('open');
+}
+function actaPintar(){
+  const box = document.getElementById('actaBox'), d = ACTA.ev, a = ACTA.a, ed = eventosPuedeEditar();
+  if(!a){
+    box.innerHTML = '<div class="acta-cab"><h3 id="actaTit">Acta de entrega</h3><button type="button" class="btn btn-secondary btn-small" data-acta="cerrar">Cerrar</button></div>'
+      + '<div class="empty-note">Todavía no hay acta de entrega para este evento. La hace el equipo de Eventos.</div>';
+    return;
+  }
+  const dis = ed ? '' : ' disabled';
+  const t = eventoCalcTotals(d);
+  const inp = (k, label, ph) => '<label class="acta-fila"><span>' + label + '</span><input type="text" data-acta-k="' + k + '" value="' + escapeHtml(a[k] || '') + '"' + (ph ? ' placeholder="' + escapeHtml(ph) + '"' : '') + dis + '></label>';
+  const crono = (a.cronograma || []).map((c, i) => '<div class="acta-crono-fila">'
+    + '<input type="text" data-acta-c="hora" data-i="' + i + '" value="' + escapeHtml(c.hora || '') + '" placeholder="7:00pm a 7:30pm" aria-label="Hora"' + dis + '>'
+    + '<input type="text" data-acta-c="momento" data-i="' + i + '" value="' + escapeHtml(c.momento || '') + '" placeholder="Hora de llegada, ofrecer..." aria-label="Momento"' + dis + '>'
+    + (ed ? '<button type="button" class="acta-x" data-acta="quitar" data-i="' + i + '" aria-label="Quitar fila">×</button>' : '')
+    + '</div>').join('');
+  box.innerHTML = '<div class="acta-cab"><div><span class="section-label" style="margin:0;">Acta de entrega</span><h3 id="actaTit">' + escapeHtml(a.titulo || d.cliente || d.nombre || 'Evento') + '</h3>'
+    + (ACTA.nueva ? '<div class="modal-sub">Llena con los datos del evento. Revísala y guárdala.</div>' : a.actualizado_por ? '<div class="modal-sub">Última edición: ' + escapeHtml(a.actualizado_por) + ' · ' + escapeHtml(new Date(a.updated_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })) + '</div>' : '') + '</div>'
+    + '<div class="acta-acc">' + (ed ? '<button type="button" class="btn btn-accent btn-small" data-acta="guardar" id="actaGuardar">' + (ACTA.dirty ? 'Guardar acta' : 'Guardada') + '</button>' : '')
+    + '<button type="button" class="btn btn-secondary btn-small" data-acta="pdf"' + (ACTA.nueva ? ' disabled title="Guárdala primero"' : '') + '>Descargar PDF</button>'
+    + '<button type="button" class="btn btn-ghost btn-small" data-acta="cerrar">Cerrar</button></div></div>'
+    + '<div class="acta-cuerpo">'
+    + inp('titulo', 'Cotización')
+    + '<div class="acta-sec">1. Información general</div>'
+    + inp('fecha_hora', 'Fecha y hora del evento', 'Domingo 13 de diciembre / 7:00pm a 2:00am') + inp('sede', 'Sede') + inp('invitados', 'Invitados') + inp('abono', 'Abono', '$5.000.000')
+    + '<div class="acta-sec">2. Menú</div>'
+    + '<div class="empty-note" style="margin:0 0 8px;">Sale de la cotización del evento: para cambiarlo, edita el evento.</div>'
+    + '<div class="ev-table-wrap">' + eventoCotizacionTabla(eventoCotizacionFilas(d, t)) + '</div>'
+    + '<div class="ev-sum-row total"><span>Total a pagar</span><span>' + fmtMoney(t.total) + '</span></div>'
+    + '<div class="acta-sec">3. Cronograma</div>'
+    + '<div class="acta-crono-fila acta-crono-cab"><span>Hora</span><span>Momento</span>' + (ed ? '<span></span>' : '') + '</div>' + crono
+    + (ed ? '<button type="button" class="btn btn-ghost btn-small" data-acta="fila" style="margin-top:6px;">+ Agregar fila</button>' : '')
+    + '<div class="acta-sec">4. Observaciones</div>'
+    + '<textarea data-acta-k="observaciones" rows="4" aria-label="Observaciones"' + dis + '>' + escapeHtml(a.observaciones || '') + '</textarea>'
+    + '<div class="acta-sec">5. Facturación electrónica</div>'
+    + '<div class="acta-fact">' + [['si', 'Sí'], ['no', 'No']].map(([v, tx]) => '<label class="cb"><input type="radio" name="actaFact" value="' + v + '"' + ((v === 'si' && a.factura === true) || (v === 'no' && a.factura === false) ? ' checked' : '') + dis + '> ' + tx + '</label>').join('') + '</div>'
+    + '<label class="acta-fila"><span>Fecha de entrega</span><input type="date" data-acta-k="fecha_entrega" value="' + escapeHtml(a.fecha_entrega || '') + '"' + dis + '></label>'
+    + inp('lider_comercial', 'Líder comercial')
+    + '</div>';
+}
+function actaMarcar(){ ACTA.dirty = true; const g = document.getElementById('actaGuardar'); if(g) g.textContent = 'Guardar acta'; }
+function actaCampo(ev){
+  const el = ev.target, a = ACTA.a;
+  if(!a || !eventosPuedeEditar()) return;
+  if(el.dataset.actaK){ a[el.dataset.actaK] = el.value; actaMarcar(); if(el.dataset.actaK === 'titulo'){ const t = document.getElementById('actaTit'); if(t) t.textContent = el.value || 'Evento'; } return; }
+  if(el.dataset.actaC){ a.cronograma[+el.dataset.i][el.dataset.actaC] = el.value; actaMarcar(); return; }
+  if(el.name === 'actaFact' && ev.type === 'change'){ a.factura = el.value === 'si'; actaMarcar(); }
+}
+async function actaClick(ev){
+  const b = ev.target.closest('[data-acta]');
+  if(!b) return;
+  const act = b.dataset.acta, a = ACTA.a;
+  if(act === 'cerrar'){ actaCerrar(); return; }
+  if(act === 'fila'){ a.cronograma.push({ hora: '', momento: '' }); actaMarcar(); actaPintar(); const x = document.querySelectorAll('[data-acta-c="hora"]'); if(x.length) x[x.length - 1].focus(); return; }
+  if(act === 'quitar'){ a.cronograma.splice(+b.dataset.i, 1); if(!a.cronograma.length) a.cronograma.push({ hora: '', momento: '' }); actaMarcar(); actaPintar(); return; }
+  if(act === 'guardar'){
+    b.disabled = true;
+    const fila = {
+      evento_id: ACTA.ev.id, titulo: (a.titulo || '').trim() || null, fecha_hora: (a.fecha_hora || '').trim() || null, sede: (a.sede || '').trim() || null,
+      invitados: (a.invitados || '').trim() || null, abono: (a.abono || '').trim() || null,
+      cronograma: (a.cronograma || []).filter(c => (c.hora || '').trim() || (c.momento || '').trim()).map(c => ({ hora: (c.hora || '').trim(), momento: (c.momento || '').trim() })),
+      observaciones: (a.observaciones || '').trim() || null, factura: a.factura === true ? true : a.factura === false ? false : null,
+      fecha_entrega: a.fecha_entrega || null, lider_comercial: (a.lider_comercial || '').trim() || null,
+      actualizado_por: profile.name || session.user.email
+    };
+    if(ACTA.nueva) fila.creado_por = fila.actualizado_por;
+    const { data, error } = await supa.from('eventos_actas').upsert(fila, { onConflict: 'evento_id' }).select().single();
+    b.disabled = false;
+    if(error){ showToast('No se guardó el acta: ' + error.message, 'danger'); return; }
+    ACTA.a = { ...data, cronograma: (data.cronograma || []).map(x => ({ ...x })) };
+    if(!ACTA.a.cronograma.length) ACTA.a.cronograma.push({ hora: '', momento: '' });
+    ACTA.nueva = false; ACTA.dirty = false;
+    showToast('Acta guardada', 'ok'); actaPintar(); return;
+  }
+  if(act === 'pdf'){
+    if(ACTA.dirty && eventosPuedeEditar() && !confirm('Hay cambios sin guardar. El PDF sale con lo que ves en pantalla. ¿Seguir?')) return;
+    const texto = b.textContent; b.disabled = true; b.textContent = 'Generando PDF...';
+    try{ await actaDescargarPdf(ACTA.ev, ACTA.a); showToast('Acta descargada', 'ok'); }
+    catch(err){ showToast('No se pudo generar el PDF: ' + err.message, 'danger'); }
+    finally{ b.disabled = false; b.textContent = texto; }
+  }
+}
+// Logo de Grupo Junín con el fondo gris claro de la imagen pasado a blanco puro (para que no se note el recuadro).
+async function actaLogo(){
+  if(ACTA.logo) return ACTA.logo;
+  const img = new Image();
+  await new Promise((ok, mal) => { img.onload = ok; img.onerror = () => mal(new Error('No se pudo cargar el logo')); img.src = 'plantillas/grupo-junin/logo.jpg'; });
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const px = x.getImageData(0, 0, c.width, c.height), p = px.data;
+  for(let i = 0; i < p.length; i += 4) if(p[i] > 200 && p[i + 1] > 200 && p[i + 2] > 200){ p[i] = p[i + 1] = p[i + 2] = 255; }
+  x.putImageData(px, 0, 0);
+  return ACTA.logo = c.toDataURL('image/png');
+}
+function actaNombreArchivo(d, a){
+  const limpio = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50);
+  return ['Acta_de_entrega', limpio(a.titulo || d.cliente || d.nombre), d.fecha].filter(Boolean).join('_') + '.pdf';
+}
+// Documento del acta (ancho de diseño 1414 px = A4 como la cotización; la tabla del menú usa los estilos de la plantilla del restaurante).
+function actaDocumentoHtml(d, a, logo){
+  const t = eventoCalcTotals(d), pl = plantillaCotizacion(d) || {};
+  const fila = (k, v) => '<tr><th>' + escapeHtml(k) + '</th><td>' + escapeHtml(v || '') + '</td></tr>';
+  const crono = (a.cronograma || []).filter(c => (c.hora || '').trim() || (c.momento || '').trim());
+  const fact = a.factura === true ? 'SI <u>&nbsp;x&nbsp;</u> &nbsp; NO ____' : a.factura === false ? 'SI ____ &nbsp; NO <u>&nbsp;x&nbsp;</u>' : 'SI ____ &nbsp; NO ____';
+  const fEnt = a.fecha_entrega ? a.fecha_entrega.split('-').reverse().join('/') : '';
+  return '<!doctype html><html><head><meta charset="utf-8">'
+    + '<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">'
+    + '<style>' + COTIZ_DOC_CSS + (pl.css || '') + ACTA_DOC_CSS + '</style></head><body><div id="acta">'
+    + '<div class="ac-blk ac-top"><img class="ac-logo" src="' + logo + '"><div class="ac-titulo">ACTA DE ENTREGA</div></div>'
+    + '<div class="ac-blk ac-cot">Cotización: &nbsp;' + escapeHtml(a.titulo || d.cliente || d.nombre || '') + '</div>'
+    + '<div class="ac-blk ac-h ac-h1">1. &nbsp; Información general</div>'
+    + '<table class="ac-info">' + fila('Fecha y hora del evento', a.fecha_hora) + fila('Sede', a.sede) + fila('Invitados', a.invitados) + fila('Abono', a.abono) + '</table>'
+    + '<div class="ac-blk ac-h ac-h1">2. &nbsp; Menú</div>'
+    + '<div class="pl-tabla-zona ac-menu"><table class="pl-tabla"><thead><tr><th>Categoría</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>'
+    + cotizacionBloquesHtml(d, t).join('') + '</table>' + cotizacionTotalesHtml(d, t) + '</div>'
+    + '<div class="ac-blk ac-h">3. Cronograma</div>'
+    + '<table class="ac-crono"><tr><th>Hora</th><th>Momento</th></tr>' + (crono.length ? crono.map(c => '<tr><td>' + escapeHtml(c.hora) + '</td><td>' + escapeHtml(c.momento) + '</td></tr>').join('') : '<tr><td>&nbsp;</td><td></td></tr>') + '</table>'
+    + '<div class="ac-blk ac-h">4. Observaciones</div>'
+    + (a.observaciones || '').split('\n').filter(x => x.trim()).map(x => '<div class="ac-blk ac-obs">' + escapeHtml(x) + '</div>').join('')
+    + '<div class="ac-blk ac-pie"><b>5. Facturación Electrónica: ' + fact + '</b></div>'
+    + '<div class="ac-blk ac-pie"><b>Fecha de entrega:</b> ' + escapeHtml(fEnt) + '</div>'
+    + '<div class="ac-blk ac-pie"><b>Líder comercial:</b> ' + escapeHtml(a.lider_comercial || '') + '</div>'
+    + '</div></body></html>';
+}
+const ACTA_DOC_CSS = ` html,body{background:#fff;} #acta{width:1414px; padding:0 150px; box-sizing:border-box; font-family:'Montserrat',Arial,sans-serif; color:#111; font-size:24px;}
+  .ac-top{display:flex; justify-content:space-between; align-items:flex-end; padding-top:10px;} .ac-logo{width:300px;}
+  .ac-titulo{font-weight:700; font-size:24px; padding-bottom:4px;} .ac-cot{font-weight:700; margin-top:40px;}
+  .ac-h{font-weight:700; margin:44px 0 20px;} .ac-h1{margin-left:46px;}
+  table.ac-info, table.ac-crono{width:100%; border-collapse:collapse; font-size:24px;}
+  table.ac-info th, table.ac-info td, table.ac-crono th, table.ac-crono td{border:2px solid #111; padding:10px 12px; text-align:left; vertical-align:top;}
+  table.ac-info th{width:400px; font-weight:700;} table.ac-info td{font-weight:400;}
+  table.ac-crono th{font-weight:700; width:50%;}
+  .ac-menu{position:static; width:100%; font-size:19px;}
+  .ac-obs{margin:6px 0 0 90px;} .ac-pie{margin-top:14px;} .ac-pie:first-of-type{margin-top:30px;}`;
+// PDF: se dibuja el acta completa y se corta en hojas A4 en los bordes de filas y bloques (no parte una fila por la mitad).
+async function actaDescargarPdf(d, a){
+  await cargarJsPdf();
+  const logo = await actaLogo();
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed; left:-10000px; top:0; width:1500px; height:2000px; border:0;';
+  document.body.appendChild(iframe);
+  try{
+    await new Promise(resolve => { iframe.onload = resolve; iframe.srcdoc = actaDocumentoHtml(d, a, logo); });
+    const win = iframe.contentWindow, doc = iframe.contentDocument;
+    try{ await doc.fonts.ready; } catch(e){}
+    await new Promise((resolve, reject) => {
+      const s = doc.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.integrity = HUELLA_HTML2CANVAS; s.crossOrigin = 'anonymous';
+      s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar el generador de imágenes'));
+      doc.head.appendChild(s);
+    });
+    const raiz = doc.getElementById('acta');
+    iframe.style.height = (raiz.scrollHeight + 100) + 'px';
+    await new Promise(r => setTimeout(r, 150));
+    const top0 = raiz.getBoundingClientRect().top;
+    const cortes = [...raiz.querySelectorAll('.ac-blk, table.ac-info tr, table.ac-crono tr, table.pl-tabla > thead, table.pl-tabla > tbody, .pl-totales-wrap')]
+      .map(el => Math.ceil(el.getBoundingClientRect().bottom - top0)).sort((x, y) => x - y);
+    const ANCHO = 1414, ALTO = 2000, MARGEN = 120, UTIL = ALTO - 2 * MARGEN, total = raiz.scrollHeight;
+    const esc = 1654 / ANCHO;
+    const canvas = await win.html2canvas(raiz, { scale: esc, useCORS: true, backgroundColor: '#ffffff', width: ANCHO, windowWidth: 1500 });
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+    let y = 0, pag = 0;
+    while(y < total - 2){
+      let fin = Math.min(total, y + UTIL);
+      if(fin < total){ const c = cortes.filter(v => v > y + 40 && v <= y + UTIL); if(c.length) fin = c[c.length - 1]; }
+      const hoja = document.createElement('canvas'); hoja.width = Math.round(ANCHO * esc); hoja.height = Math.round(ALTO * esc);
+      const g = hoja.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, hoja.width, hoja.height);
+      g.drawImage(canvas, 0, Math.round(y * esc), canvas.width, Math.round((fin - y) * esc), 0, Math.round(MARGEN * esc), canvas.width, Math.round((fin - y) * esc));
+      if(pag > 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(hoja.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
+      y = fin; pag++;
+    }
+    pdf.save(actaNombreArchivo(d, a));
+  } finally {
+    iframe.remove();
+  }
+}
+
 function eventoFormSoloLectura(){
   if(eventosPuedeEditar()) return;
   const body = document.getElementById('costeoDetailBody');
-  const libres = new Set(['evCancel', 'evDocDescargar', 'evDocCompleto', 'evExpPng', 'evExpPdf', 'evExpTxt']);
+  const libres = new Set(['evCancel', 'evDocDescargar', 'evDocCompleto', 'evExpPng', 'evExpPdf', 'evExpTxt', 'evActa']);
   body.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
   body.querySelectorAll('button').forEach(b => { if(!libres.has(b.id)) b.disabled = true; });
   ['evSave', 'evDelete'].forEach(id => { const b = document.getElementById(id); if(b) b.style.display = 'none'; });
