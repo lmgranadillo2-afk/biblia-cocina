@@ -11989,6 +11989,7 @@ async function rnAbrir(){
   await rnCargarFichas();
   rnPintar();
   rnCargarSugerencias(RN.locId);
+  if(!RN.toteat[RN.locId]) rnTraerToteat();
 }
 function rnCerrar(){
   if(RN.dirty && !confirm('Hay cambios sin guardar en la ficha. ¿Salir igual?')) return;
@@ -12179,6 +12180,20 @@ async function rnTraerToteat(){
   if(error && error.context && typeof error.context.json === 'function'){ try { const j = await error.context.json(); if(j && j.error) msg = j.error; } catch(e){} }
   RN.toteat[locId] = msg ? { estado: 'error', msg, at: new Date().toISOString() }
     : { estado: 'ok', insumos: data.insumos || [], total: data.total || 0, con_precio: data.con_precio || 0, at: new Date().toISOString() };
+  if(RN.locId === locId && !msg){
+    const d = RN.draft; let n = 0;
+    if(d) d.filas.forEach(f => {
+      if(!f.ing || (f.precio && !f.app && !f.toteat)) return;
+      const t = rnToteatDe(f.ing, f.code);
+      if(!t || !(t.costo > 0)) return;
+      const p = rnDesdeToteat(t), precio = String(Math.round(p.precio));
+      if(f.precio === precio && f.toteat) return;
+      f.precio = precio; f.por = p.por; f.app = null; f.toteat = { nombre: t.nombre, unidad: t.unidad, costo: t.costo, fecha: t.fecha };
+      if(!f.code && t.codigo && !/^\d+$/.test(t.codigo)) f.code = t.codigo;
+      n++;
+    });
+    if(n) RN.dirty = true;
+  }
   if(RN.locId === locId) rnPintar();
   if(!msg && !(data.total)) showToast('Toteat respondió, pero sin insumos en los últimos 42 días', 'warn');
 }
@@ -12278,7 +12293,7 @@ function rnCampo(ev){
     if(ev.type !== 'change') return;
     if(RN.dirty && !confirm('Hay cambios sin guardar en esta ficha. ¿Cambiar de restaurante igual?')){ el.value = RN.locId; return; }
     RN.locId = el.value; RN.selId = null; RN.pasar = null; RN.dirty = false;
-    rnCargarFichas().then(rnPintar); rnCargarSugerencias(RN.locId); return;
+    rnCargarFichas().then(rnPintar); rnCargarSugerencias(RN.locId); if(!RN.toteat[RN.locId]) rnTraerToteat(); return;
   }
   if(!d) return;
   if(el.dataset.rnH){ d[el.dataset.rnH] = el.value; RN.dirty = true; if(el.dataset.rnRepintar){ if(ev.type === 'change') rnPintar(); return; } rnRecalcular(); return; }
