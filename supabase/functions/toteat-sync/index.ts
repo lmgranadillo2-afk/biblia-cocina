@@ -299,6 +299,15 @@ function tramos(ini: string, end: string, dias: number): [string, string][] {
 //    lo esperado (inicial + compras + transformaciones + uso por ventas) contra lo contado.
 // Precios de insumos (fichas de recetas nuevas): último costo unitario de cada insumo del inventario de
 // Toteat en los últimos 14 días. Una sola consulta. También sirve para probar las claves del restaurante.
+// Costo unitario de un día de inventario (o de un ingrediente): Toteat no siempre usa el mismo nombre de campo.
+function costoDe(o: any): number {
+  for (const k of ["cost", "cost_average", "cost_last_inbound", "unit_cost", "unitCost", "average_cost", "averageCost", "avg_cost", "weighted_cost", "last_cost", "lastCost", "last_purchase_cost", "price"]) {
+    const v = Number(o?.[k]);
+    if (v > 0) return v;
+  }
+  return 0;
+}
+
 async function preciosInsumos(loc: { id: string; slug: string; name: string }) {
   const { cred, faltan, prefijo } = credenciales(loc.slug);
   if (faltan.length) throw new ErrorSync(`Faltan credenciales de Toteat para ${loc.name}: ${faltan.map((k) => `${prefijo}_${k.toUpperCase()}`).join(", ")}.`);
@@ -313,13 +322,15 @@ async function preciosInsumos(loc: { id: string; slug: string; name: string }) {
     if (!nombre) continue;
     let costo = 0, fecha = "";
     for (const w of ing.warehouses ?? []) {
-      for (const d of w.inventories ?? []) {
-        const c = Number(d.cost), f = String(d.date ?? "");
+      for (const d of w.inventory ?? w.inventories ?? []) {
+        const c = costoDe(d), f = String(d.date ?? "");
         if (c > 0 && f >= fecha) { costo = c; fecha = f; }
       }
     }
+    if (!costo) costo = costoDe(ing); // algunos Toteat mandan el costo en el ingrediente y no por día
     const previo = porNombre.get(norm(nombre));
-    const codigo = String(ing.product_id ?? ing.productId ?? ing.code ?? "").trim();
+    // El código visible (ej. PRO071) si Toteat lo manda; si no, el id interno numérico.
+    const codigo = String(ing.code ?? ing.sku ?? ing.product_code ?? ing.productCode ?? ing.external_id ?? ing.product_id ?? ing.productId ?? "").trim();
     if (!previo || (costo > 0 && fecha >= previo.fecha)) porNombre.set(norm(nombre), { nombre, codigo: codigo || previo?.codigo || "", unidad: String(ing.unit ?? ""), costo, fecha });
   }
   const insumos = [...porNombre.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
