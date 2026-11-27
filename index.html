@@ -1198,6 +1198,12 @@ nav.tabs button{position:relative;}
 .rn-rinde input{width:70px; border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px 6px;}
 .rn-rinde select{border:1px solid var(--border-strong) !important; border-radius:6px; padding:4px;}
 .rn-poru{color:var(--text-muted);}
+.rn-pv{display:grid; grid-template-columns:260px 170px minmax(0, 1fr); background:#DCE6F2; border-bottom:2px solid var(--text);}
+.rn-pv > *{padding:6px 8px; border-bottom:1px solid var(--text); border-right:2px solid var(--text) !important; display:flex; align-items:center; gap:6px;}
+.rn-pv > :nth-child(3n){border-right:0 !important;}
+.rn-pv label{font-weight:700;}
+.rn-pv-in{background:#FFFFFF;} .rn-pv-in input{flex:1; min-width:0; background:#FFFFFF;}
+.rn-pv-r{background:#FFFFFF; font-size:13px; color:var(--text-muted);} .rn-pv-r b{font:600 14px 'IBM Plex Mono',monospace; color:var(--text);} .rn-pv-r b.rn-err{color:var(--danger);}
 .rn-emp{display:grid; grid-template-columns:260px 110px 80px minmax(0, 1fr); background:#DCE6F2; border-bottom:2px solid var(--text);}
 .rn-emp > *{padding:6px 8px; border-bottom:1px solid var(--text); border-right:2px solid var(--text) !important; display:flex; align-items:center;}
 .rn-emp > :nth-child(4n){border-right:0 !important;}
@@ -12262,6 +12268,8 @@ function rnSeleccionar(id, sinPintar){
   RN.draft = f ? { id: f.id, codigo: f.codigo || '', nombre: f.nombre || '', categoria: f.categoria || '', rinde: f.rinde === null ? '' : String(f.rinde),
     rinde_unidad: f.rinde_unidad || 'kg', procedimiento: f.procedimiento || '',
     unidad_descarga: f.unidad_descarga || '', tipo: f.tipo || 'plato', empaque_ref: f.empaque_ref === null || f.empaque_ref === undefined ? '' : String(f.empaque_ref), empaque_unidad: f.empaque_unidad || 'g',
+    precio_venta: f.precio_venta == null ? '' : String(f.precio_venta), ico_pct: f.ico_pct == null ? '8' : String(f.ico_pct),
+    merma_pct: f.merma_pct == null ? '0' : String(f.merma_pct), foodcost_obj: f.foodcost_obj == null ? '30' : String(f.foodcost_obj),
     rend_unidades: f.rend_unidades === null || f.rend_unidades === undefined ? '' : String(f.rend_unidades), rend_gramos: f.rend_gramos === null || f.rend_gramos === undefined ? '' : String(f.rend_gramos), filas: (f.filas || []).map(x => ({ ...rnFilaVacia(), ...x })) } : null;
   if(RN.draft && !RN.draft.filas.length) RN.draft.filas.push(rnFilaVacia());
   RN.dirty = false;
@@ -12347,6 +12355,16 @@ function rnFichaHtml(d, loc){
           <span id="rnPorU" class="rn-poru"></span>
         </div>
       </div>
+      ${d.tipo !== 'subreceta' ? `<div class="rn-proc-tit">PRECIO DE VENTA</div>
+      <div class="rn-pv">
+        <label for="rnPvMerma">MERMA O IMPREVISTOS</label><span class="rn-pv-in"><input id="rnPvMerma" type="text" inputmode="decimal" data-rn-h="merma_pct" value="${escapeHtml(d.merma_pct)}" class="rn-num"> %</span><span class="rn-pv-r">Costo del plato <b id="rnPvCosto"></b></span>
+        <label for="rnPvPrecio">PRECIO EN CARTA (CON ICO)</label><span class="rn-pv-in">$ <input id="rnPvPrecio" type="text" inputmode="decimal" data-rn-h="precio_venta" value="${escapeHtml(d.precio_venta)}" class="rn-num" placeholder="42.000"></span><span class="rn-pv-r" id="rnPvNota"></span>
+        <label for="rnPvIcoPct">ICO</label><span class="rn-pv-in"><input id="rnPvIcoPct" type="text" inputmode="decimal" data-rn-h="ico_pct" value="${escapeHtml(d.ico_pct)}" class="rn-num"> %</span><span class="rn-pv-r"><b id="rnPvIco"></b></span>
+        <label>VENTA SIN ICO</label><span class="rn-pv-in"></span><span class="rn-pv-r"><b id="rnPvSin"></b></span>
+        <label>FOOD COST</label><span class="rn-pv-in"></span><span class="rn-pv-r"><b id="rnPvFc"></b></span>
+        <label>UTILIDAD BRUTA</label><span class="rn-pv-in"></span><span class="rn-pv-r"><b id="rnPvUtil"></b></span>
+        <label for="rnPvObj">FOOD COST OBJETIVO</label><span class="rn-pv-in"><input id="rnPvObj" type="text" inputmode="decimal" data-rn-h="foodcost_obj" value="${escapeHtml(d.foodcost_obj)}" class="rn-num"> %</span><span class="rn-pv-r">Precio sugerido (con ICO) <b id="rnPvSug"></b></span>
+      </div>` : ''}
       ${d.tipo === 'subreceta' ? `<div class="rn-proc-tit">EMPAQUE</div>
       <div class="rn-emp">
         <label for="rnEmpRef">REFERENCIA DE EMPAQUE</label><input id="rnEmpRef" type="text" inputmode="decimal" data-rn-h="empaque_ref" value="${escapeHtml(d.empaque_ref)}" class="rn-num" placeholder="30">
@@ -12363,6 +12381,18 @@ function rnFichaHtml(d, loc){
 }
 function fmtFechaCorta(yyyymmdd){ const s = String(yyyymmdd || ''); return /^\d{8}$/.test(s) ? fmtFecha(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`) : s; }
 
+// Porcentaje escrito ("8", "8,5"); vacío = el valor por defecto.
+function rnPct(v, def){ const s = String(v == null ? '' : v).trim(); if(s === '') return def; const n = parseFloat(s.replace(',', '.')); return isFinite(n) && n >= 0 ? n : def; }
+// Precio de venta de un plato terminado. Margen y food cost sobre la venta SIN ICO (el ICO es del Estado), como la Calculadora de precios.
+function rnPrecioVenta(d, costoIng){
+  const merma = rnPct(d.merma_pct, 0), ico = rnPct(d.ico_pct, 8), obj = rnPct(d.foodcost_obj, 30);
+  const costo = costoIng * (1 + merma / 100), precio = rnNum(d.precio_venta);
+  const sinIco = precio ? precio / (1 + ico / 100) : 0;
+  const sugerido = costo && obj > 0 && obj < 100 ? Math.ceil(costo / (obj / 100) * (1 + ico / 100) / 500) * 500 : 0;
+  return { merma, ico, obj, costo, precio, sinIco, icoValor: precio - sinIco, fc: sinIco ? costo / sinIco * 100 : null,
+    utilidad: sinIco - costo, utilPct: sinIco ? (sinIco - costo) / sinIco * 100 : null, sugerido };
+}
+const rnPctTxt = n => n == null ? '—' : n.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' %';
 function rnRecalcular(){
   const d = RN.draft;
   if(!d) return;
@@ -12381,6 +12411,17 @@ function rnRecalcular(){
     put('rnEmpCostoU', und && total ? fmtMoney(total / und) + ' por und' : '');
     put('rnEmpCostoKg', gr && total ? fmtMoney(total / gr * 1000) + ' por kg' : '');
     r = 0;
+  }
+  if(d.tipo !== 'subreceta' && document.getElementById('rnPvCosto')){
+    const v = rnPrecioVenta(d, total), put = (id, t) => { const el = document.getElementById(id); if(el) el.textContent = t; };
+    put('rnPvCosto', fmtMoney(v.costo) || '$0');
+    put('rnPvIco', v.precio ? fmtMoney(v.icoValor) : '—');
+    put('rnPvSin', v.precio ? fmtMoney(v.sinIco) : '—');
+    put('rnPvFc', rnPctTxt(v.fc));
+    const fcEl = document.getElementById('rnPvFc'); if(fcEl) fcEl.classList.toggle('rn-err', v.fc != null && v.fc > v.obj);
+    put('rnPvUtil', v.precio ? fmtMoney(v.utilidad) + ' · ' + rnPctTxt(v.utilPct) : '—');
+    put('rnPvSug', v.sugerido ? fmtMoney(v.sugerido) : '—');
+    put('rnPvNota', v.precio && v.fc != null ? (v.fc > v.obj ? 'Por encima del objetivo: sube el precio o baja el costo.' : 'Dentro del objetivo.') : 'Escribe el precio de carta para ver el margen.');
   }
   const tot = document.getElementById('rnTotal'), pu = document.getElementById('rnPorU');
   if(tot) tot.textContent = fmtMoney(total) || '$0';
@@ -12414,6 +12455,7 @@ async function rnGuardar(){
   const fila = {
     codigo: d.codigo.trim() || null, nombre: d.nombre.trim(), categoria: d.categoria.trim() || null,
     rinde: rnCant(d.rinde) || null, rinde_unidad: d.rinde_unidad, procedimiento: d.procedimiento.trim() || null,
+    precio_venta: rnNum(d.precio_venta) || null, ico_pct: rnPct(d.ico_pct, 8), merma_pct: rnPct(d.merma_pct, 0), foodcost_obj: rnPct(d.foodcost_obj, 30) || 30,
     unidad_descarga: d.unidad_descarga || null, tipo: d.tipo, empaque_ref: rnCant(d.empaque_ref) || null, empaque_unidad: d.empaque_unidad, rend_unidades: rnCant(d.rend_unidades) || null, rend_gramos: rnCant(d.rend_gramos) || null,
     filas: d.filas.filter(f => f.ing.trim() || f.peso || f.precio).map(f => ({ ...f, ing: f.ing.trim() }))
   };
@@ -12599,6 +12641,19 @@ async function rnDescargar(){
     filas.push(['Referencia de empaque', rnCant(d.empaque_ref) || '', { g: 'GR', ml: 'ML', und: 'UND' }[d.empaque_unidad] || '', '', '', '', und && total ? 'Costo por empaque ' + fmtMoney(total / und) : '']);
     filas.push(['Rendimiento en unidades', und || '', 'UND', '', '', '', '']);
     filas.push(['Rendimiento en gramos', gr || '', 'GR', '', '', '', gr && total ? fmtMoney(total / gr * 1000) + ' por kg' : '']);
+  }
+  if(d.tipo !== 'subreceta'){
+    const v = rnPrecioVenta(d, total);
+    filas.push(['PRECIO DE VENTA', '', '', '', '', '', '']);
+    filas.push(['Merma o imprevistos', v.merma, '%', '', '', Math.round(v.costo), 'Costo del plato']);
+    if(v.precio){
+      filas.push(['Precio en carta (con ICO)', '', '', Math.round(v.precio), '', '', '']);
+      filas.push(['ICO ' + rnPctTxt(v.ico), '', '', Math.round(v.icoValor), '', '', '']);
+      filas.push(['Venta sin ICO', '', '', Math.round(v.sinIco), '', '', '']);
+      filas.push(['Food cost', '', '', '', '', '', rnPctTxt(v.fc)]);
+      filas.push(['Utilidad bruta', '', '', Math.round(v.utilidad), '', '', rnPctTxt(v.utilPct)]);
+    }
+    filas.push(['Food cost objetivo ' + rnPctTxt(v.obj), '', '', v.sugerido || '', '', '', 'Precio sugerido (con ICO)']);
   }
   if(d.procedimiento.trim()) filas.push(['PROCEDIMIENTO', '', '', '', '', '', d.procedimiento.trim()]);
   await exportarTabla({ formato, titulo: (d.codigo ? d.codigo + ' · ' : '') + (d.nombre || 'Receta nueva'),
